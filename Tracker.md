@@ -13,17 +13,17 @@
 
 # Foundation
 
-* [ ] Repository
-* [ ] Frontend
-* [ ] Backend
-* [ ] PostgreSQL
-* [ ] Environment configuration
-* [ ] Alembic
-* [ ] Health endpoint
-* [ ] API error handling
-* [ ] Logging
-* [ ] CORS
-* [ ] Base routing
+* [x] Repository
+* [x] Frontend
+* [x] Backend
+* [-] PostgreSQL
+* [x] Environment configuration
+* [x] Alembic
+* [x] Health endpoint
+* [x] API error handling
+* [x] Logging
+* [x] CORS
+* [x] Base routing
 
 ---
 
