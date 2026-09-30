@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/feedback/EmptyState";
@@ -20,6 +21,7 @@ function errorMessage(error: unknown): string {
 
 export function DashboardPage() {
   const health = useHealth();
+  const navigate = useNavigate();
   const databaseLabel =
     health.data?.database === "ok" ? "Database connected" : "Database unavailable";
 
@@ -32,7 +34,16 @@ export function DashboardPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_320px]">
         <EmptyState
           title="No work queued"
-          description="Leads, audits, and follow-ups will show up here."
+          description="Add a lead to start the acquisition workflow."
+          action={
+            <Button
+              onClick={() => {
+                navigate("/leads/new");
+              }}
+            >
+              Add lead
+            </Button>
+          }
         />
         <Card>
           <h2 className="text-h4 font-semibold text-ink">System</h2>

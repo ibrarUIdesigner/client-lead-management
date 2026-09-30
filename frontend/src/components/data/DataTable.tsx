@@ -20,6 +20,7 @@ type DataTableProps<T> = {
   onRetry?: () => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  emptyAction?: ReactNode;
   page?: number;
   pageCount?: number;
   onPageChange?: (page: number) => void;
@@ -34,6 +35,7 @@ export function DataTable<T>({
   onRetry,
   emptyTitle = "Nothing here yet",
   emptyDescription = "Records will show up here.",
+  emptyAction,
   page,
   pageCount,
   onPageChange,
@@ -62,7 +64,7 @@ export function DataTable<T>({
 
       {!isLoading && !error && rows.length === 0 ? (
         <div className="p-6">
-          <EmptyState title={emptyTitle} description={emptyDescription} />
+          <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
         </div>
       ) : null}
 

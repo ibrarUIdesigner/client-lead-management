@@ -77,23 +77,23 @@
 
 # Leads
 
-* [ ] Create lead
-* [ ] Edit lead
-* [ ] Delete lead
-* [ ] Search
-* [ ] Filters
-* [ ] Sorting
-* [ ] Pagination
-* [ ] Tags
-* [ ] Notes
-* [ ] Contacts
-* [ ] Status changes
-* [ ] CSV import
-* [ ] CSV validation
-* [ ] Bulk updates
-* [ ] Lead List
-* [ ] Add Lead
-* [ ] Lead Details
+* [x] Create lead
+* [x] Edit lead
+* [x] Delete lead
+* [x] Search
+* [x] Filters
+* [x] Sorting
+* [x] Pagination
+* [x] Tags
+* [x] Notes
+* [x] Contacts
+* [x] Status changes
+* [x] CSV import
+* [x] CSV validation
+* [x] Bulk updates
+* [x] Lead List
+* [x] Add Lead
+* [x] Lead Details
 
 ---
 
@@ -103,7 +103,7 @@
 * [ ] Pipeline snapshot
 * [ ] Follow-up widget
 * [ ] Recent activity
-* [ ] Quick add lead
+* [x] Quick add lead
 * [ ] Loading state
 * [ ] Empty state
 * [ ] Error state
@@ -182,13 +182,13 @@
 
 # Pipeline
 
-* [ ] Kanban
-* [ ] Columns
-* [ ] Drag/drop
-* [ ] Optimistic update
-* [ ] API persistence
-* [ ] Rollback on failure
-* [ ] Mobile pipeline
+* [x] Kanban
+* [x] Columns
+* [x] Drag/drop
+* [x] Optimistic update
+* [x] API persistence
+* [x] Rollback on failure
+* [x] Mobile pipeline
 
 ---
 
