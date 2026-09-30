@@ -36,6 +36,12 @@ _TONES = {
     "brief": "Keep the body under 80 words.",
 }
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,40}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$")
+_GEMINI_FALLBACK_MODELS = (
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+)
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -218,6 +224,104 @@ def draft_email(
     return parse_draft(raw)
 
 
+def suggest_offer(
+    *,
+    business: str,
+    industry: str | None,
+    has_website: bool,
+    findings: list[tuple[str, str]],
+    scores: dict[str, int],
+    settings: Settings,
+    client: httpx.Client | None = None,
+) -> tuple[str, str]:
+    """Return (offer, source) where source is ai, audit, or default."""
+    fallback = offer_from_findings(
+        has_website=has_website,
+        industry=industry,
+        findings=findings,
+        scores=scores,
+    )
+    provider = resolve_email_provider(settings)
+    if provider is None:
+        return fallback, "audit" if findings or scores else "default"
+
+    prompt = _offer_instructions(
+        business=business,
+        industry=industry,
+        has_website=has_website,
+        findings=findings,
+        scores=scores,
+    )
+    owns_client = client is None
+    http = client or httpx.Client(timeout=30.0)
+    try:
+        try:
+            if provider == "gemini":
+                raw = _gemini_offer(http, settings, prompt)
+            else:
+                raw = _groq_offer(http, settings, prompt)
+        except AppError as exc:
+            if not _should_try_groq(settings, provider, exc):
+                logger.warning("offer_suggest_failed code=%s", exc.code)
+                return fallback, "audit" if findings or scores else "default"
+            logger.warning("offer_suggest_fallback provider=groq")
+            raw = _groq_offer(http, settings, prompt)
+    except (httpx.TimeoutException, httpx.HTTPError, AppError):
+        logger.warning("offer_suggest_failed")
+        return fallback, "audit" if findings or scores else "default"
+    finally:
+        if owns_client:
+            http.close()
+
+    offer = _parse_offer(raw)
+    if not offer:
+        return fallback, "audit" if findings or scores else "default"
+    return offer, "ai"
+
+
+def offer_from_findings(
+    *,
+    has_website: bool,
+    industry: str | None,
+    findings: list[tuple[str, str]],
+    scores: dict[str, int],
+) -> str:
+    label = (industry or "business").strip().lower() or "business"
+    if not has_website:
+        return NEW_SITE_OFFER
+
+    weak = [
+        (name, score)
+        for name, score in scores.items()
+        if isinstance(score, int) and score < 60
+    ]
+    weak.sort(key=lambda item: item[1])
+    titles = [title for title, _detail in findings[:3] if title.strip()]
+
+    if weak and titles:
+        score_name = _SCORE_LABELS.get(weak[0][0], weak[0][0]).lower()
+        focus = titles[0].rstrip(".")
+        return (
+            f"I help local {label}s improve {score_name} and fix issues like "
+            f"{focus}, starting with a clearer homepage that makes the next step obvious."
+        )
+    if titles:
+        focus = titles[0].rstrip(".")
+        extra = f" and {titles[1].rstrip('.')}" if len(titles) > 1 else ""
+        return (
+            f"I redesign websites for local {label}s, focusing on {focus}{extra}, "
+            f"with a homepage that makes the next step obvious."
+        )
+    if weak:
+        parts = [_SCORE_LABELS.get(name, name).lower() for name, _score in weak[:2]]
+        joined = " and ".join(parts)
+        return (
+            f"I improve {joined} for local {label} websites, starting with a homepage "
+            f"that loads cleanly and makes the next step obvious."
+        )
+    return DEFAULT_OFFER
+
+
 def parse_draft(raw: str) -> tuple[str, str]:
     payload = _json_object(raw)
     subject = payload.get("subject")
@@ -263,29 +367,78 @@ def _instructions(facts: str, purpose: str) -> str:
 
 
 def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> str:
-    model = settings.gemini_model.strip()
-    response = _post(
-        client,
-        _GEMINI_URL.format(model=model),
-        headers={"x-goog-api-key": settings.gemini_api_key.strip()},
-        json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.5,
-                "maxOutputTokens": 4096,
-                "responseMimeType": "application/json",
-                "responseSchema": {
-                    "type": "OBJECT",
-                    "properties": {
-                        "subject": {"type": "STRING"},
-                        "body": {"type": "STRING"},
-                    },
-                    "required": ["subject", "body"],
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.5,
+            "maxOutputTokens": 4096,
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "subject": {"type": "STRING"},
+                    "body": {"type": "STRING"},
                 },
+                "required": ["subject", "body"],
             },
         },
-    )
-    _raise_for_status(response, "gemini")
+    }
+    response = _gemini_generate(client, settings, payload)
+    return _gemini_text(response)
+
+
+def _gemini_offer(client: httpx.Client, settings: Settings, prompt: str) -> str:
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.4,
+            "maxOutputTokens": 512,
+            "responseMimeType": "application/json",
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {"offer": {"type": "STRING"}},
+                "required": ["offer"],
+            },
+        },
+    }
+    response = _gemini_generate(client, settings, payload)
+    return _gemini_text(response)
+
+
+def _gemini_generate(client: httpx.Client, settings: Settings, payload: dict[str, object]) -> httpx.Response:
+    models: list[str] = []
+    preferred = settings.gemini_model.strip()
+    if preferred:
+        models.append(preferred)
+    for model in _GEMINI_FALLBACK_MODELS:
+        if model not in models:
+            models.append(model)
+    last: httpx.Response | None = None
+    for model in models:
+        response = _post(
+            client,
+            _GEMINI_URL.format(model=model),
+            headers={"x-goog-api-key": settings.gemini_api_key.strip()},
+            json=payload,
+        )
+        if response.status_code < 400:
+            if model != preferred:
+                logger.info("email_draft_model_fallback model=%s", model)
+            return response
+        last = response
+        if response.status_code not in {404, 429}:
+            break
+        logger.warning(
+            "email_draft_model_retry model=%s status=%s",
+            model,
+            response.status_code,
+        )
+    assert last is not None
+    _raise_for_status(last, "gemini")
+    return last
+
+
+def _gemini_text(response: httpx.Response) -> str:
     payload = _response_json(response)
     candidates = payload.get("candidates") if isinstance(payload, dict) else None
     if not isinstance(candidates, list) or not candidates:
@@ -333,6 +486,86 @@ def _groq(client: httpx.Client, settings: Settings, prompt: str) -> str:
     if not isinstance(content, str) or not content.strip():
         _invalid_draft()
     return content
+
+
+def _groq_offer(client: httpx.Client, settings: Settings, prompt: str) -> str:
+    response = _post(
+        client,
+        _GROQ_URL,
+        headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
+        json={
+            "model": settings.groq_model.strip(),
+            "temperature": 0.4,
+            "max_tokens": 256,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You write one short outreach offer sentence and return JSON only.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        },
+    )
+    _raise_for_status(response, "groq")
+    payload = _response_json(response)
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        _invalid_draft()
+    message = choices[0].get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, str) or not content.strip():
+        _invalid_draft()
+    return content
+
+
+def _offer_instructions(
+    *,
+    business: str,
+    industry: str | None,
+    has_website: bool,
+    findings: list[tuple[str, str]],
+    scores: dict[str, int],
+) -> str:
+    lines = [
+        "Write one short first-person offer for an outreach email.",
+        "One or two sentences. Max 220 characters. No quotes. No bullet list.",
+        "Do not mention AI, audits, scores as numbers, or that this was generated.",
+        "Speak as a web designer/developer helping a local business.",
+        f"Business: {business.strip()}",
+    ]
+    if industry and industry.strip():
+        lines.append(f"Industry: {industry.strip()}")
+    if not has_website:
+        lines.append("They have no website. Offer to create a clear professional site.")
+    else:
+        lines.append("They have a website. Offer a redesign or improvement tied to the issues.")
+        weak = [
+            f"{_SCORE_LABELS.get(name, name)} {score}/100"
+            for name, score in scores.items()
+            if isinstance(score, int) and score < 80
+        ]
+        if weak:
+            lines.append("Weak areas: " + ", ".join(weak[:4]))
+        if findings:
+            lines.append("Findings to address:")
+            lines.extend(f"- {title}: {detail}" for title, detail in findings[:4])
+    lines.append('Return JSON with key "offer".')
+    return "\n".join(lines)
+
+
+def _parse_offer(raw: str) -> str | None:
+    try:
+        payload = _json_object(raw)
+    except AppError:
+        return None
+    value = payload.get("offer")
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.split()).strip(" \"'")
+    if not 20 <= len(cleaned) <= 400:
+        return None
+    return cleaned[:400]
 
 
 def _post(client: httpx.Client, url: str, **kwargs: object) -> httpx.Response:

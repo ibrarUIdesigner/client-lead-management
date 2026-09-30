@@ -34,6 +34,11 @@ class OutreachUpdate(BaseModel):
     message: str | None = Field(default=None, max_length=20000)
 
 
+class OutreachOfferSuggestion(BaseModel):
+    offer: str
+    source: Literal["ai", "audit", "default"]
+
+
 class FollowupCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

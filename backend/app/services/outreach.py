@@ -14,9 +14,14 @@ from app.models.outreach import OutreachMessage, OutreachTemplate
 from app.models.website_audit import WebsiteAudit
 from app.repositories.activities import ActivityRepository
 from app.repositories.leads import LeadRepository
-from app.schemas.outreach import OutreachCreate, OutreachGenerate, OutreachUpdate
+from app.schemas.outreach import (
+    OutreachCreate,
+    OutreachGenerate,
+    OutreachOfferSuggestion,
+    OutreachUpdate,
+)
 from app.schemas.workspace import OutreachMessageRead
-from app.services.outreach_ai import build_brief, draft_email
+from app.services.outreach_ai import build_brief, draft_email, suggest_offer
 from app.services.outreach_copy import (
     compose_outreach,
     finding_items,
@@ -44,6 +49,39 @@ class OutreachService:
     def list_for_lead(self, lead_id: UUID) -> list[OutreachMessageRead]:
         self._require_lead(lead_id)
         return self.workspace.list_messages(lead_id)
+
+    def suggest_offer(self, lead_id: UUID) -> OutreachOfferSuggestion:
+        lead = self._require_lead(lead_id)
+        settings = get_settings()
+        audit = self._completed_audit(lead.id)
+        report = None
+        scores: dict[str, int] = {}
+        issues = None
+        if audit is not None:
+            issues = audit.issues
+            if isinstance(audit.raw_analysis, dict):
+                report = audit.raw_analysis.get("report")
+            scores = {
+                name: score
+                for name, score in {
+                    "performance": audit.performance_score,
+                    "design": audit.design_score,
+                    "seo": audit.seo_score,
+                    "mobile": audit.mobile_score,
+                    "ux": audit.ux_score,
+                }.items()
+                if isinstance(score, int) and score < 80
+            }
+        has_website = bool(lead.website_url) and lead.website_status != "missing"
+        offer, source = suggest_offer(
+            business=lead.business_name,
+            industry=lead.industry,
+            has_website=has_website,
+            findings=finding_items(issues, report),
+            scores=scores,
+            settings=settings,
+        )
+        return OutreachOfferSuggestion(offer=offer, source=source)
 
     def generate(self, lead_id: UUID, data: OutreachGenerate) -> OutreachMessageRead:
         lead = self._require_lead(lead_id)

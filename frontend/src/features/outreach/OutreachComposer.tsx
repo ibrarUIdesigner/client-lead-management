@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useToast } from "../../components/feedback/useToast";
 import { Button } from "../../components/ui/Button";
@@ -8,7 +9,7 @@ import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { useLatestAudit } from "../../hooks/useAudit";
 import { useHealth } from "../../hooks/useHealth";
-import { useGenerateOutreach } from "../../hooks/useOutreach";
+import { useGenerateOutreach, useSuggestOutreachOffer } from "../../hooks/useOutreach";
 import { useOutreachTemplates } from "../../hooks/useWorkspace";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
@@ -42,6 +43,7 @@ export function OutreachComposer({
   onCreated,
 }: OutreachComposerProps) {
   const { notify } = useToast();
+  const queryClient = useQueryClient();
   const templates = useOutreachTemplates();
   const audit = useLatestAudit(leadId);
   const health = useHealth();
@@ -51,12 +53,36 @@ export function OutreachComposer({
   const [tone, setTone] = useState<OutreachTone>(() => readTone());
   const [senderName, setSenderName] = useState(() => readStored(SENDER_KEY, ""));
   const [pending, setPending] = useState<"ai" | "template" | null>(null);
+  const [offerTouched, setOfferTouched] = useState(() => {
+    const stored = readStored(OFFER_KEY, "");
+    return Boolean(stored) && stored !== DEFAULT_OFFER;
+  });
+  const appliedSuggestion = useRef<string | null>(null);
   const activeTemplates = (templates.data ?? []).filter((item) => item.is_active);
   const missingAudit = audit.isError && apiErrorCode(audit.error) === "AUDIT_NOT_FOUND";
   const running = audit.data?.status === "PENDING" || audit.data?.status === "RUNNING";
+  const auditReady =
+    !hasWebsite ||
+    (audit.data?.status === "COMPLETED" && !running) ||
+    (audit.data?.status === "FAILED" && !running) ||
+    missingAudit;
+  const suggestion = useSuggestOutreachOffer(leadId, auditReady && !offerTouched);
   const lines = findingLines(audit.data);
   const provider = health.data?.email_drafts;
   const aiBlocked = provider === "unconfigured";
+
+  useEffect(() => {
+    const next = suggestion.data?.offer?.trim();
+    if (!next || offerTouched) {
+      return;
+    }
+    if (appliedSuggestion.current === next) {
+      return;
+    }
+    appliedSuggestion.current = next;
+    setOffer(next);
+    writeStored(OFFER_KEY, next);
+  }, [offerTouched, suggestion.data?.offer]);
 
   const createDraft = (useAi: boolean) => {
     setPending(useAi ? "ai" : "template");
@@ -92,6 +118,12 @@ export function OutreachComposer({
     );
   };
 
+  const refreshOffer = () => {
+    setOfferTouched(false);
+    appliedSuggestion.current = null;
+    void queryClient.invalidateQueries({ queryKey: ["outreach-offer", leadId] });
+  };
+
   return (
     <Card>
       <p className="text-caption font-semibold text-gray-500">1. What the email will say</p>
@@ -123,16 +155,29 @@ export function OutreachComposer({
               writeStored(SENDER_KEY, next);
             }}
           />
-          <Textarea
-            label="Your offer"
-            hint="What you want this email to propose."
-            value={offer}
-            onChange={(event) => {
-              const next = event.target.value;
-              setOffer(next);
-              writeStored(OFFER_KEY, next);
-            }}
-          />
+          <div>
+            <Textarea
+              label="Your offer"
+              hint={offerHint(suggestion.data?.source, suggestion.isFetching, offerTouched)}
+              value={offer}
+              onChange={(event) => {
+                const next = event.target.value;
+                setOfferTouched(true);
+                setOffer(next);
+                writeStored(OFFER_KEY, next);
+              }}
+            />
+            <div className="mt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={suggestion.isFetching || generate.isPending}
+                onClick={refreshOffer}
+              >
+                {suggestion.isFetching ? "Updating offer…" : "Suggest from audit"}
+              </Button>
+            </div>
+          </div>
           <Select
             label="Tone"
             value={tone}
@@ -206,6 +251,26 @@ export function OutreachComposer({
       </div>
     </Card>
   );
+}
+
+function offerHint(
+  source: "ai" | "audit" | "default" | undefined,
+  loading: boolean,
+  touched: boolean,
+): string {
+  if (loading) {
+    return "Building an offer from the latest audit findings…";
+  }
+  if (touched) {
+    return "Edited by you. Click Suggest from audit to replace it.";
+  }
+  if (source === "ai") {
+    return "Suggested from the audit findings with AI. Edit freely.";
+  }
+  if (source === "audit") {
+    return "Suggested from the audit findings. Edit freely.";
+  }
+  return "What you want this email to propose.";
 }
 
 function ExternalLink({ href, children }: { href: string; children: string }) {

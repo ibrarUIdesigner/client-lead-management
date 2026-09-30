@@ -326,13 +326,13 @@ def _assemble(
     directory_website: bool = False,
 ) -> FoundBusiness:
     website_url, facebook_url, instagram_url, status = _classify_web(website, facebook, instagram)
-    if directory_website and status == "missing":
-        status = "present"
+    claimed_website = directory_website and status == "missing" and website_url is None
+    if claimed_website:
         extra_lines = [
             *extra_lines,
             "The directory shows a website, but it does not publish the URL.",
         ]
-    score, pitch = _pitch(status, name, industry)
+    score, pitch = _pitch(status, name, industry, claimed_website=claimed_website)
     notes = _notes(address=address, pitch=pitch, extra_lines=extra_lines)
     tag = slugify(category)[:50] or "discovered"
     return FoundBusiness(
@@ -377,8 +377,17 @@ def _classify_web(
     return None, facebook_url, instagram_url, "missing"
 
 
-def _pitch(status: str, name: str, industry: str) -> tuple[int, str]:
+def _pitch(
+    status: str, name: str, industry: str, *, claimed_website: bool = False
+) -> tuple[int, str]:
     label = industry.strip() or "business"
+    if claimed_website:
+        return (
+            70,
+            f"{name} is listed with a website in the directory, but the URL is not public. "
+            f"Add the address before auditing, or pitch a new site if none exists for this "
+            f"{label.lower()}.",
+        )
     if status == "missing":
         return (
             85,

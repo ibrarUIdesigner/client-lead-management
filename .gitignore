@@ -29,3 +29,6 @@ Thumbs.db
 
 # Private audit and mockup files
 storage/
+
+# Local tooling / embedded Postgres
+.tools/

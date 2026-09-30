@@ -16,6 +16,11 @@ export type OutreachUpdateInput = {
   message?: string;
 };
 
+export type OutreachOfferSuggestion = {
+  offer: string;
+  source: "ai" | "audit" | "default";
+};
+
 export async function generateOutreach(
   leadId: string,
   payload: OutreachGenerateInput,
@@ -24,6 +29,11 @@ export async function generateOutreach(
     `/leads/${leadId}/outreach/generate`,
     payload,
   );
+  return response.data;
+}
+
+export async function suggestOutreachOffer(leadId: string): Promise<OutreachOfferSuggestion> {
+  const response = await api.get<OutreachOfferSuggestion>(`/leads/${leadId}/outreach/offer`);
   return response.data;
 }
 

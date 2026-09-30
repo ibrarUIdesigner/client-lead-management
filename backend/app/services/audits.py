@@ -62,6 +62,10 @@ class AuditService:
                 message="This website is already being analyzed.",
                 status_code=409,
             )
+        if not lead.website_url:
+            latest = self.audits.latest(lead_id)
+            if latest is not None and _is_missing_website_result(latest):
+                return latest, False
         audit = WebsiteAudit(
             lead_id=lead.id, url=lead.website_url, status=AuditStatus.PENDING.value
         )
@@ -155,20 +159,22 @@ class AuditService:
         except AuditRunError as exc:
             self._fail(audit, exc.message)
         except Exception:
-            logger.warning("audit_failed")
+            logger.exception("audit_failed")
             self._fail(audit, "The website could not be analyzed.")
 
     def _queue(
         self, lead: Lead, audit: WebsiteAudit, *, created: bool
     ) -> tuple[WebsiteAudit, bool]:
         if not lead.website_url:
+            already_recorded = _is_missing_website_result(audit)
             self._apply(audit, analyze_missing_website(), website_status="missing")
-            self.activities.add(
-                lead.id,
-                "audit_completed",
-                "Website audit completed",
-                description="No website address",
-            )
+            if not already_recorded:
+                self.activities.add(
+                    lead.id,
+                    "audit_completed",
+                    "No website address on file",
+                    description="Add a website URL on the lead before running a full audit.",
+                )
             self._touch_lead_status(lead, AuditStatus.COMPLETED.value)
             self.session.flush()
             self.session.refresh(audit)
@@ -305,6 +311,15 @@ class AuditService:
                 status_code=404,
             )
         return audit
+
+
+def _is_missing_website_result(audit: WebsiteAudit) -> bool:
+    if audit.status != AuditStatus.COMPLETED.value:
+        return False
+    issues = audit.issues
+    if not isinstance(issues, list):
+        return False
+    return any(isinstance(item, dict) and item.get("code") == "missing_website" for item in issues)
 
 
 def _clear_scores(audit: WebsiteAudit) -> None:

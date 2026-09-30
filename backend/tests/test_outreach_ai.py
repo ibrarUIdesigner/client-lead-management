@@ -56,7 +56,33 @@ def _brief():
     )
 
 
-def test_a_lead_without_a_website_offers_to_create_one() -> None:
+def test_offer_from_findings_mentions_the_weak_point() -> None:
+    from app.services.outreach_ai import offer_from_findings
+
+    offer = offer_from_findings(
+        has_website=True,
+        industry="Dentist",
+        findings=[("Slow pages", "The homepage took more than 4 seconds to load.")],
+        scores={"performance": 42, "seo": 55},
+    )
+
+    assert "performance" in offer.lower()
+    assert "Slow pages" in offer
+    assert "dentist" in offer.lower()
+
+
+def test_offer_from_findings_without_a_website() -> None:
+    from app.services.outreach_ai import NEW_SITE_OFFER, offer_from_findings
+
+    offer = offer_from_findings(
+        has_website=False,
+        industry="Cafe",
+        findings=[],
+        scores={},
+    )
+
+    assert offer == NEW_SITE_OFFER
+
     text = render_brief(
         build_brief(
             business="Northwind Cafe",

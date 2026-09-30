@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 MAX_REDIRECTS = 5
 NAVIGATION_TIMEOUT_MS = 20_000
-_browser_lock = asyncio.Lock()
+_browser_lock = threading.Lock()
 
 _PAGE_FACTS = """() => {
   const text = (document.body && document.body.innerText
@@ -154,23 +155,65 @@ class _Guard:
 
 
 async def capture_website(url: str) -> CapturedPage:
+    """Capture a public website in a worker thread.
+
+    Playwright needs subprocess support. Uvicorn on Windows can run a selector
+    loop that cannot spawn processes, so the browser run uses its own loop.
+    """
     assert_public_http_url(url)
-    async with _browser_lock:
+    try:
+        return await asyncio.to_thread(_capture_website_isolated, url)
+    except AuditRunError:
+        raise
+    except Exception:
+        logger.exception("audit_browser_failed")
+        raise AuditRunError("The website could not be analyzed.") from None
+
+
+def _capture_website_isolated(url: str) -> CapturedPage:
+    with _browser_lock:
+        return asyncio.run(_capture_website(url))
+
+
+async def _capture_website(url: str) -> CapturedPage:
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        logger.warning("audit_browser_unavailable")
+        raise AuditRunError(
+            "The website browser is not available. Install Playwright in the API environment."
+        ) from None
+    async with async_playwright() as playwright:
+        browser = await _launch_browser(playwright)
         try:
-            from playwright.async_api import async_playwright
-        except ImportError:
-            logger.warning("audit_browser_unavailable")
-            raise AuditRunError("The website browser is not available.") from None
-        async with async_playwright() as playwright:
-            try:
-                browser = await playwright.chromium.launch(headless=True)
-            except Exception:
-                logger.warning("audit_browser_unavailable")
-                raise AuditRunError("The website browser is not available.") from None
-            try:
-                return await _capture(browser, url)
-            finally:
-                await browser.close()
+            return await _capture(browser, url)
+        finally:
+            await browser.close()
+
+
+async def _launch_browser(playwright: Any) -> Any:
+    """Prefer Playwright Chromium, then the system Chrome or Edge install."""
+    attempts: list[dict[str, object]] = [
+        {},
+        {"channel": "chrome"},
+        {"channel": "msedge"},
+    ]
+    last_error: Exception | None = None
+    for options in attempts:
+        try:
+            return await playwright.chromium.launch(headless=True, **options)
+        except Exception as exc:
+            last_error = exc
+            label = options.get("channel", "chromium")
+            logger.warning("audit_browser_launch_failed channel=%s", label)
+    detail = str(last_error or "")
+    if "Executable doesn't exist" in detail or "playwright install" in detail.lower():
+        raise AuditRunError(
+            "The website browser is not installed. Run `playwright install chromium`, "
+            "or install Google Chrome / Microsoft Edge on this machine."
+        ) from None
+    logger.warning("audit_browser_unavailable")
+    raise AuditRunError("The website browser could not be started.") from None
 
 
 async def _capture(browser: Any, url: str) -> CapturedPage:
@@ -256,7 +299,11 @@ def _raise_navigation_error(guard: _Guard, exc: Exception) -> None:
         raise AuditRunError("The website took too long to respond.") from None
     if "ERR_NAME_NOT_RESOLVED" in text:
         raise AuditRunError("The website address could not be found.") from None
-    logger.warning("audit_navigation_failed")
+    if "ERR_CONNECTION" in text or "ERR_ADDRESS_UNREACHABLE" in text:
+        raise AuditRunError("The website could not be reached.") from None
+    if "ERR_HTTP_RESPONSE_CODE_FAILURE" in text or "net::ERR_" in text:
+        raise AuditRunError("The website refused the audit browser.") from None
+    logger.warning("audit_navigation_failed error=%s", text[:300])
     raise AuditRunError("The website could not be analyzed.") from None
 
 

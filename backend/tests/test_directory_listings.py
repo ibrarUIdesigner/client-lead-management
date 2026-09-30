@@ -43,8 +43,10 @@ def test_businesslist_reads_the_public_card() -> None:
     assert lead.source_key == "businesslist:257901"
     assert lead.phone == "+923001112233"
     assert "Mall Road" in (lead.notes or "")
-    assert lead.website_status == "present"
+    assert lead.website_status == "missing"
     assert lead.website_url is None
+    assert "does not publish the URL" in (lead.notes or "")
+    assert lead.lead_score == 70
     assert lead.google_maps_url is not None
 
 

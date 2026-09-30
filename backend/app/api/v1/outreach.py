@@ -3,7 +3,12 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.api.deps import SessionDep
-from app.schemas.outreach import OutreachCreate, OutreachGenerate, OutreachUpdate
+from app.schemas.outreach import (
+    OutreachCreate,
+    OutreachGenerate,
+    OutreachOfferSuggestion,
+    OutreachUpdate,
+)
 from app.schemas.workspace import OutreachMessageRead
 from app.services.outreach import OutreachService
 
@@ -13,6 +18,11 @@ router = APIRouter(tags=["outreach"])
 @router.get("/leads/{lead_id}/outreach", response_model=list[OutreachMessageRead])
 def list_lead_outreach(lead_id: UUID, session: SessionDep) -> list[OutreachMessageRead]:
     return OutreachService(session).list_for_lead(lead_id)
+
+
+@router.get("/leads/{lead_id}/outreach/offer", response_model=OutreachOfferSuggestion)
+def suggest_outreach_offer(lead_id: UUID, session: SessionDep) -> OutreachOfferSuggestion:
+    return OutreachService(session).suggest_offer(lead_id)
 
 
 @router.post(

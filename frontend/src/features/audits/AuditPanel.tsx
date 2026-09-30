@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
 import { useToast } from "../../components/feedback/useToast";
@@ -10,7 +10,7 @@ import { Skeleton } from "../../components/ui/Skeleton";
 import { Spinner } from "../../components/ui/Spinner";
 import { useLatestAudit, useRerunAudit, useStartAudit } from "../../hooks/useAudit";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
-import { cn } from "../../lib/cn";
+import { cn, focusRing } from "../../lib/cn";
 import { formatWhen } from "../../lib/format";
 import { screenshotUrl } from "../../services/audits";
 import type { Audit } from "../../types/audit";
@@ -37,6 +37,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
   const rerunAudit = useRerunAudit(leadId);
   const missing = audit.isError && apiErrorCode(audit.error) === "AUDIT_NOT_FOUND";
   const running = audit.data?.status === "PENDING" || audit.data?.status === "RUNNING";
+  const hasWebsite = Boolean(websiteUrl);
 
   const analyze = () => {
     startAudit.mutate(undefined, {
@@ -48,6 +49,10 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
   const retry = () => {
     if (!audit.data) {
+      return;
+    }
+    if (!hasWebsite) {
+      navigate(`/leads/${leadId}/edit`);
       return;
     }
     rerunAudit.mutate(audit.data.id, {
@@ -88,15 +93,36 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
   }
 
   if (missing || !audit.data) {
+    if (!hasWebsite) {
+      return (
+        <div>
+          <EmptyState
+            title="No website address on this lead"
+            description="A full audit needs a public URL. Add the website on the lead, or record that none is listed so you can pitch a new site."
+            action={
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => {
+                    navigate(`/leads/${leadId}/edit`);
+                  }}
+                >
+                  Add website URL
+                </Button>
+                <Button variant="secondary" onClick={analyze} isLoading={startAudit.isPending}>
+                  Confirm no website
+                </Button>
+              </div>
+            }
+          />
+        </div>
+      );
+    }
+
     return (
       <div>
         <EmptyState
           title="No website audit yet"
-          description={
-            websiteUrl
-              ? "Checks the homepage plus About, Contact, and a service page when they are linked."
-              : "This lead has no website address. You can still record that as an opportunity."
-          }
+          description="Checks the homepage plus About, Contact, and a service page when they are linked."
           action={
             <Button onClick={analyze} isLoading={startAudit.isPending}>
               Analyze website
@@ -129,7 +155,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
           description={audit.data.raw_analysis?.error || "Try the website again."}
           action={
             <Button onClick={retry} isLoading={rerunAudit.isPending}>
-              Try again
+              {hasWebsite ? "Try again" : "Add website URL"}
             </Button>
           }
         />
@@ -140,6 +166,8 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
   return (
     <AuditResults
       audit={audit.data}
+      leadId={leadId}
+      hasWebsite={hasWebsite}
       onRetry={retry}
       retrying={rerunAudit.isPending}
       onCreateMockup={() => {
@@ -151,17 +179,22 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
 function AuditResults({
   audit,
+  leadId,
+  hasWebsite,
   onRetry,
   retrying,
   onCreateMockup,
 }: {
   audit: Audit;
+  leadId: string;
+  hasWebsite: boolean;
   onRetry: () => void;
   retrying: boolean;
   onCreateMockup: () => void;
 }) {
   const analysis = audit.raw_analysis;
   const brand = analysis?.brand;
+  const missingWebsite = !hasWebsite || isMissingWebsiteAudit(audit);
   const scores = [
     { label: "Performance", value: audit.performance_score },
     { label: "Mobile", value: audit.mobile_score },
@@ -172,6 +205,27 @@ function AuditResults({
 
   return (
     <div className="space-y-4">
+      {missingWebsite ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <h2 className="text-h4 font-semibold text-amber-950">No URL to crawl</h2>
+          <p className="mt-2 text-body text-amber-900">
+            This result only confirms the lead has no website address on file. It did not open or
+            score a live site. Add the URL to run a real audit.
+          </p>
+          <div className="mt-4">
+            <Link
+              to={`/leads/${leadId}/edit`}
+              className={cn(
+                "inline-flex h-10 items-center rounded-control bg-amber-900 px-4 text-body font-semibold text-white hover:bg-amber-950",
+                focusRing,
+              )}
+            >
+              Add website URL
+            </Link>
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
@@ -190,9 +244,15 @@ function AuditResults({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={onRetry} isLoading={retrying}>
-              Run again
-            </Button>
+            {missingWebsite ? (
+              <Button variant="secondary" onClick={onRetry}>
+                Add website URL
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={onRetry} isLoading={retrying}>
+                Run again
+              </Button>
+            )}
             <Button onClick={onCreateMockup}>Create mockup</Button>
           </div>
         </div>
@@ -365,6 +425,10 @@ function AuditResults({
       ) : null}
     </div>
   );
+}
+
+function isMissingWebsiteAudit(audit: Audit): boolean {
+  return audit.issues.some((issue) => issue.code === "missing_website");
 }
 
 function OpportunityBars({ items }: { items: { code: string; label: string; points: number }[] }) {

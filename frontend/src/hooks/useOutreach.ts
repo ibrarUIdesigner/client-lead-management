@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
   generateOutreach,
   markOutreachContacted,
   markOutreachReplied,
+  suggestOutreachOffer,
   updateOutreach,
   type OutreachGenerateInput,
   type OutreachUpdateInput,
@@ -42,6 +43,15 @@ async function refreshWorkspace(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ["analytics"] }),
     queryClient.invalidateQueries({ queryKey: ["leads"] }),
   ]);
+}
+
+export function useSuggestOutreachOffer(leadId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["outreach-offer", leadId],
+    queryFn: () => suggestOutreachOffer(leadId),
+    enabled: Boolean(leadId) && enabled,
+    staleTime: 60_000,
+  });
 }
 
 export function useGenerateOutreach(leadId: string) {
