@@ -8,34 +8,29 @@ import { useLatestAudit } from "../../hooks/useAudit";
 import { useGenerateOutreach } from "../../hooks/useOutreach";
 import { useOutreachTemplates } from "../../hooks/useWorkspace";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
-import type { Contact } from "../../types/lead";
 import { findingLines } from "./findings";
 
 type OutreachComposerProps = {
   leadId: string;
-  contacts: Contact[];
+  email: string | null;
   onCreated: (messageId: string) => void;
 };
 
-export function OutreachComposer({ leadId, contacts, onCreated }: OutreachComposerProps) {
+export function OutreachComposer({ leadId, email, onCreated }: OutreachComposerProps) {
   const { notify } = useToast();
   const templates = useOutreachTemplates();
   const audit = useLatestAudit(leadId);
   const generate = useGenerateOutreach(leadId);
-  const primary = contacts.find((contact) => contact.is_primary) ?? contacts[0];
   const [templateId, setTemplateId] = useState("");
-  const [contactId, setContactId] = useState(primary?.id ?? "");
   const activeTemplates = (templates.data ?? []).filter((item) => item.is_active);
   const missingAudit = audit.isError && apiErrorCode(audit.error) === "AUDIT_NOT_FOUND";
   const running = audit.data?.status === "PENDING" || audit.data?.status === "RUNNING";
   const lines = findingLines(audit.data);
-  const recipient = contacts.find((contact) => contact.id === contactId) ?? primary;
 
   const createDraft = () => {
     generate.mutate(
       {
         template_id: templateId || undefined,
-        contact_id: contactId || undefined,
       },
       {
         onSuccess: (message) => {
@@ -63,13 +58,13 @@ export function OutreachComposer({ leadId, contacts, onCreated }: OutreachCompos
       <div className="mt-6 border-t border-gray-200 pt-6">
         <p className="text-caption font-semibold text-gray-500">2. Write the draft</p>
         <p className="mt-1 text-body text-gray-600">
-          {recipient?.name
-            ? `Addressed to ${recipient.name}. `
-            : "Addressed as “there” until you add a contact. "}
+          {email
+            ? `This opens in your mail app to ${email}. `
+            : "Add an email on this lead before Open in email can be used. "}
           You send it from your own inbox. A draft you already edited stays as you saved it.
         </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {activeTemplates.length > 0 ? (
+        {activeTemplates.length > 0 ? (
+          <div className="mt-4">
             <Select
               label="Template"
               value={templateId}
@@ -79,25 +74,8 @@ export function OutreachComposer({ leadId, contacts, onCreated }: OutreachCompos
               placeholder="Homepage concept"
               options={activeTemplates.map((item) => ({ value: item.id, label: item.name }))}
             />
-          ) : null}
-          {contacts.length > 0 ? (
-            <Select
-              label="Who receives it"
-              value={contactId}
-              onChange={(event) => {
-                setContactId(event.target.value);
-              }}
-              options={contacts.map((contact) => ({
-                value: contact.id,
-                label: [contact.name, contact.email].filter(Boolean).join(" · ") || "Contact",
-              }))}
-            />
-          ) : (
-            <p className="text-body text-gray-600">
-              Add a contact on Overview to use their name and email.
-            </p>
-          )}
-        </div>
+          </div>
+        ) : null}
         <div className="mt-4">
           <Button onClick={createDraft} isLoading={generate.isPending} disabled={running}>
             {lines.length > 0 ? "Write email from these findings" : "Write email"}

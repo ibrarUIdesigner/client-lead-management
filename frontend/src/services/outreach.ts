@@ -3,7 +3,6 @@ import type { OutreachMessageItem } from "../types/workspace";
 
 export type OutreachGenerateInput = {
   template_id?: string;
-  contact_id?: string;
 };
 
 export type OutreachUpdateInput = {

@@ -5,7 +5,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import LeadStatus
-from app.schemas.contacts import ContactRead
 from app.schemas.values import EMAIL_RE, URL_RE, normalize_tags
 
 URL_FIELDS = (
@@ -216,7 +215,6 @@ class ActivityRead(BaseModel):
 
 
 class LeadDetail(LeadRead):
-    contacts: list[ContactRead]
     activities: list[ActivityRead]
 
 

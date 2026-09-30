@@ -8,7 +8,6 @@ from app.db.session import create_db_engine, create_session_factory
 from app.models import (
     Activity,
     BrandProfile,
-    Contact,
     Followup,
     Lead,
     Mockup,
@@ -41,7 +40,6 @@ def seed() -> int:
         session.add_all(leads)
         session.flush()
         by_name = {lead.business_name: lead for lead in leads}
-        _contacts(session, by_name)
         _activities(session, by_name, now)
         audits = _audits(session, by_name, now)
         _brands(session, by_name)
@@ -423,50 +421,6 @@ def _leads(now: datetime) -> list[Lead]:
             )
         )
     return leads
-
-
-def _contacts(session: Session, leads: dict[str, Lead]) -> None:
-    people: dict[str, list[tuple[str, str, str, bool]]] = {
-        "Maple & Rye Bakery": [("Jonah Hale", "Owner", "jonah@mapleandrye.example", True)],
-        "Harbor Dental": [
-            ("Priya Shah", "Office manager", "priya@harbordental.example", True),
-            ("Dr. Elena Vos", "Dentist", "elena@harbordental.example", False),
-        ],
-        "Lumen Studio": [("Avery Chen", "Owner", "avery@lumen.example", True)],
-        "Northwind Cafe": [("Sam Ortiz", "Owner", "sam@northwind.example", True)],
-        "Oak & Iron Fitness": [
-            ("Chris Adler", "General manager", "chris@oakandiron.example", True)
-        ],
-        "Field & Fern Florist": [("Nina Park", "Owner", "nina@fieldandfern.example", True)],
-        "Sable Law": [("Jordan Blake", "Partner", "jordan@sablelaw.example", True)],
-        "Kindred Salon": [("Riley Quinn", "Owner", "riley@kindredsalon.example", True)],
-        "Redbird Bicycles": [("Morgan Lee", "Shop owner", "morgan@redbird.example", True)],
-        "Glasshouse Hotel": [("Helen Cho", "General manager", "helen@glasshouse.example", True)],
-        "Pebble Pediatrics": [
-            ("Dr. Amir Hassan", "Pediatrician", "amir@pebblepediatrics.example", True)
-        ],
-        "Marlowe Interiors": [("Claire Marlowe", "Principal", "claire@marlowe.example", True)],
-        "Summit Auto": [("Ben Carter", "Owner", "ben@summitauto.example", True)],
-        "Hearth & Hide": [("Luis Romero", "Chef-owner", "luis@hearthandhide.example", True)],
-        "Atlas Accounting": [("Nora Ellis", "Partner", "nora@atlasaccounting.example", True)],
-        "Willow Yoga": [("Sophie Grant", "Founder", "sophie@willowyoga.example", True)],
-        "Drift Goods": [("Evan Brooks", "Buyer", "evan@driftgoods.example", True)],
-        "Copper Kettle Tea": [("Mia Chen", "Owner", "mia@copperkettle.example", True)],
-    }
-    session.add_all(
-        [
-            Contact(
-                lead_id=leads[business].id,
-                name=name,
-                job_title=title,
-                email=email,
-                is_primary=primary,
-            )
-            for business, contacts in people.items()
-            for name, title, email, primary in contacts
-        ]
-    )
-    session.flush()
 
 
 def _activities(session: Session, leads: dict[str, Lead], now: datetime) -> None:

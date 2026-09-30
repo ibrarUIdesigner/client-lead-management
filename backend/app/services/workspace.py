@@ -5,7 +5,6 @@ from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from app.models import (
     BrandProfile,
-    Contact,
     Followup,
     Lead,
     Mockup,
@@ -78,9 +77,8 @@ class WorkspaceService:
                 OutreachMessage.id,
                 OutreachMessage.lead_id,
                 Lead.business_name,
-                Contact.name.label("contact_name"),
                 OutreachMessage.channel,
-                func.coalesce(Contact.email, Lead.email).label("recipient_email"),
+                Lead.email.label("recipient_email"),
                 OutreachMessage.subject,
                 OutreachMessage.message,
                 OutreachMessage.status,
@@ -90,7 +88,6 @@ class WorkspaceService:
                 OutreachMessage.created_at,
             )
             .join(Lead, Lead.id == OutreachMessage.lead_id)
-            .outerjoin(Contact, Contact.id == OutreachMessage.contact_id)
         )
 
     def list_templates(self) -> list[OutreachTemplateRead]:

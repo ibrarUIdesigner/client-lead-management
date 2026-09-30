@@ -11,12 +11,10 @@ import { Card } from "../components/ui/Card";
 import { Modal } from "../components/ui/Modal";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Tabs } from "../components/ui/Tabs";
-import { ContactForm } from "../features/leads/ContactForm";
 import { MockupGallery } from "../features/mockups/MockupGallery";
 import { MessageList } from "../features/outreach/MessageList";
 import { OutreachComposer } from "../features/outreach/OutreachComposer";
 import { AuditPanel } from "../features/audits/AuditPanel";
-import { useDeleteContact, useUpdateContact } from "../hooks/useContacts";
 import { useDeleteLead, useLead } from "../hooks/useLeads";
 import { apiErrorCode, apiErrorMessage } from "../lib/apiError";
 import { formatWhen } from "../lib/format";
@@ -171,7 +169,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
               <div className="mt-6 space-y-6">
                 <OutreachComposer
                   leadId={lead.id}
-                  contacts={lead.contacts}
+                  email={lead.email}
                   onCreated={setOutreachFocus}
                 />
                 <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
@@ -184,7 +182,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
       <Modal
         open={confirming}
         title="Delete this lead?"
-        description="Contacts, notes, and activity for this lead will be removed."
+        description="Notes and activity for this lead will be removed."
         onClose={() => {
           setConfirming(false);
         }}
@@ -251,100 +249,7 @@ function Overview({ lead }: { lead: LeadDetail }) {
           <p className="mt-4 whitespace-pre-wrap text-body text-gray-700">{lead.notes}</p>
         ) : null}
       </Card>
-      <Card>
-        <h2 className="text-h4 font-semibold text-ink">Contacts</h2>
-        <div className="mt-4">
-          <ContactList lead={lead} />
-        </div>
-        <div className="mt-6 border-t border-gray-200 pt-6">
-          <ContactForm leadId={lead.id} />
-        </div>
-      </Card>
     </div>
-  );
-}
-
-function ContactList({ lead }: { lead: LeadDetail }) {
-  const { notify } = useToast();
-  const updateContact = useUpdateContact(lead.id);
-  const deleteContact = useDeleteContact(lead.id);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-
-  if (lead.contacts.length === 0) {
-    return <p className="text-body text-gray-600">No contacts yet.</p>;
-  }
-
-  return (
-    <ul className="divide-y divide-gray-200">
-      {lead.contacts.map((contact) => (
-        <li
-          key={contact.id}
-          className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between"
-        >
-          <div>
-            <p className="font-medium text-ink">
-              {contact.name}
-              {contact.is_primary ? (
-                <span className="ml-2">
-                  <Badge tone="indigo">Primary</Badge>
-                </span>
-              ) : null}
-            </p>
-            <p className="text-small text-gray-600">
-              {[contact.job_title, contact.email, contact.phone].filter(Boolean).join(" · ") || "—"}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {contact.is_primary ? null : (
-              <Button
-                variant="secondary"
-                disabled={updateContact.isPending}
-                onClick={() => {
-                  updateContact.mutate(
-                    { contactId: contact.id, payload: { is_primary: true } },
-                    {
-                      onError: (error) => {
-                        notify(apiErrorMessage(error, "Could not update the contact."), "danger");
-                      },
-                    },
-                  );
-                }}
-              >
-                Make primary
-              </Button>
-            )}
-            {pendingId === contact.id ? (
-              <Button
-                variant="secondary"
-                isLoading={deleteContact.isPending}
-                onClick={() => {
-                  deleteContact.mutate(contact.id, {
-                    onSuccess: () => {
-                      notify("Contact removed.", "success");
-                      setPendingId(null);
-                    },
-                    onError: (error) => {
-                      notify(apiErrorMessage(error, "Could not remove the contact."), "danger");
-                    },
-                  });
-                }}
-              >
-                Confirm remove
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setPendingId(contact.id);
-                }}
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-        </li>
-      ))}
-    </ul>
   );
 }
 

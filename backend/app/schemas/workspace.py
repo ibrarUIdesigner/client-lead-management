@@ -23,7 +23,6 @@ class OutreachMessageRead(BaseModel):
     id: UUID
     lead_id: UUID
     business_name: str
-    contact_name: str | None
     channel: str | None
     recipient_email: str | None
     subject: str | None

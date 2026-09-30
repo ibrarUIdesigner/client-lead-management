@@ -6,9 +6,7 @@ from app.core.errors import AppError
 from app.models.enums import LeadStatus
 from app.models.lead import Lead
 from app.repositories.activities import ActivityRepository
-from app.repositories.contacts import ContactRepository
 from app.repositories.leads import LeadQuery, LeadRepository
-from app.schemas.contacts import ContactRead
 from app.schemas.leads import (
     ActivityRead,
     BulkLeadResult,
@@ -44,10 +42,8 @@ class LeadService:
 
     def get(self, lead_id: UUID) -> LeadDetail:
         lead = self._require(lead_id)
-        contacts = ContactRepository(self.session).list_for_lead(lead_id)
         return LeadDetail(
             **LeadRead.model_validate(lead).model_dump(),
-            contacts=[ContactRead.model_validate(contact) for contact in contacts],
             activities=[
                 ActivityRead.model_validate(activity)
                 for activity in self.activities.list_for_lead(lead_id)

@@ -185,9 +185,7 @@ function MessageCard({
             </p>
           )}
           <p className="mt-1 text-small text-gray-600">
-            {[item.contact_name, item.recipient_email, item.channel, formatWhen(when)]
-              .filter(Boolean)
-              .join(" · ")}
+            {[item.recipient_email, item.channel, formatWhen(when)].filter(Boolean).join(" · ")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -283,7 +281,7 @@ function MessageCard({
       {draft ? (
         <p className="mt-3 text-small text-gray-600">
           Open in email uses your mail app. Nothing is sent until you send it there.
-          {item.recipient_email ? "" : " Add an email on the lead or contact to use that button."}
+          {item.recipient_email ? "" : " Add an email on the lead to use that button."}
         </p>
       ) : null}
       {item.status === "SENT" || item.status === "OPENED" || item.status === "REPLIED" ? (

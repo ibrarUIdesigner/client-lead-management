@@ -5,14 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.contact import Contact
 from app.models.enums import AuditStatus, LeadStatus, MockupStatus, OutreachStatus
 from app.models.lead import Lead
 from app.models.mockup import Mockup
 from app.models.outreach import OutreachMessage, OutreachTemplate
 from app.models.website_audit import WebsiteAudit
 from app.repositories.activities import ActivityRepository
-from app.repositories.contacts import ContactRepository
 from app.repositories.leads import LeadRepository
 from app.schemas.outreach import OutreachCreate, OutreachGenerate, OutreachUpdate
 from app.schemas.workspace import OutreachMessageRead
@@ -32,7 +30,6 @@ class OutreachService:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.leads = LeadRepository(session)
-        self.contacts = ContactRepository(session)
         self.activities = ActivityRepository(session)
         self.workspace = WorkspaceService(session)
 
@@ -42,13 +39,12 @@ class OutreachService:
 
     def generate(self, lead_id: UUID, data: OutreachGenerate) -> OutreachMessageRead:
         lead = self._require_lead(lead_id)
-        contact = self._resolve_contact(lead.id, data.contact_id)
         template = self._template_for_generate(data.template_id)
         subject, body = compose_outreach(
             template.subject if template else None,
             template.body if template else None,
             business=lead.business_name,
-            name=contact.name if contact else None,
+            name=None,
             industry=lead.industry,
             website=lead.website_url,
             mockup=self._mockup_label(lead.id),
@@ -56,7 +52,6 @@ class OutreachService:
         )
         message = OutreachMessage(
             lead_id=lead.id,
-            contact_id=contact.id if contact else None,
             channel=template.channel if template and template.channel else "email",
             subject=subject,
             message=body,
@@ -78,14 +73,12 @@ class OutreachService:
         if not (data.subject or data.message):
             return self.generate(
                 data.lead_id,
-                OutreachGenerate(template_id=data.template_id, contact_id=data.contact_id),
+                OutreachGenerate(template_id=data.template_id),
             )
         lead = self._require_lead(data.lead_id)
-        contact = self._resolve_contact(lead.id, data.contact_id)
         template = self._require_template(data.template_id) if data.template_id else None
         message = OutreachMessage(
             lead_id=lead.id,
-            contact_id=contact.id if contact else None,
             channel=data.channel or "email",
             subject=data.subject,
             message=data.message,
@@ -107,9 +100,6 @@ class OutreachService:
         message = self._require(message_id)
         self._ensure_editable(message)
         changes = data.model_dump(exclude_unset=True)
-        if "contact_id" in changes and changes["contact_id"] is not None:
-            contact = self._resolve_contact(message.lead_id, changes["contact_id"])
-            changes["contact_id"] = contact.id
         for key, value in changes.items():
             setattr(message, key, value)
         flush_or_reject(self.session)
@@ -205,20 +195,6 @@ class OutreachService:
                 status_code=404,
             )
         return template
-
-    def _resolve_contact(self, lead_id: UUID, contact_id: UUID | None) -> Contact | None:
-        rows = self.contacts.list_for_lead(lead_id)
-        if contact_id is None:
-            primary = next((item for item in rows if item.is_primary), None)
-            return primary or (rows[0] if rows else None)
-        match = next((item for item in rows if item.id == contact_id), None)
-        if match is None:
-            raise AppError(
-                code="CONTACT_NOT_FOUND",
-                message="That contact could not be found.",
-                status_code=404,
-            )
-        return match
 
     def _audit_findings(self, lead_id: UUID) -> str | None:
         statement = (

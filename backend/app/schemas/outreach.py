@@ -6,14 +6,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class OutreachGenerate(BaseModel):
     template_id: UUID | None = None
-    contact_id: UUID | None = None
 
 
 class OutreachCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     lead_id: UUID
-    contact_id: UUID | None = None
     template_id: UUID | None = None
     channel: str | None = Field(default="email", max_length=32)
     subject: str | None = Field(default=None, max_length=500)
@@ -23,7 +21,6 @@ class OutreachCreate(BaseModel):
 class OutreachUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    contact_id: UUID | None = None
     subject: str | None = Field(default=None, max_length=500)
     message: str | None = Field(default=None, max_length=20000)
 
