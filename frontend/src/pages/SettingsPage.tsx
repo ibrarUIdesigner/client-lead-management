@@ -4,6 +4,7 @@ import { Badge } from "../components/ui/Badge";
 import { Card } from "../components/ui/Card";
 import { useHealth } from "../hooks/useHealth";
 import { useOutreachTemplates } from "../hooks/useWorkspace";
+import type { HealthResponse } from "../types/health";
 import type { OutreachTemplateItem } from "../types/workspace";
 
 export function SettingsPage() {
@@ -44,6 +45,23 @@ export function SettingsPage() {
                 )}
               </dd>
             </div>
+            <div>
+              <dt className="text-caption font-semibold text-gray-500">Email drafts</dt>
+              <dd className="mt-2">
+                {health.data ? (
+                  <>
+                    <Badge tone={health.data.email_drafts === "unconfigured" ? "orange" : "green"}>
+                      {emailDraftLabel(health.data.email_drafts)}
+                    </Badge>
+                    <p className="mt-2 text-small text-gray-600">
+                      {emailDraftDetail(health.data.email_drafts)}
+                    </p>
+                  </>
+                ) : (
+                  <span className="text-body text-gray-600">Checking the email provider.</span>
+                )}
+              </dd>
+            </div>
           </dl>
         </Card>
         <QueryGate
@@ -59,6 +77,26 @@ export function SettingsPage() {
       </div>
     </>
   );
+}
+
+function emailDraftLabel(provider: HealthResponse["email_drafts"]): string {
+  if (provider === "gemini") {
+    return "Gemini API";
+  }
+  if (provider === "groq") {
+    return "Groq API";
+  }
+  return "Add an API key";
+}
+
+function emailDraftDetail(provider: HealthResponse["email_drafts"]): string {
+  if (provider === "gemini") {
+    return "Drafts use the Gemini free tier. Google can use that content to improve its products, so drafts send public business details and audit findings.";
+  }
+  if (provider === "groq") {
+    return "Drafts use the Groq API with the public business details and verified audit findings.";
+  }
+  return "Set GEMINI_API_KEY or GROQ_API_KEY in the server environment and restart the API.";
 }
 
 function TemplateList({ items }: { items: OutreachTemplateItem[] }) {

@@ -1,11 +1,20 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+OutreachTone = Literal["professional", "warm", "direct", "brief"]
+
 
 class OutreachGenerate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     template_id: UUID | None = None
+    offer: str | None = Field(default=None, max_length=800)
+    tone: OutreachTone = "professional"
+    sender_name: str | None = Field(default=None, max_length=120)
+    use_ai: bool = True
 
 
 class OutreachCreate(BaseModel):

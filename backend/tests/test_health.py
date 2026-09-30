@@ -13,6 +13,9 @@ def _settings() -> Settings:
         database_url="postgresql+psycopg://app:app@127.0.0.1:1/client_acquisition",
         cors_origins="http://localhost:5175,http://127.0.0.1:5175",
         log_level="WARNING",
+        gemini_api_key="",
+        groq_api_key="",
+        ai_email_provider="",
     )
 
 
@@ -27,6 +30,9 @@ def test_health_reports_database_unavailable_without_postgres() -> None:
     assert body["service"] == "client-acquisition-api"
     assert body["environment"] == "test"
     assert body["database"] == "unavailable"
+    assert body["email_drafts"] == "unconfigured"
+    assert body["gemini"] == "missing"
+    assert body["groq"] == "missing"
     assert response.headers["x-request-id"]
 
 

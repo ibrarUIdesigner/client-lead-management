@@ -1,8 +1,14 @@
 import { api } from "./api";
 import type { OutreachMessageItem } from "../types/workspace";
 
+export type OutreachTone = "professional" | "warm" | "direct" | "brief";
+
 export type OutreachGenerateInput = {
   template_id?: string;
+  offer?: string;
+  tone?: OutreachTone;
+  sender_name?: string;
+  use_ai?: boolean;
 };
 
 export type OutreachUpdateInput = {

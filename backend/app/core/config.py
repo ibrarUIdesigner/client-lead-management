@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     google_pagespeed_api_key: str = ""
     yelp_api_key: str = ""
     discovery_user_agent: str = "ClientAcquisitionTool/0.1 (local prospecting workspace)"
+    gemini_api_key: str = ""
+    groq_api_key: str = ""
+    ai_email_provider: str = ""
+    gemini_model: str = "gemini-3.5-flash"
+    groq_model: str = "llama-3.3-70b-versatile"
+    outreach_sender_name: str = ""
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),

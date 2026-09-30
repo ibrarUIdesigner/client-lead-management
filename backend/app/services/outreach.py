@@ -4,7 +4,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AppError
+from app.models.contact import Contact
 from app.models.enums import AuditStatus, LeadStatus, MockupStatus, OutreachStatus
 from app.models.lead import Lead
 from app.models.mockup import Mockup
@@ -14,7 +16,13 @@ from app.repositories.activities import ActivityRepository
 from app.repositories.leads import LeadRepository
 from app.schemas.outreach import OutreachCreate, OutreachGenerate, OutreachUpdate
 from app.schemas.workspace import OutreachMessageRead
-from app.services.outreach_copy import compose_outreach, findings_message, next_lead_status
+from app.services.outreach_ai import build_brief, draft_email
+from app.services.outreach_copy import (
+    compose_outreach,
+    finding_items,
+    findings_message,
+    next_lead_status,
+)
 from app.services.persistence import flush_or_reject
 from app.services.workspace import WorkspaceService
 
@@ -39,20 +47,26 @@ class OutreachService:
 
     def generate(self, lead_id: UUID, data: OutreachGenerate) -> OutreachMessageRead:
         lead = self._require_lead(lead_id)
-        template = self._template_for_generate(data.template_id)
-        subject, body = compose_outreach(
-            template.subject if template else None,
-            template.body if template else None,
-            business=lead.business_name,
-            name=None,
-            industry=lead.industry,
-            website=lead.website_url,
-            mockup=self._mockup_label(lead.id),
-            audit_findings=self._audit_findings(lead.id),
-        )
+        template: OutreachTemplate | None = None
+        if data.use_ai:
+            subject, body = self._ai_subject_and_body(lead, data)
+            channel = "email"
+        else:
+            template = self._template_for_generate(data.template_id)
+            subject, body = compose_outreach(
+                template.subject if template else None,
+                template.body if template else None,
+                business=lead.business_name,
+                name=self._greeting_name(lead.id),
+                industry=lead.industry,
+                website=lead.website_url,
+                mockup=self._mockup_label(lead.id),
+                audit_findings=self._audit_findings(lead.id),
+            )
+            channel = template.channel if template and template.channel else "email"
         message = OutreachMessage(
             lead_id=lead.id,
-            channel=template.channel if template and template.channel else "email",
+            channel=channel,
             subject=subject,
             message=body,
             template_id=template.id if template else None,
@@ -73,7 +87,7 @@ class OutreachService:
         if not (data.subject or data.message):
             return self.generate(
                 data.lead_id,
-                OutreachGenerate(template_id=data.template_id),
+                OutreachGenerate(template_id=data.template_id, use_ai=False),
             )
         lead = self._require_lead(data.lead_id)
         template = self._require_template(data.template_id) if data.template_id else None
@@ -196,18 +210,74 @@ class OutreachService:
             )
         return template
 
-    def _audit_findings(self, lead_id: UUID) -> str | None:
+    def _ai_subject_and_body(self, lead: Lead, data: OutreachGenerate) -> tuple[str, str]:
+        settings = get_settings()
+        audit = self._completed_audit(lead.id)
+        report = None
+        scores: dict[str, int] = {}
+        issues = None
+        if audit is not None:
+            issues = audit.issues
+            if isinstance(audit.raw_analysis, dict):
+                report = audit.raw_analysis.get("report")
+            scores = {
+                name: score
+                for name, score in {
+                    "performance": audit.performance_score,
+                    "design": audit.design_score,
+                    "seo": audit.seo_score,
+                    "mobile": audit.mobile_score,
+                    "ux": audit.ux_score,
+                }.items()
+                if isinstance(score, int) and score < 80
+            }
+        has_website = bool(lead.website_url) and lead.website_status != "missing"
+        sender = data.sender_name or settings.outreach_sender_name
+        brief = build_brief(
+            business=lead.business_name,
+            industry=lead.industry,
+            description=lead.description,
+            city=lead.city,
+            country=lead.country,
+            website=lead.website_url if has_website else None,
+            greeting_name=self._greeting_name(lead.id),
+            findings=finding_items(issues, report),
+            scores=scores,
+            offer=data.offer,
+            tone=data.tone,
+            sender_name=sender,
+        )
+        return draft_email(brief, settings)
+
+    def _completed_audit(self, lead_id: UUID) -> WebsiteAudit | None:
         statement = (
             select(WebsiteAudit)
             .where(WebsiteAudit.lead_id == lead_id)
             .order_by(WebsiteAudit.created_at.desc())
         )
         rows = list(self.session.scalars(statement))
-        audit = next((item for item in rows if item.status == AuditStatus.COMPLETED.value), None)
+        return next((item for item in rows if item.status == AuditStatus.COMPLETED.value), None)
+
+    def _audit_findings(self, lead_id: UUID) -> str | None:
+        audit = self._completed_audit(lead_id)
         if audit is None:
             return None
         report = audit.raw_analysis.get("report") if isinstance(audit.raw_analysis, dict) else None
         return findings_message(audit.issues, report)
+
+    def _greeting_name(self, lead_id: UUID) -> str | None:
+        name = self.session.scalar(
+            select(Contact.name)
+            .where(Contact.lead_id == lead_id, Contact.name.is_not(None))
+            .order_by(Contact.is_primary.desc(), Contact.created_at.asc())
+            .limit(1)
+        )
+        if not isinstance(name, str):
+            return None
+        first = name.strip().split(" ", 1)[0].strip(" ,.")
+        if not first or "@" in first:
+            return None
+        return first
 
     def _mockup_label(self, lead_id: UUID) -> str | None:
         ready = self.session.scalar(

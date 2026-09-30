@@ -57,6 +57,16 @@ def findings_message(issues: list[object] | None, report: object = None) -> str 
     return f"A few things stood out:\n\n{bullets}"
 
 
+def finding_items(
+    issues: list[object] | None,
+    report: object = None,
+    *,
+    limit: int = 6,
+) -> list[tuple[str, str]]:
+    pairs = _finding_pairs(report) or _finding_pairs(issues)
+    return pairs[:limit]
+
+
 def findings_text(issues: list[object] | None) -> str | None:
     titles: list[str] = []
     for issue in issues or []:
@@ -117,6 +127,23 @@ def _compose_body(
     if rendered and not rendered.endswith("\n"):
         rendered = f"{rendered}\n"
     return rendered
+
+
+def _finding_pairs(source: object) -> list[tuple[str, str]]:
+    if not isinstance(source, list):
+        return []
+    pairs: list[tuple[str, str]] = []
+    for item in source:
+        title = _issue_title(item)
+        detail = _sentence(_issue_detail(item) or title)
+        if not title or not detail:
+            continue
+        pair = (title, detail)
+        if pair not in pairs:
+            pairs.append(pair)
+        if len(pairs) == 6:
+            break
+    return pairs
 
 
 def _report_lines(report: object) -> list[str]:

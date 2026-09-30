@@ -4,6 +4,7 @@ from uuid import uuid4
 from app.models.enums import LeadStatus
 from app.services.outreach_copy import (
     compose_outreach,
+    finding_items,
     findings_message,
     findings_text,
     next_lead_status,
@@ -100,6 +101,26 @@ def test_next_lead_status_moves_forward_only() -> None:
     assert next_lead_status("REPLIED", LeadStatus.CONTACTED) is None
     assert next_lead_status("WON", LeadStatus.REPLIED) is None
     assert next_lead_status("FOLLOW_UP", LeadStatus.REPLIED) == "REPLIED"
+
+
+def test_finding_items_prefer_the_audit_report() -> None:
+    items = finding_items(
+        [{"title": "Ignored title", "detail": "This should not be used."}],
+        [{"title": "Weak CTA", "detail": "No clear call to action was found."}],
+    )
+
+    assert items == [("Weak CTA", "No clear call to action was found.")]
+
+
+def test_generate_outreach_rejects_an_unknown_tone() -> None:
+    with _client(Mock()) as client:
+        response = client.post(
+            f"/api/v1/leads/{uuid4()}/outreach/generate",
+            json={"tone": "pushy"},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_generate_outreach_reports_a_missing_lead() -> None:
