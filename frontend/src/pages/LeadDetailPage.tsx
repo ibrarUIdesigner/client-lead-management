@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -21,6 +22,23 @@ import { apiErrorCode, apiErrorMessage } from "../lib/apiError";
 import { formatWhen } from "../lib/format";
 import type { LeadDetail } from "../types/lead";
 
+function BackToLeads() {
+  const navigate = useNavigate();
+
+  return (
+    <Button
+      variant="ghost"
+      className="-ml-3 mb-4"
+      onClick={() => {
+        navigate("/leads");
+      }}
+    >
+      <ArrowLeft className="size-4" aria-hidden="true" />
+      Back to leads
+    </Button>
+  );
+}
+
 export function LeadDetailPage() {
   const { leadId = "" } = useParams();
   const navigate = useNavigate();
@@ -28,9 +46,12 @@ export function LeadDetailPage() {
 
   if (lead.isPending) {
     return (
-      <div className="space-y-3" aria-busy="true">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-40 w-full" />
+      <div aria-busy="true">
+        <BackToLeads />
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-40 w-full" />
+        </div>
       </div>
     );
   }
@@ -55,20 +76,23 @@ export function LeadDetailPage() {
 
   if (lead.isError || !lead.data) {
     return (
-      <EmptyState
-        title="This lead could not be loaded"
-        description={apiErrorMessage(lead.error, "The lead could not be loaded.")}
-        action={
-          <Button
-            variant="secondary"
-            onClick={() => {
-              void lead.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        }
-      />
+      <>
+        <BackToLeads />
+        <EmptyState
+          title="This lead could not be loaded"
+          description={apiErrorMessage(lead.error, "The lead could not be loaded.")}
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                void lead.refetch();
+              }}
+            >
+              Retry
+            </Button>
+          }
+        />
+      </>
     );
   }
 
@@ -96,6 +120,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
 
   return (
     <>
+      <BackToLeads />
       <PageHeader
         title={lead.business_name}
         description={[lead.city, lead.country].filter(Boolean).join(", ") || undefined}

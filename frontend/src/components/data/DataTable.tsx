@@ -3,12 +3,14 @@ import type { ReactNode } from "react";
 import { EmptyState } from "../feedback/EmptyState";
 import { Button } from "../ui/Button";
 import { Skeleton } from "../ui/Skeleton";
+import { cn } from "../../lib/cn";
 import { Pagination } from "./Pagination";
 
 export type DataColumn<T> = {
   id: string;
   header: string;
   cell: (row: T) => ReactNode;
+  className?: string;
 };
 
 type DataTableProps<T> = {
@@ -70,15 +72,18 @@ export function DataTable<T>({
 
       {!isLoading && !error && rows.length > 0 ? (
         <>
-          <div className="hidden md:block">
-            <table className="w-full border-collapse text-left">
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-max min-w-full border-collapse text-left">
               <thead className="bg-gray-50">
                 <tr>
                   {columns.map((column) => (
                     <th
                       key={column.id}
                       scope="col"
-                      className="px-4 py-3 text-caption font-semibold text-gray-500"
+                      className={cn(
+                        "px-4 py-3 text-caption font-semibold whitespace-nowrap text-gray-500",
+                        column.className,
+                      )}
                     >
                       {column.header}
                     </th>
@@ -89,7 +94,13 @@ export function DataTable<T>({
                 {rows.map((row) => (
                   <tr key={getRowId(row)} className="border-t border-gray-200 hover:bg-gray-50">
                     {columns.map((column) => (
-                      <td key={column.id} className="h-16 px-4 text-body text-ink">
+                      <td
+                        key={column.id}
+                        className={cn(
+                          "min-h-16 px-4 py-2 align-middle text-body text-ink",
+                          column.className,
+                        )}
+                      >
                         {column.cell(row)}
                       </td>
                     ))}

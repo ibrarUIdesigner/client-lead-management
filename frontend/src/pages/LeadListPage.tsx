@@ -1,10 +1,11 @@
+import { ChevronDown } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useToast } from "../components/feedback/useToast";
 import { PageHeader } from "../components/layout/PageHeader";
 import { DataTable, type DataColumn } from "../components/data/DataTable";
-import { Badge, StatusBadge } from "../components/ui/Badge";
+import { StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
@@ -48,6 +49,37 @@ const sortOptions = [
   { value: "updated_at:desc", label: "Recently updated" },
 ];
 
+const websiteStatusOptions = [
+  { value: "present", label: "Has a website" },
+  { value: "missing", label: "No website" },
+  { value: "social_only", label: "Social only" },
+  { value: "pending", label: "Audit pending" },
+  { value: "analyzed", label: "Audited" },
+  { value: "failed", label: "Audit failed" },
+];
+
+const extraFilterKeys = [
+  "industry",
+  "city",
+  "country",
+  "source",
+  "tag",
+  "website_status",
+  "min_score",
+] as const satisfies readonly (keyof Filters)[];
+
+function extraFilterCount(filters: Filters): number {
+  return extraFilterKeys.filter((key) => filters[key] !== "").length;
+}
+
+function websiteLabel(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url.replace(/^https?:\/\//, "");
+  }
+}
+
 function filtersAreActive(filters: Filters): boolean {
   return (Object.keys(defaultFilters) as (keyof Filters)[]).some(
     (key) => key !== "sort" && filters[key] !== defaultFilters[key],
@@ -79,6 +111,7 @@ export function LeadListPage() {
   const { notify } = useToast();
   const [draft, setDraft] = useState(defaultFilters);
   const [applied, setApplied] = useState(defaultFilters);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
@@ -104,6 +137,7 @@ export function LeadListPage() {
   const clearFilters = () => {
     setDraft(defaultFilters);
     setApplied(defaultFilters);
+    setShowMoreFilters(false);
     setPage(1);
     setSelected(new Set());
   };
@@ -157,6 +191,8 @@ export function LeadListPage() {
     );
   };
 
+  const extraCount = extraFilterCount(draft);
+
   const columns: DataColumn<Lead>[] = [
     {
       id: "select",
@@ -179,12 +215,26 @@ export function LeadListPage() {
       id: "business",
       header: "Business",
       cell: (row) => (
-        <Link
-          to={`/leads/${row.id}`}
-          className={cn("font-medium text-ink hover:text-primary-700", focusRing)}
-        >
-          {row.business_name}
-        </Link>
+        <div className="flex max-w-72 flex-col gap-1.5 py-2">
+          <Link
+            to={`/leads/${row.id}`}
+            className={cn("font-medium text-ink hover:text-primary-700", focusRing)}
+          >
+            {row.business_name}
+          </Link>
+          {row.tags.length > 0 ? (
+            <span className="flex flex-wrap gap-1">
+              {row.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-caption font-medium text-gray-700"
+                >
+                  {tag}
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -193,9 +243,53 @@ export function LeadListPage() {
       cell: (row) => <StatusBadge status={row.lead_status} />,
     },
     {
+      id: "score",
+      header: "Score",
+      cell: (row) =>
+        row.lead_score === null ? (
+          "—"
+        ) : (
+          <span className="font-medium tabular-nums">{row.lead_score}</span>
+        ),
+    },
+    {
+      id: "email",
+      header: "Email",
+      cell: (row) =>
+        row.email ? (
+          <a
+            href={`mailto:${row.email}`}
+            title={row.email}
+            className={cn("block max-w-56 truncate text-primary-700 hover:underline", focusRing)}
+          >
+            {row.email}
+          </a>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      id: "website",
+      header: "Website",
+      cell: (row) =>
+        row.website_url ? (
+          <a
+            href={row.website_url}
+            target="_blank"
+            rel="noreferrer"
+            title={row.website_url}
+            className={cn("block max-w-48 truncate text-primary-700 hover:underline", focusRing)}
+          >
+            {websiteLabel(row.website_url)}
+          </a>
+        ) : (
+          "—"
+        ),
+    },
+    {
       id: "location",
       header: "Location",
-      cell: (row) => [row.city, row.country].filter(Boolean).join(", ") || "—",
+      cell: (row) => row.country || "—",
     },
     {
       id: "industry",
@@ -203,18 +297,9 @@ export function LeadListPage() {
       cell: (row) => row.industry || "—",
     },
     {
-      id: "tags",
-      header: "Tags",
-      cell: (row) =>
-        row.tags.length > 0 ? (
-          <span className="flex flex-wrap gap-1">
-            {row.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag}>{tag}</Badge>
-            ))}
-          </span>
-        ) : (
-          "—"
-        ),
+      id: "source",
+      header: "Source",
+      cell: (row) => row.source || "—",
     },
   ];
 
@@ -243,91 +328,117 @@ export function LeadListPage() {
           </>
         }
       />
-      <form className="mb-6 grid gap-4 md:grid-cols-3" onSubmit={applyFilters}>
-        <div className="md:col-span-2">
-          <Input
-            label="Search"
-            value={draft.q}
-            onChange={(event) => {
-              updateDraft("q", event.target.value);
-            }}
-          />
+      <form className="mb-4" onSubmit={applyFilters}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="min-w-0 lg:w-80 lg:shrink-0">
+            <Input
+              label="Search"
+              value={draft.q}
+              onChange={(event) => {
+                updateDraft("q", event.target.value);
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+            <Select
+              label="Status"
+              placeholder="Any status"
+              options={leadStatusOptions}
+              value={draft.lead_status}
+              onChange={(event) => {
+                updateDraft("lead_status", event.target.value);
+              }}
+            />
+            <Select
+              label="Sort"
+              options={sortOptions}
+              value={draft.sort}
+              onChange={(event) => {
+                updateDraft("sort", event.target.value);
+              }}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit">Apply</Button>
+            {hasFilters || filtersAreActive(draft) ? (
+              <Button variant="secondary" onClick={clearFilters}>
+                Clear
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              aria-expanded={showMoreFilters}
+              aria-controls="lead-extra-filters"
+              onClick={() => {
+                setShowMoreFilters((open) => !open);
+              }}
+            >
+              {extraCount > 0 ? `More filters (${extraCount})` : "More filters"}
+              <ChevronDown
+                className={cn("size-4 transition-transform", showMoreFilters && "rotate-180")}
+                aria-hidden="true"
+              />
+            </Button>
+          </div>
         </div>
-        <Select
-          label="Sort"
-          options={sortOptions}
-          value={draft.sort}
-          onChange={(event) => {
-            updateDraft("sort", event.target.value);
-          }}
-        />
-        <Select
-          label="Status"
-          placeholder="Any status"
-          options={leadStatusOptions}
-          value={draft.lead_status}
-          onChange={(event) => {
-            updateDraft("lead_status", event.target.value);
-          }}
-        />
-        <Input
-          label="Industry"
-          value={draft.industry}
-          onChange={(event) => {
-            updateDraft("industry", event.target.value);
-          }}
-        />
-        <Input
-          label="City"
-          value={draft.city}
-          onChange={(event) => {
-            updateDraft("city", event.target.value);
-          }}
-        />
-        <Input
-          label="Country"
-          value={draft.country}
-          onChange={(event) => {
-            updateDraft("country", event.target.value);
-          }}
-        />
-        <Input
-          label="Source"
-          value={draft.source}
-          onChange={(event) => {
-            updateDraft("source", event.target.value);
-          }}
-        />
-        <Input
-          label="Tag"
-          value={draft.tag}
-          onChange={(event) => {
-            updateDraft("tag", event.target.value);
-          }}
-        />
-        <Input
-          label="Website status"
-          value={draft.website_status}
-          onChange={(event) => {
-            updateDraft("website_status", event.target.value);
-          }}
-        />
-        <Input
-          label="Minimum score"
-          type="number"
-          min={0}
-          max={100}
-          value={draft.min_score}
-          onChange={(event) => {
-            updateDraft("min_score", event.target.value);
-          }}
-        />
-        <div className="flex flex-wrap items-end gap-2 md:col-span-2">
-          <Button type="submit">Apply filters</Button>
-          <Button variant="secondary" onClick={clearFilters}>
-            Clear
-          </Button>
-        </div>
+        {showMoreFilters ? (
+          <div id="lead-extra-filters" className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Input
+              label="Industry"
+              value={draft.industry}
+              onChange={(event) => {
+                updateDraft("industry", event.target.value);
+              }}
+            />
+            <Input
+              label="City"
+              value={draft.city}
+              onChange={(event) => {
+                updateDraft("city", event.target.value);
+              }}
+            />
+            <Input
+              label="Country"
+              value={draft.country}
+              onChange={(event) => {
+                updateDraft("country", event.target.value);
+              }}
+            />
+            <Input
+              label="Source"
+              value={draft.source}
+              onChange={(event) => {
+                updateDraft("source", event.target.value);
+              }}
+            />
+            <Input
+              label="Tag"
+              value={draft.tag}
+              onChange={(event) => {
+                updateDraft("tag", event.target.value);
+              }}
+            />
+            <Select
+              label="Website"
+              placeholder="Any website"
+              options={websiteStatusOptions}
+              value={draft.website_status}
+              onChange={(event) => {
+                updateDraft("website_status", event.target.value);
+              }}
+            />
+            <Input
+              label="Minimum score"
+              type="number"
+              min={0}
+              max={100}
+              value={draft.min_score}
+              onChange={(event) => {
+                updateDraft("min_score", event.target.value);
+              }}
+            />
+          </div>
+        ) : null}
       </form>
 
       {selected.size > 0 ? (

@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 import { Drawer } from "../ui/Drawer";
+import { cn } from "../../lib/cn";
 import { Sidebar } from "./Sidebar";
 import { SidebarNav } from "./SidebarNav";
 import { Topbar } from "./Topbar";
 
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const wide = location.pathname === "/leads";
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");
@@ -53,7 +56,10 @@ export function AppShell() {
         />
         <main
           id="main"
-          className="mx-auto w-full max-w-[1440px] px-4 py-6 md:px-8 md:py-8 lg:px-10"
+          className={cn(
+            "mx-auto w-full px-4 py-6 md:px-8 md:py-8 lg:px-10",
+            wide ? "max-w-none" : "max-w-[1440px]",
+          )}
         >
           <Outlet />
         </main>
