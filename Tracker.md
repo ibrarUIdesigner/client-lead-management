@@ -112,24 +112,24 @@
 
 # Website Audit
 
-* [ ] URL validation
-* [ ] SSRF protection
-* [ ] Playwright setup
-* [ ] Desktop screenshot
-* [ ] Mobile screenshot
-* [ ] HTTPS check
-* [ ] Responsive check
-* [ ] CTA check
-* [ ] Contact check
-* [ ] Navigation check
-* [ ] SEO checks
-* [ ] Content analysis
-* [ ] Brand extraction
-* [ ] Opportunity scoring
-* [ ] Database persistence
-* [ ] Retry
-* [ ] Failure states
-* [ ] Private storage
+* [x] URL validation
+* [x] SSRF protection
+* [x] Playwright setup
+* [x] Desktop screenshot
+* [x] Mobile screenshot
+* [x] HTTPS check
+* [x] Responsive check
+* [x] CTA check
+* [x] Contact check
+* [x] Navigation check
+* [x] SEO checks
+* [x] Content analysis
+* [x] Brand extraction
+* [x] Opportunity scoring
+* [x] Database persistence
+* [x] Retry
+* [x] Failure states
+* [x] Private storage
 
 ---
 

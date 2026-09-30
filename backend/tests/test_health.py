@@ -11,7 +11,7 @@ def _settings() -> Settings:
     return Settings(
         app_env="test",
         database_url="postgresql+psycopg://app:app@127.0.0.1:1/client_acquisition",
-        cors_origins="http://localhost:5173,http://127.0.0.1:5173",
+        cors_origins="http://localhost:5175,http://127.0.0.1:5175",
         log_level="WARNING",
     )
 
@@ -43,12 +43,12 @@ def test_cors_allows_configured_origin() -> None:
         response = client.options(
             "/api/v1/health",
             headers={
-                "Origin": "http://localhost:5173",
+                "Origin": "http://localhost:5175",
                 "Access-Control-Request-Method": "GET",
             },
         )
 
-    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5175"
 
 
 def test_cors_allows_loopback_dev_origin() -> None:
@@ -57,9 +57,9 @@ def test_cors_allows_loopback_dev_origin() -> None:
         response = client.options(
             "/api/v1/health",
             headers={
-                "Origin": "http://127.0.0.1:5173",
+                "Origin": "http://127.0.0.1:5175",
                 "Access-Control-Request-Method": "GET",
             },
         )
 
-    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5175"

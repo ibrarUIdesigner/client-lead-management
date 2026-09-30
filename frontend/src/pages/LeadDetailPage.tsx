@@ -11,6 +11,7 @@ import { Modal } from "../components/ui/Modal";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Tabs } from "../components/ui/Tabs";
 import { ContactForm } from "../features/leads/ContactForm";
+import { AuditPanel } from "../features/audits/AuditPanel";
 import { useDeleteContact, useUpdateContact } from "../hooks/useContacts";
 import { useDeleteLead, useLead } from "../hooks/useLeads";
 import { apiErrorCode, apiErrorMessage } from "../lib/apiError";
@@ -123,12 +124,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           {
             id: "audit",
             label: "Audit",
-            content: (
-              <EmptyState
-                title="No website audit yet"
-                description="Website analysis for this lead will show up here."
-              />
-            ),
+            content: <AuditPanel leadId={lead.id} websiteUrl={lead.website_url} />,
           },
           {
             id: "mockups",

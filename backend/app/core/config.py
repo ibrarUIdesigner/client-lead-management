@@ -10,8 +10,9 @@ ROOT_DIR = BACKEND_DIR.parent
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str = "postgresql+psycopg://app:app@127.0.0.1:5432/client_acquisition"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:5175,http://127.0.0.1:5175"
     log_level: str = "INFO"
+    storage_dir: Path = ROOT_DIR / "storage"
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),

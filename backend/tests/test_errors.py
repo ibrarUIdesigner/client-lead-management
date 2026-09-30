@@ -10,7 +10,7 @@ def _client() -> TestClient:
     settings = Settings(
         app_env="test",
         database_url="postgresql+psycopg://app:app@127.0.0.1:1/client_acquisition",
-        cors_origins="http://localhost:5173,http://127.0.0.1:5173",
+        cors_origins="http://localhost:5175,http://127.0.0.1:5175",
         log_level="WARNING",
     )
     app = create_app(settings)
