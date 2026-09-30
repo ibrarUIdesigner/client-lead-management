@@ -38,14 +38,14 @@ const defaultFilters: Filters = {
   tag: "",
   website_status: "",
   min_score: "",
-  sort: "created_at:desc",
+  sort: "lead_score:desc",
 };
 
 const sortOptions = [
+  { value: "lead_score:desc", label: "Highest score" },
   { value: "created_at:desc", label: "Newest" },
   { value: "created_at:asc", label: "Oldest" },
   { value: "business_name:asc", label: "Name" },
-  { value: "lead_score:desc", label: "Score" },
   { value: "updated_at:desc", label: "Recently updated" },
 ];
 

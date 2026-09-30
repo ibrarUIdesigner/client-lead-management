@@ -211,7 +211,9 @@ function MessageCard({
           />
         </div>
       ) : item.message ? (
-        <p className="mt-4 whitespace-pre-wrap text-body text-gray-700">{item.message}</p>
+        <p className="mt-4 rounded-control border border-gray-100 bg-gray-50 px-4 py-3 whitespace-pre-wrap text-body text-gray-700">
+          {item.message}
+        </p>
       ) : null}
       <div className="mt-4">
         <p className="text-caption font-semibold text-gray-500">

@@ -1,3 +1,4 @@
+import { Check, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
@@ -9,6 +10,7 @@ import { Skeleton } from "../../components/ui/Skeleton";
 import { Spinner } from "../../components/ui/Spinner";
 import { useLatestAudit, useRerunAudit, useStartAudit } from "../../hooks/useAudit";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
+import { cn } from "../../lib/cn";
 import { formatWhen } from "../../lib/format";
 import { screenshotUrl } from "../../services/audits";
 import type { Audit } from "../../types/audit";
@@ -24,6 +26,7 @@ const checks = [
   { key: "has_clear_cta", label: "Call to action" },
   { key: "has_contact_form", label: "Contact form" },
   { key: "has_modern_navigation", label: "Navigation" },
+  { key: "has_social_proof", label: "Social proof" },
 ] as const;
 
 export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
@@ -56,7 +59,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
   if (audit.isPending) {
     return (
-      <div className="mt-6 space-y-3" aria-busy="true">
+      <div className="space-y-3" aria-busy="true">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" />
       </div>
@@ -65,7 +68,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
   if (audit.isError && !missing) {
     return (
-      <div className="mt-6">
+      <div>
         <EmptyState
           title="The audit could not be loaded"
           description={apiErrorMessage(audit.error, "The audit could not be loaded.")}
@@ -86,7 +89,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
   if (missing || !audit.data) {
     return (
-      <div className="mt-6">
+      <div>
         <EmptyState
           title="No website audit yet"
           description={
@@ -106,7 +109,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
   if (running) {
     return (
-      <Card className="mt-6">
+      <Card>
         <div className="flex items-center gap-3" aria-live="polite">
           <Spinner />
           <div>
@@ -120,7 +123,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
 
   if (audit.data.status === "FAILED") {
     return (
-      <div className="mt-6">
+      <div>
         <EmptyState
           title="The website could not be analyzed"
           description={audit.data.raw_analysis?.error || "Try the website again."}
@@ -168,12 +171,20 @@ function AuditResults({
   ];
 
   return (
-    <div className="mt-6 space-y-6">
-      <Card>
+    <div className="space-y-4">
+      <Card className="shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-caption font-semibold text-gray-500">Opportunity score</p>
-            <p className="mt-1 text-h2 font-bold text-ink">{analysis?.opportunity_score ?? "—"}</p>
+            <p className="mt-1 text-h2 font-bold text-ink tabular-nums">
+              {analysis?.opportunity_score ?? "—"}
+            </p>
+            <div className="mt-3 h-1.5 max-w-xs overflow-hidden rounded-full bg-gray-100">
+              <div
+                className={cn("h-full rounded-full", meterColor(analysis?.opportunity_score))}
+                style={{ width: `${meterWidth(analysis?.opportunity_score)}%` }}
+              />
+            </div>
             <p className="mt-2 text-small text-gray-600">
               Higher means more reason to reach out. Checked {formatWhen(audit.completed_at)}.
             </p>
@@ -186,14 +197,7 @@ function AuditResults({
           </div>
         </div>
         {analysis?.opportunity_breakdown && analysis.opportunity_breakdown.length > 0 ? (
-          <ul className="mt-4 space-y-2">
-            {analysis.opportunity_breakdown.map((item) => (
-              <li key={item.code} className="flex items-center justify-between text-body text-ink">
-                <span>{item.label}</span>
-                <span className="font-medium">+{item.points}</span>
-              </li>
-            ))}
-          </ul>
+          <OpportunityBars items={analysis.opportunity_breakdown} />
         ) : (
           <p className="mt-4 text-body text-gray-600">No major website gaps were found.</p>
         )}
@@ -207,16 +211,23 @@ function AuditResults({
               ? `The strongest checked issues from ${pageList(analysis.pages)}.`
               : "The strongest checked issues."}
           </p>
-          <ol className="mt-4 space-y-4">
+          <ol className="mt-4 space-y-3">
             {analysis.report.map((item) => (
-              <li key={`${item.code}-${item.url}`}>
+              <li
+                key={`${item.code}-${item.url}`}
+                className="rounded-control border border-gray-200 p-4"
+              >
                 <p className="font-medium text-ink">{item.title}</p>
-                <p className="text-small text-gray-600">{item.detail}</p>
-                {item.fix ? <p className="mt-1 text-small text-gray-700">Fix: {item.fix}</p> : null}
+                <p className="mt-1 text-small text-gray-600">{item.detail}</p>
+                {item.fix ? (
+                  <p className="mt-3 rounded-control bg-primary-50 px-3 py-2 text-small text-primary-800">
+                    Fix: {item.fix}
+                  </p>
+                ) : null}
                 {item.url ? (
                   <a
                     href={item.url}
-                    className="mt-1 block truncate text-caption text-primary-700"
+                    className="mt-2 block truncate text-caption text-primary-700"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -232,11 +243,19 @@ function AuditResults({
         </Card>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {scores.map((score) => (
-          <Card key={score.label}>
-            <p className="text-caption font-semibold text-gray-500">{score.label}</p>
-            <p className="mt-2 text-h3 font-semibold text-ink">{score.value ?? "—"}</p>
+          <Card key={score.label} className="shadow-sm">
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-caption font-semibold text-gray-500">{score.label}</p>
+              <p className="text-h4 font-semibold text-ink tabular-nums">{score.value ?? "—"}</p>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className={cn("h-full rounded-full", meterColor(score.value))}
+                style={{ width: `${meterWidth(score.value)}%` }}
+              />
+            </div>
           </Card>
         ))}
       </div>
@@ -260,14 +279,30 @@ function AuditResults({
 
       <Card>
         <h2 className="text-h4 font-semibold text-ink">Checks</h2>
-        <ul className="mt-4 flex flex-wrap gap-2">
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {checks.map((check) => {
             const passed = audit[check.key];
+            const label = passed === null ? "Unknown" : passed ? "Yes" : "No";
             return (
-              <li key={check.key}>
-                <Badge tone={passed ? "green" : "orange"}>
-                  {check.label}: {passed ? "Yes" : "No"}
-                </Badge>
+              <li
+                key={check.key}
+                className="flex items-center justify-between gap-3 rounded-control border border-gray-200 px-3 py-2"
+              >
+                <span className="text-body text-ink">{check.label}</span>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 text-small font-medium",
+                    passed
+                      ? "text-emerald-700"
+                      : passed === false
+                        ? "text-amber-800"
+                        : "text-gray-500",
+                  )}
+                >
+                  {passed ? <Check className="size-4" aria-hidden="true" /> : null}
+                  {passed === false ? <X className="size-4" aria-hidden="true" /> : null}
+                  {label}
+                </span>
               </li>
             );
           })}
@@ -290,9 +325,9 @@ function AuditResults({
           <h2 className="text-h4 font-semibold text-ink">Issues</h2>
           <ul className="mt-4 space-y-3">
             {audit.issues.map((issue) => (
-              <li key={issue.code}>
+              <li key={issue.code} className="rounded-control border border-gray-200 px-4 py-3">
                 <p className="font-medium text-ink">{issue.title}</p>
-                <p className="text-small text-gray-600">{issue.detail}</p>
+                <p className="mt-1 text-small text-gray-600">{issue.detail}</p>
               </li>
             ))}
           </ul>
@@ -304,9 +339,9 @@ function AuditResults({
           <h2 className="text-h4 font-semibold text-ink">Recommendations</h2>
           <ul className="mt-4 space-y-3">
             {audit.recommendations.map((item) => (
-              <li key={item.code}>
+              <li key={item.code} className="rounded-control border border-gray-200 px-4 py-3">
                 <p className="font-medium text-ink">{item.title}</p>
-                <p className="text-small text-gray-600">{item.detail}</p>
+                <p className="mt-1 text-small text-gray-600">{item.detail}</p>
               </li>
             ))}
           </ul>
@@ -330,6 +365,49 @@ function AuditResults({
       ) : null}
     </div>
   );
+}
+
+function OpportunityBars({ items }: { items: { code: string; label: string; points: number }[] }) {
+  const max = Math.max(...items.map((item) => item.points), 1);
+
+  return (
+    <ul className="mt-5 space-y-3 border-t border-gray-100 pt-5">
+      {items.map((item) => (
+        <li key={item.code}>
+          <div className="flex items-baseline justify-between gap-3 text-body text-ink">
+            <span>{item.label}</span>
+            <span className="font-medium tabular-nums">+{item.points}</span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div
+              className="h-full rounded-full bg-primary"
+              style={{ width: `${Math.round((item.points / max) * 100)}%` }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function meterWidth(value: number | null | undefined): number {
+  if (value == null) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, value));
+}
+
+function meterColor(value: number | null | undefined): string {
+  if (value == null) {
+    return "bg-gray-200";
+  }
+  if (value >= 70) {
+    return "bg-emerald-500";
+  }
+  if (value >= 40) {
+    return "bg-amber-400";
+  }
+  return "bg-red-400";
 }
 
 function pageList(pages: { role: string }[]): string {

@@ -6,6 +6,7 @@ export type TabItem = {
   id: string;
   label: string;
   content: ReactNode;
+  count?: number;
 };
 
 type TabsProps = {
@@ -25,7 +26,11 @@ export function Tabs({ label, tabs }: TabsProps) {
 
   return (
     <div>
-      <div role="tablist" aria-label={label} className="flex gap-1 border-b border-gray-200">
+      <div
+        role="tablist"
+        aria-label={label}
+        className="flex flex-wrap gap-1 rounded-card bg-gray-100 p-1"
+      >
         {tabs.map((tab) => {
           const selected = tab.id === activeTab?.id;
 
@@ -39,9 +44,9 @@ export function Tabs({ label, tabs }: TabsProps) {
               aria-controls={`${baseId}-panel-${tab.id}`}
               tabIndex={selected ? 0 : -1}
               className={cn(
-                "min-h-11 border-b-2 px-3 text-body font-medium",
+                "inline-flex min-h-10 items-center gap-2 rounded-control px-3 text-body font-medium",
                 focusRing,
-                selected ? "border-primary text-primary-700" : "border-transparent text-gray-500",
+                selected ? "bg-white text-ink shadow-sm" : "text-gray-600 hover:text-ink",
               )}
               onClick={() => {
                 selectTab(tab.id);
@@ -61,6 +66,16 @@ export function Tabs({ label, tabs }: TabsProps) {
               }}
             >
               {tab.label}
+              {tab.count !== undefined ? (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 text-caption font-semibold tabular-nums",
+                    selected ? "bg-primary-50 text-primary-700" : "bg-white text-gray-500",
+                  )}
+                >
+                  {tab.count}
+                </span>
+              ) : null}
             </button>
           );
         })}
@@ -70,7 +85,7 @@ export function Tabs({ label, tabs }: TabsProps) {
           role="tabpanel"
           id={`${baseId}-panel-${activeTab.id}`}
           aria-labelledby={`${baseId}-${activeTab.id}`}
-          className="pt-4"
+          className="pt-5"
         >
           {activeTab.content}
         </div>
