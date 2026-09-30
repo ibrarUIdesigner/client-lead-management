@@ -162,6 +162,9 @@ class WorkspaceService:
             by_source=self._grouped(Lead.source),
             high_scores=self._count(Lead, Lead.lead_score >= 70),
             websites_missing=self._count(Lead, Lead.website_status == "missing"),
+            outreach_drafts=self._count(
+                OutreachMessage, OutreachMessage.status == OutreachStatus.DRAFT.value
+            ),
         )
 
     def _count(self, model: type[object], *criteria: object) -> int:

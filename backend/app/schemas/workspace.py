@@ -82,3 +82,4 @@ class AnalyticsRead(BaseModel):
     by_source: list[LabelCount]
     high_scores: int
     websites_missing: int
+    outreach_drafts: int

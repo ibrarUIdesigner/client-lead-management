@@ -76,4 +76,5 @@ export type AnalyticsSummary = {
   by_source?: LabelCount[];
   high_scores?: number;
   websites_missing?: number;
+  outreach_drafts?: number;
 };
