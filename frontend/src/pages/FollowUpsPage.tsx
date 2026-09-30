@@ -5,6 +5,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { StatusBadge } from "../components/ui/Badge";
 import { Card } from "../components/ui/Card";
 import { followUpBucket, type FollowupBucket } from "../features/followups/buckets";
+import { FollowUpActions } from "../features/followups/FollowUpActions";
 import { useFollowups } from "../hooks/useWorkspace";
 import { cn, focusRing } from "../lib/cn";
 import { formatWhen } from "../lib/format";
@@ -76,6 +77,7 @@ function FollowUpBoard({ items }: { items: FollowupItem[] }) {
                     {item.notes ? (
                       <p className="mt-2 text-body text-gray-700">{item.notes}</p>
                     ) : null}
+                    <FollowUpActions item={item} />
                   </li>
                 ))}
               </ul>

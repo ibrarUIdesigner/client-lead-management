@@ -25,6 +25,7 @@ class OutreachMessageRead(BaseModel):
     business_name: str
     contact_name: str | None
     channel: str | None
+    recipient_email: str | None
     subject: str | None
     message: str | None
     status: str

@@ -1,0 +1,46 @@
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class OutreachGenerate(BaseModel):
+    template_id: UUID | None = None
+    contact_id: UUID | None = None
+
+
+class OutreachCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    lead_id: UUID
+    contact_id: UUID | None = None
+    template_id: UUID | None = None
+    channel: str | None = Field(default="email", max_length=32)
+    subject: str | None = Field(default=None, max_length=500)
+    message: str | None = Field(default=None, max_length=20000)
+
+
+class OutreachUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    contact_id: UUID | None = None
+    subject: str | None = Field(default=None, max_length=500)
+    message: str | None = Field(default=None, max_length=20000)
+
+
+class FollowupCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    lead_id: UUID
+    outreach_id: UUID | None = None
+    scheduled_for: datetime
+    type: str | None = Field(default="email", max_length=64)
+    notes: str | None = Field(default=None, max_length=5000)
+
+
+class FollowupUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    scheduled_for: datetime | None = None
+    type: str | None = Field(default=None, max_length=64)
+    notes: str | None = Field(default=None, max_length=5000)

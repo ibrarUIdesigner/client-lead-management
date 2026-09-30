@@ -19,6 +19,7 @@ export type OutreachMessageItem = {
   business_name: string;
   contact_name: string | null;
   channel: string | null;
+  recipient_email: string | null;
   subject: string | null;
   message: string | null;
   status: string;

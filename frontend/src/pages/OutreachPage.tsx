@@ -6,7 +6,7 @@ export function OutreachPage() {
     <>
       <PageHeader
         title="Outreach"
-        description="Notes prepared for a prospect. Review a draft before you send it."
+        description="Drafts and sent notes. Open a lead to write one, send it from your email app, then mark it here."
       />
       <MessageList />
     </>

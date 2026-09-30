@@ -57,13 +57,30 @@ class WorkspaceService:
         ]
 
     def list_messages(self, lead_id: UUID | None = None) -> list[OutreachMessageRead]:
-        statement = (
+        statement = self._messages().order_by(OutreachMessage.created_at.desc())
+        if lead_id is not None:
+            statement = statement.where(OutreachMessage.lead_id == lead_id)
+        return [
+            OutreachMessageRead.model_validate(row, from_attributes=True)
+            for row in self.session.execute(statement)
+        ]
+
+    def get_message(self, message_id: UUID) -> OutreachMessageRead | None:
+        statement = self._messages().where(OutreachMessage.id == message_id)
+        row = self.session.execute(statement).one_or_none()
+        if row is None:
+            return None
+        return OutreachMessageRead.model_validate(row, from_attributes=True)
+
+    def _messages(self):
+        return (
             select(
                 OutreachMessage.id,
                 OutreachMessage.lead_id,
                 Lead.business_name,
                 Contact.name.label("contact_name"),
                 OutreachMessage.channel,
+                func.coalesce(Contact.email, Lead.email).label("recipient_email"),
                 OutreachMessage.subject,
                 OutreachMessage.message,
                 OutreachMessage.status,
@@ -74,14 +91,7 @@ class WorkspaceService:
             )
             .join(Lead, Lead.id == OutreachMessage.lead_id)
             .outerjoin(Contact, Contact.id == OutreachMessage.contact_id)
-            .order_by(OutreachMessage.created_at.desc())
         )
-        if lead_id is not None:
-            statement = statement.where(OutreachMessage.lead_id == lead_id)
-        return [
-            OutreachMessageRead.model_validate(row, from_attributes=True)
-            for row in self.session.execute(statement)
-        ]
 
     def list_templates(self) -> list[OutreachTemplateRead]:
         statement = select(OutreachTemplate).order_by(OutreachTemplate.name.asc())
@@ -91,25 +101,31 @@ class WorkspaceService:
         ]
 
     def list_followups(self) -> list[FollowupRead]:
-        statement = (
-            select(
-                Followup.id,
-                Followup.lead_id,
-                Lead.business_name,
-                Lead.city,
-                Followup.scheduled_for,
-                Followup.type,
-                Followup.status,
-                Followup.notes,
-                Followup.completed_at,
-            )
-            .join(Lead, Lead.id == Followup.lead_id)
-            .order_by(Followup.scheduled_for.asc())
-        )
+        statement = self._followups().order_by(Followup.scheduled_for.asc())
         return [
             FollowupRead.model_validate(row, from_attributes=True)
             for row in self.session.execute(statement)
         ]
+
+    def get_followup(self, followup_id: UUID) -> FollowupRead | None:
+        statement = self._followups().where(Followup.id == followup_id)
+        row = self.session.execute(statement).one_or_none()
+        if row is None:
+            return None
+        return FollowupRead.model_validate(row, from_attributes=True)
+
+    def _followups(self):
+        return select(
+            Followup.id,
+            Followup.lead_id,
+            Lead.business_name,
+            Lead.city,
+            Followup.scheduled_for,
+            Followup.type,
+            Followup.status,
+            Followup.notes,
+            Followup.completed_at,
+        ).join(Lead, Lead.id == Followup.lead_id)
 
     def analytics(self) -> AnalyticsRead:
         status_rows = self.session.execute(

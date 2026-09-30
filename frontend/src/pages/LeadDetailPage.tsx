@@ -13,6 +13,7 @@ import { Tabs } from "../components/ui/Tabs";
 import { ContactForm } from "../features/leads/ContactForm";
 import { MockupGallery } from "../features/mockups/MockupGallery";
 import { MessageList } from "../features/outreach/MessageList";
+import { OutreachComposer } from "../features/outreach/OutreachComposer";
 import { AuditPanel } from "../features/audits/AuditPanel";
 import { useDeleteContact, useUpdateContact } from "../hooks/useContacts";
 import { useDeleteLead, useLead } from "../hooks/useLeads";
@@ -79,6 +80,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
   const { notify } = useToast();
   const removeLead = useDeleteLead();
   const [confirming, setConfirming] = useState(false);
+  const [outreachFocus, setOutreachFocus] = useState<string | null>(null);
 
   const remove = () => {
     removeLead.mutate(lead.id, {
@@ -141,8 +143,13 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
             id: "outreach",
             label: "Outreach",
             content: (
-              <div className="mt-6">
-                <MessageList leadId={lead.id} />
+              <div className="mt-6 space-y-6">
+                <OutreachComposer
+                  leadId={lead.id}
+                  contacts={lead.contacts}
+                  onCreated={setOutreachFocus}
+                />
+                <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
               </div>
             ),
           },
