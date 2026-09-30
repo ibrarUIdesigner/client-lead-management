@@ -21,7 +21,12 @@ export type Lead = {
   tags: string[];
   notes: string | null;
   last_contacted_at: string | null;
+  last_replied_at: string | null;
   next_followup_at: string | null;
+  email_unread: boolean;
+  do_not_contact: boolean;
+  email_suppressed: boolean;
+  suppressed_email: string | null;
   created_at: string;
   updated_at: string;
 };

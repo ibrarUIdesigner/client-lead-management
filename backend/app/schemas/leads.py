@@ -190,7 +190,12 @@ class LeadRead(BaseModel):
     tags: list[str]
     notes: str | None
     last_contacted_at: datetime | None
+    last_replied_at: datetime | None = None
     next_followup_at: datetime | None
+    email_unread: bool = False
+    do_not_contact: bool = False
+    email_suppressed: bool = False
+    suppressed_email: str | None = None
     created_at: datetime
     updated_at: datetime
 

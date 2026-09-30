@@ -13,6 +13,7 @@ export const LEAD_STATUS_VALUES = [
   "WON",
   "LOST",
   "NOT_INTERESTED",
+  "DO_NOT_CONTACT",
 ] as const;
 
 export type LeadStatus = (typeof LEAD_STATUS_VALUES)[number];
@@ -32,6 +33,7 @@ const labels: Record<LeadStatus, string> = {
   WON: "Won",
   LOST: "Lost",
   NOT_INTERESTED: "Not interested",
+  DO_NOT_CONTACT: "Do not contact",
 };
 
 export const leadStatusOptions = LEAD_STATUS_VALUES.map((value) => ({

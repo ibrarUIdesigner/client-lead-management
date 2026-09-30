@@ -24,6 +24,8 @@ export function useLead(id: string | undefined) {
     queryKey: ["leads", id],
     queryFn: () => getLead(id ?? ""),
     enabled: Boolean(id),
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
   });
 }
 

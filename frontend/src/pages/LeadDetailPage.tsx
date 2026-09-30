@@ -22,6 +22,8 @@ import { Modal } from "../components/ui/Modal";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Tabs } from "../components/ui/Tabs";
 import { MockupGallery } from "../features/mockups/MockupGallery";
+import { ConversationPanel } from "../features/gmail/ConversationPanel";
+import { GmailComposer } from "../features/gmail/GmailComposer";
 import { MessageList } from "../features/outreach/MessageList";
 import { OutreachComposer } from "../features/outreach/OutreachComposer";
 import { AuditPanel } from "../features/audits/AuditPanel";
@@ -137,6 +139,8 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
         }
         actions={
           <>
+            {lead.email_unread ? <Badge tone="orange">Unread reply</Badge> : null}
+            {lead.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
             <StatusBadge status={lead.lead_status} />
             <Button
               variant="secondary"
@@ -175,22 +179,28 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
             id: "outreach",
             label: "Outreach",
             content: (
-              <div className="grid items-start gap-6 xl:grid-cols-2">
-                <OutreachComposer
-                  leadId={lead.id}
-                  email={lead.email}
-                  hasWebsite={Boolean(lead.website_url) && lead.website_status !== "missing"}
-                  onCreated={setOutreachFocus}
-                />
-                <section>
-                  <h2 className="text-h4 font-semibold text-ink">Messages</h2>
-                  <p className="mt-1 text-small text-gray-600">
-                    Review a draft, send it from your mail app, then record what happened.
-                  </p>
-                  <div className="mt-4">
-                    <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
-                  </div>
-                </section>
+              <div className="space-y-6">
+                <div className="grid items-start gap-6 xl:grid-cols-2">
+                  <OutreachComposer
+                    leadId={lead.id}
+                    email={lead.email}
+                    hasWebsite={Boolean(lead.website_url) && lead.website_status !== "missing"}
+                    onCreated={setOutreachFocus}
+                  />
+                  <section>
+                    <h2 className="text-h4 font-semibold text-ink">Messages</h2>
+                    <p className="mt-1 text-small text-gray-600">
+                      Review a draft, send it with Gmail or your mail app, then track replies here.
+                    </p>
+                    <div className="mt-4">
+                      <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
+                    </div>
+                  </section>
+                </div>
+                <div className="grid items-start gap-6 xl:grid-cols-2">
+                  <GmailComposer leadId={lead.id} defaultTo={lead.email} />
+                  <ConversationPanel leadId={lead.id} />
+                </div>
               </div>
             ),
           },
@@ -249,7 +259,7 @@ function Overview({ lead }: { lead: LeadDetail }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Card className="shadow-sm">
           <p className="text-caption font-semibold text-gray-500">Lead score</p>
           <p className="mt-2 text-h2 font-bold text-ink tabular-nums">{lead.lead_score ?? "—"}</p>
@@ -273,6 +283,11 @@ function Overview({ lead }: { lead: LeadDetail }) {
         <SummaryCard
           label="Last contacted"
           value={lead.last_contacted_at ? formatWhen(lead.last_contacted_at) : "Not yet"}
+        />
+        <SummaryCard
+          label="Last reply"
+          value={lead.last_replied_at ? formatWhen(lead.last_replied_at) : "None yet"}
+          emphasis={lead.email_unread}
         />
         <SummaryCard
           label="Next follow-up"

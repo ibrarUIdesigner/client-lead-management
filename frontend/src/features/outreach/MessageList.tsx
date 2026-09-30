@@ -10,6 +10,7 @@ import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
 import { FollowUpSchedule } from "../followups/FollowUpSchedule";
+import { useGmailStatus, useSendLeadEmail } from "../../hooks/useGmail";
 import { useMarkContacted, useMarkReplied, useUpdateOutreach } from "../../hooks/useOutreach";
 import { useOutreachMessages } from "../../hooks/useWorkspace";
 import { apiErrorMessage } from "../../lib/apiError";
@@ -79,6 +80,8 @@ function MessageCard({
   const updateOutreach = useUpdateOutreach();
   const markContacted = useMarkContacted();
   const markReplied = useMarkReplied();
+  const gmail = useGmailStatus();
+  const sendGmail = useSendLeadEmail(item.lead_id);
   const [openedManually, setOpenedManually] = useState(false);
   const [subject, setSubject] = useState(item.subject ?? "");
   const [body, setBody] = useState(item.message ?? "");
@@ -88,8 +91,13 @@ function MessageCard({
   const editing = draft && (startEditing || openedManually);
   const dirty = subject !== (item.subject ?? "") || body !== (item.message ?? "");
   const ready = subject.trim().length > 0 && body.trim().length > 0;
+  const gmailReady = Boolean(gmail.data?.connected && !gmail.data.needs_reauth);
   const pending =
-    busy || updateOutreach.isPending || markContacted.isPending || markReplied.isPending;
+    busy ||
+    updateOutreach.isPending ||
+    markContacted.isPending ||
+    markReplied.isPending ||
+    sendGmail.isPending;
 
   const persist = async () => {
     if (!dirty) {
@@ -142,6 +150,31 @@ function MessageCard({
       setOpenedManually(false);
     } catch (error) {
       notify(apiErrorMessage(error, "Could not record the email."), "danger");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendWithGmail = async () => {
+    if (!item.recipient_email || !ready || pending) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const saved = await persist();
+      setSubject(saved.subject ?? "");
+      setBody(saved.message ?? "");
+      await sendGmail.mutateAsync({
+        to: item.recipient_email,
+        subject: saved.subject ?? subject,
+        body: saved.message ?? body,
+        outreach_message_id: item.id,
+        idempotency_key: crypto.randomUUID(),
+      });
+      notify("Email accepted by Gmail. Delivery is not confirmed yet.", "success");
+      setOpenedManually(false);
+    } catch (error) {
+      notify(apiErrorMessage(error, "Could not send via Gmail."), "danger");
     } finally {
       setBusy(false);
     }
@@ -264,8 +297,16 @@ function MessageCard({
           >
             Open in email
           </Button>
+          {draft && gmailReady ? (
+            <Button
+              disabled={!ready || !item.recipient_email || pending}
+              onClick={() => void sendWithGmail()}
+            >
+              Send with Gmail
+            </Button>
+          ) : null}
           {draft ? (
-            <Button disabled={!ready || pending} onClick={() => void recordSent()}>
+            <Button variant="secondary" disabled={!ready || pending} onClick={() => void recordSent()}>
               I sent this
             </Button>
           ) : null}

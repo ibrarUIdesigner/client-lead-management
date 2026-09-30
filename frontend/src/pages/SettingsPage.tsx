@@ -2,6 +2,7 @@ import { QueryGate } from "../components/feedback/QueryGate";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Card } from "../components/ui/Card";
+import { GmailSettingsCard } from "../features/gmail/GmailSettingsCard";
 import { useHealth } from "../hooks/useHealth";
 import { useOutreachTemplates } from "../hooks/useWorkspace";
 import type { HealthResponse } from "../types/health";
@@ -17,53 +18,56 @@ export function SettingsPage() {
     <>
       <PageHeader
         title="Settings"
-        description="Workspace details and the message templates used for outreach."
+        description="Workspace details, Gmail connection, and outreach templates."
       />
       <div className="grid items-start gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <Card>
-          <h2 className="text-h4 font-semibold text-ink">Workspace</h2>
-          <dl className="mt-4 space-y-4">
-            <div>
-              <dt className="text-caption font-semibold text-gray-500">Name</dt>
-              <dd className="mt-1 text-body text-ink">Client Acquisition</dd>
-            </div>
-            <div>
-              <dt className="text-caption font-semibold text-gray-500">Environment</dt>
-              <dd className="mt-1 text-body text-ink">
-                {health.isPending ? "Checking…" : (health.data?.environment ?? "Unavailable")}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-caption font-semibold text-gray-500">Database</dt>
-              <dd className="mt-2">
-                {health.data ? (
-                  <Badge tone={health.data.database === "ok" ? "green" : "orange"}>
-                    {databaseLabel}
-                  </Badge>
-                ) : (
-                  <span className="text-body text-gray-600">Checking the connection.</span>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-caption font-semibold text-gray-500">Email drafts</dt>
-              <dd className="mt-2">
-                {health.data ? (
-                  <>
-                    <Badge tone={health.data.email_drafts === "unconfigured" ? "orange" : "green"}>
-                      {emailDraftLabel(health.data.email_drafts)}
+        <div className="space-y-6">
+          <Card>
+            <h2 className="text-h4 font-semibold text-ink">Workspace</h2>
+            <dl className="mt-4 space-y-4">
+              <div>
+                <dt className="text-caption font-semibold text-gray-500">Name</dt>
+                <dd className="mt-1 text-body text-ink">Client Acquisition</dd>
+              </div>
+              <div>
+                <dt className="text-caption font-semibold text-gray-500">Environment</dt>
+                <dd className="mt-1 text-body text-ink">
+                  {health.isPending ? "Checking…" : (health.data?.environment ?? "Unavailable")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-caption font-semibold text-gray-500">Database</dt>
+                <dd className="mt-2">
+                  {health.data ? (
+                    <Badge tone={health.data.database === "ok" ? "green" : "orange"}>
+                      {databaseLabel}
                     </Badge>
-                    <p className="mt-2 text-small text-gray-600">
-                      {emailDraftDetail(health.data.email_drafts)}
-                    </p>
-                  </>
-                ) : (
-                  <span className="text-body text-gray-600">Checking the email provider.</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-        </Card>
+                  ) : (
+                    <span className="text-body text-gray-600">Checking the connection.</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-caption font-semibold text-gray-500">Email drafts</dt>
+                <dd className="mt-2">
+                  {health.data ? (
+                    <>
+                      <Badge tone={health.data.email_drafts === "unconfigured" ? "orange" : "green"}>
+                        {emailDraftLabel(health.data.email_drafts)}
+                      </Badge>
+                      <p className="mt-2 text-small text-gray-600">
+                        {emailDraftDetail(health.data.email_drafts)}
+                      </p>
+                    </>
+                  ) : (
+                    <span className="text-body text-gray-600">Checking the email provider.</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+          <GmailSettingsCard />
+        </div>
         <QueryGate
           pending={templates.isPending}
           error={templates.error}

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.brand_profile import BrandProfile
     from app.models.contact import Contact
     from app.models.followup import Followup
+    from app.models.gmail import LeadEmail
     from app.models.mockup import Mockup
     from app.models.outreach import OutreachMessage
     from app.models.website_audit import WebsiteAudit
@@ -67,7 +68,27 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     tags: Mapped[list[str] | None] = mapped_column(JSONB)
     notes: Mapped[str | None] = mapped_column(Text)
     last_contacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_followup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_unread: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+    do_not_contact: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+    email_suppressed: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+    suppressed_email: Mapped[str | None] = mapped_column(String(320))
 
     contacts: Mapped[list["Contact"]] = relationship(
         back_populates="lead",
@@ -100,6 +121,11 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         passive_deletes=True,
     )
     activities: Mapped[list["Activity"]] = relationship(
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    emails: Mapped[list["LeadEmail"]] = relationship(
         back_populates="lead",
         cascade="all, delete-orphan",
         passive_deletes=True,

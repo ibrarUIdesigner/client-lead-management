@@ -16,6 +16,28 @@ class LeadStatus(StrEnum):
     WON = "WON"
     LOST = "LOST"
     NOT_INTERESTED = "NOT_INTERESTED"
+    DO_NOT_CONTACT = "DO_NOT_CONTACT"
+
+
+class GmailAccountStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    NEEDS_REAUTH = "NEEDS_REAUTH"
+    DISCONNECTED = "DISCONNECTED"
+
+
+class EmailDirection(StrEnum):
+    OUTBOUND = "OUTBOUND"
+    INBOUND = "INBOUND"
+
+
+class EmailClassification(StrEnum):
+    OUTGOING = "OUTGOING"
+    HUMAN_REPLY = "HUMAN_REPLY"
+    OUT_OF_OFFICE = "OUT_OF_OFFICE"
+    BOUNCE = "BOUNCE"
+    OPT_OUT = "OPT_OUT"
+    AMBIGUOUS = "AMBIGUOUS"
+    OTHER = "OTHER"
 
 
 class AuditStatus(StrEnum):

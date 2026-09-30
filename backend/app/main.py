@@ -15,6 +15,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.session import create_db_engine, create_session_factory
 from app.jobs.discovery import start_discovery_scheduler
+from app.jobs.gmail_sync import start_gmail_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,21 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    scheduler = None
+    discovery_scheduler = None
+    gmail_scheduler = None
     settings = app.state.settings
-    if settings.discovery_enabled and settings.app_env != "test":
-        scheduler = start_discovery_scheduler(app)
-        app.state.discovery_scheduler = scheduler
+    if settings.app_env != "test":
+        if settings.discovery_enabled:
+            discovery_scheduler = start_discovery_scheduler(app)
+            app.state.discovery_scheduler = discovery_scheduler
+        if settings.gmail_sync_enabled:
+            gmail_scheduler = start_gmail_scheduler(app)
+            app.state.gmail_scheduler = gmail_scheduler
     yield
-    if scheduler is not None:
-        scheduler.shutdown(wait=False)
+    if discovery_scheduler is not None:
+        discovery_scheduler.shutdown(wait=False)
+    if gmail_scheduler is not None:
+        gmail_scheduler.shutdown(wait=False)
     app.state.engine.dispose()
 
 

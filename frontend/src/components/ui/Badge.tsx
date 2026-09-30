@@ -46,6 +46,7 @@ const statusLabels: Record<string, string> = {
   WON: "Won",
   LOST: "Lost",
   NOT_INTERESTED: "Not interested",
+  DO_NOT_CONTACT: "Do not contact",
 };
 
 const statusTones: Record<string, BadgeTone> = {
@@ -63,6 +64,7 @@ const statusTones: Record<string, BadgeTone> = {
   WON: "green",
   LOST: "red",
   NOT_INTERESTED: "gray",
+  DO_NOT_CONTACT: "red",
   PENDING: "indigo",
   GENERATING: "indigo",
   READY: "green",

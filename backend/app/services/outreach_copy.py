@@ -28,11 +28,13 @@ _RANK = {
     LeadStatus.WON.value: 11,
     LeadStatus.LOST.value: 11,
     LeadStatus.NOT_INTERESTED.value: 11,
+    LeadStatus.DO_NOT_CONTACT.value: 11,
 }
 _TERMINAL = {
     LeadStatus.WON.value,
     LeadStatus.LOST.value,
     LeadStatus.NOT_INTERESTED.value,
+    LeadStatus.DO_NOT_CONTACT.value,
 }
 
 

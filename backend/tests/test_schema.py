@@ -24,6 +24,9 @@ EXPECTED_TABLES = {
     "activities",
     "discovery_searches",
     "discovery_runs",
+    "gmail_accounts",
+    "gmail_oauth_states",
+    "lead_emails",
 }
 
 
@@ -40,6 +43,7 @@ def test_child_rows_are_removed_with_their_lead() -> None:
         "outreach_messages": "lead_id",
         "followups": "lead_id",
         "activities": "lead_id",
+        "lead_emails": "lead_id",
     }
 
     for table_name, column_name in lead_children.items():
@@ -62,6 +66,7 @@ def test_optional_links_do_not_delete_the_parent_record() -> None:
         ("outreach_messages", "contact_id"): "contacts",
         ("outreach_messages", "template_id"): "outreach_templates",
         ("followups", "outreach_id"): "outreach_messages",
+        ("lead_emails", "outreach_message_id"): "outreach_messages",
     }
 
     for (table_name, column_name), target in optional_links.items():

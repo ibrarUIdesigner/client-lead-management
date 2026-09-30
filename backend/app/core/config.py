@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash-lite"
     groq_model: str = "llama-3.3-70b-versatile"
     outreach_sender_name: str = ""
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_redirect_uri: str = "http://localhost:8000/api/v1/gmail/oauth/callback"
+    gmail_frontend_redirect_url: str = "http://localhost:5175/settings"
+    token_encryption_key: str = ""
+    gmail_sync_enabled: bool = True
+    gmail_sync_interval_minutes: int = Field(default=3, ge=1, le=60)
+    gmail_api_max_retries: int = Field(default=4, ge=1, le=10)
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),
@@ -36,6 +44,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def gmail_oauth_configured(self) -> bool:
+        return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
 
 
 @lru_cache
