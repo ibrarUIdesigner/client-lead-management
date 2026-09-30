@@ -73,4 +73,7 @@ export type AnalyticsSummary = {
   by_status: StatusCount[];
   by_industry: LabelCount[];
   by_city: LabelCount[];
+  by_source?: LabelCount[];
+  high_scores?: number;
+  websites_missing?: number;
 };

@@ -159,6 +159,9 @@ class WorkspaceService:
             by_status=by_status,
             by_industry=self._grouped(Lead.industry),
             by_city=self._grouped(Lead.city),
+            by_source=self._grouped(Lead.source),
+            high_scores=self._count(Lead, Lead.lead_score >= 70),
+            websites_missing=self._count(Lead, Lead.website_status == "missing"),
         )
 
     def _count(self, model: type[object], *criteria: object) -> int:

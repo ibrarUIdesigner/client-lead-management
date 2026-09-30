@@ -79,3 +79,6 @@ class AnalyticsRead(BaseModel):
     by_status: list[StatusCount]
     by_industry: list[LabelCount]
     by_city: list[LabelCount]
+    by_source: list[LabelCount]
+    high_scores: int
+    websites_missing: int
