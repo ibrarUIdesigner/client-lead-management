@@ -1,0 +1,65 @@
+import {
+  BarChart3,
+  CalendarClock,
+  Images,
+  LayoutDashboard,
+  Mail,
+  Settings,
+  SquareKanban,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
+export type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+  description?: string;
+};
+
+export const navItems: NavItem[] = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  {
+    to: "/leads",
+    label: "Leads",
+    icon: Users,
+    description: "Businesses you want to contact will show up here.",
+  },
+  {
+    to: "/pipeline",
+    label: "Pipeline",
+    icon: SquareKanban,
+    description: "Prospects will move through stages here.",
+  },
+  {
+    to: "/mockups",
+    label: "Mockups",
+    icon: Images,
+    description: "Homepage concepts for a prospect will show up here.",
+  },
+  {
+    to: "/outreach",
+    label: "Outreach",
+    icon: Mail,
+    description: "Drafts you can edit before sending will show up here.",
+  },
+  {
+    to: "/follow-ups",
+    label: "Follow-ups",
+    icon: CalendarClock,
+    description: "Today, overdue, and upcoming follow-ups will show up here.",
+  },
+  {
+    to: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    description: "Acquisition activity will show up here after you start working leads.",
+  },
+  {
+    to: "/settings",
+    label: "Settings",
+    icon: Settings,
+    description: "Workspace preferences will show up here.",
+  },
+];

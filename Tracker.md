@@ -29,30 +29,30 @@
 
 # Design System
 
-* [ ] Inter font
-* [ ] Color tokens
-* [ ] Typography tokens
-* [ ] Spacing tokens
-* [ ] Button
-* [ ] Input
-* [ ] Textarea
-* [ ] Select
-* [ ] Checkbox
-* [ ] Radio
-* [ ] Switch
-* [ ] Badge
-* [ ] Card
-* [ ] Modal
-* [ ] Drawer
-* [ ] Tabs
-* [ ] Toast
-* [ ] Skeleton
-* [ ] Empty state
-* [ ] Data table
-* [ ] Pagination
-* [ ] Sidebar
-* [ ] Topbar
-* [ ] Responsive shell
+* [x] Inter font
+* [x] Color tokens
+* [x] Typography tokens
+* [x] Spacing tokens
+* [x] Button
+* [x] Input
+* [x] Textarea
+* [x] Select
+* [x] Checkbox
+* [x] Radio
+* [x] Switch
+* [x] Badge
+* [x] Card
+* [x] Modal
+* [x] Drawer
+* [x] Tabs
+* [x] Toast
+* [x] Skeleton
+* [x] Empty state
+* [x] Data table
+* [x] Pagination
+* [x] Sidebar
+* [x] Topbar
+* [x] Responsive shell
 * [ ] Dark mode
 
 ---
