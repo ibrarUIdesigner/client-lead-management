@@ -50,5 +50,16 @@ class FollowupStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class DiscoveryRunStatus(StrEnum):
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class DiscoveryTrigger(StrEnum):
+    DAILY = "daily"
+    MANUAL = "manual"
+
+
 def enum_values(enum_cls: type[StrEnum]) -> tuple[str, ...]:
     return tuple(item.value for item in enum_cls)

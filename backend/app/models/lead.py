@@ -37,6 +37,7 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Index("ix_leads_lead_score", "lead_score"),
         Index("ix_leads_next_followup_at", "next_followup_at"),
         Index("ix_leads_website_url", "website_url"),
+        Index("uq_leads_source_key", "source_key", unique=True),
     )
 
     business_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -62,6 +63,7 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         server_default=text("'NEW'"),
     )
     source: Mapped[str | None] = mapped_column(String(120))
+    source_key: Mapped[str | None] = mapped_column(String(300))
     tags: Mapped[list[str] | None] = mapped_column(JSONB)
     notes: Mapped[str | None] = mapped_column(Text)
     last_contacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

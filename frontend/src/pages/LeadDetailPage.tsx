@@ -11,6 +11,8 @@ import { Modal } from "../components/ui/Modal";
 import { Skeleton } from "../components/ui/Skeleton";
 import { Tabs } from "../components/ui/Tabs";
 import { ContactForm } from "../features/leads/ContactForm";
+import { MockupGallery } from "../features/mockups/MockupGallery";
+import { MessageList } from "../features/outreach/MessageList";
 import { AuditPanel } from "../features/audits/AuditPanel";
 import { useDeleteContact, useUpdateContact } from "../hooks/useContacts";
 import { useDeleteLead, useLead } from "../hooks/useLeads";
@@ -130,20 +132,18 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
             id: "mockups",
             label: "Mockups",
             content: (
-              <EmptyState
-                title="No mockups yet"
-                description="Homepage concepts for this lead will show up here."
-              />
+              <div className="mt-6">
+                <MockupGallery leadId={lead.id} />
+              </div>
             ),
           },
           {
             id: "outreach",
             label: "Outreach",
             content: (
-              <EmptyState
-                title="No outreach yet"
-                description="Drafts for this lead will show up here."
-              />
+              <div className="mt-6">
+                <MessageList leadId={lead.id} />
+              </div>
             ),
           },
           { id: "activity", label: "Activity", content: <ActivityList lead={lead} /> },

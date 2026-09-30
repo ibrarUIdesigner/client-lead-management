@@ -63,6 +63,19 @@ const statusTones: Record<string, BadgeTone> = {
   WON: "green",
   LOST: "red",
   NOT_INTERESTED: "gray",
+  PENDING: "indigo",
+  GENERATING: "indigo",
+  READY: "green",
+  FAILED: "red",
+  ARCHIVED: "gray",
+  DRAFT: "gray",
+  SENT: "blue",
+  OPENED: "blue",
+  BOUNCED: "red",
+  SCHEDULED: "indigo",
+  DUE: "orange",
+  COMPLETED: "green",
+  CANCELLED: "gray",
 };
 
 type StatusBadgeProps = {

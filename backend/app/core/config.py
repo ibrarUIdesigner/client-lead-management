@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -13,6 +14,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5175,http://127.0.0.1:5175"
     log_level: str = "INFO"
     storage_dir: Path = ROOT_DIR / "storage"
+    discovery_enabled: bool = True
+    discovery_hour: int = Field(default=6, ge=0, le=23)
+    discovery_timezone: str = "UTC"
+    google_places_api_key: str = ""
+    yelp_api_key: str = ""
+    discovery_user_agent: str = "ClientAcquisitionTool/0.1 (local prospecting workspace)"
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),

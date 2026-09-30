@@ -4,6 +4,8 @@ import app.models  # noqa: F401
 from app.db.base import Base
 from app.models.enums import (
     AuditStatus,
+    DiscoveryRunStatus,
+    DiscoveryTrigger,
     FollowupStatus,
     LeadStatus,
     MockupStatus,
@@ -20,6 +22,8 @@ EXPECTED_TABLES = {
     "outreach_messages",
     "followups",
     "activities",
+    "discovery_searches",
+    "discovery_runs",
 }
 
 
@@ -45,6 +49,12 @@ def test_child_rows_are_removed_with_their_lead() -> None:
         assert foreign_key.column.table.name == "leads"
         assert foreign_key.ondelete == "CASCADE"
 
+    run_keys = Base.metadata.tables["discovery_runs"].c.search_id.foreign_keys
+    assert len(run_keys) == 1
+    run_key = next(iter(run_keys))
+    assert run_key.column.table.name == "discovery_searches"
+    assert run_key.ondelete == "CASCADE"
+
 
 def test_optional_links_do_not_delete_the_parent_record() -> None:
     optional_links = {
@@ -67,6 +77,8 @@ def test_status_constraints_list_every_enum_value() -> None:
         ("mockups", "ck_mockups_status"): MockupStatus,
         ("outreach_messages", "ck_outreach_messages_status"): OutreachStatus,
         ("followups", "ck_followups_status"): FollowupStatus,
+        ("discovery_runs", "ck_discovery_runs_status"): DiscoveryRunStatus,
+        ("discovery_runs", "ck_discovery_runs_run_trigger"): DiscoveryTrigger,
     }
 
     for (table_name, constraint_name), enum_cls in expected.items():
@@ -100,6 +112,8 @@ def test_required_indexes_and_unique_keys_exist() -> None:
         "ix_followups_scheduled_for",
         "ix_followups_status",
         "ix_activities_lead_id_created_at",
+        "uq_leads_source_key",
+        "ix_discovery_runs_search_id_started_at",
     } <= index_names
 
     mockup_uniques = {

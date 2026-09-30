@@ -14,6 +14,7 @@ from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.session import create_db_engine, create_session_factory
+from app.jobs.discovery import start_discovery_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,14 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    scheduler = None
+    settings = app.state.settings
+    if settings.discovery_enabled and settings.app_env != "test":
+        scheduler = start_discovery_scheduler(app)
+        app.state.discovery_scheduler = scheduler
     yield
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
     app.state.engine.dispose()
 
 

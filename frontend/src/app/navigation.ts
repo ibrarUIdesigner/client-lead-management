@@ -6,6 +6,7 @@ import {
   Mail,
   Settings,
   SquareKanban,
+  MapPinned,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -25,6 +26,12 @@ export const navItems: NavItem[] = [
     label: "Leads",
     icon: Users,
     description: "Businesses you want to contact will show up here.",
+  },
+  {
+    to: "/discover",
+    label: "Find leads",
+    icon: MapPinned,
+    description: "Daily searches for businesses you can pitch.",
   },
   {
     to: "/pipeline",
