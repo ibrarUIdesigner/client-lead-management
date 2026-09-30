@@ -59,19 +59,19 @@
 
 # Database
 
-* [ ] Leads
-* [ ] Contacts
-* [ ] Website Audits
-* [ ] Brand Profiles
-* [ ] Mockups
-* [ ] Outreach Templates
-* [ ] Outreach Messages
-* [ ] Follow-ups
-* [ ] Activities
-* [ ] Indexes
-* [ ] Constraints
-* [ ] Seed data
-* [ ] Alembic migrations
+* [x] Leads
+* [x] Contacts
+* [x] Website Audits
+* [x] Brand Profiles
+* [x] Mockups
+* [x] Outreach Templates
+* [x] Outreach Messages
+* [x] Follow-ups
+* [x] Activities
+* [x] Indexes
+* [x] Constraints
+* [x] Seed data
+* [x] Alembic migrations
 
 ---
 
