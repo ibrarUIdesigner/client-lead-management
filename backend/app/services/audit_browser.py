@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -52,9 +53,73 @@ _PAGE_FACTS = """() => {
     headingFont: headingStyle ? headingStyle.fontFamily || "" : "",
     theme: theme ? theme.content || "" : "",
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 8,
-    outdated: Boolean(document.querySelector("marquee, font, frameset, center"))
+    outdated: Boolean(document.querySelector("marquee, font, frameset, center")),
+    lcp: (() => {
+      const paints = performance.getEntriesByType("largest-contentful-paint");
+      const last = paints.length ? paints[paints.length - 1] : null;
+      return last ? Math.round(last.startTime) : 0;
+    })(),
+    schemaTypes: collectSchemaTypes(),
+    canonical: (() => {
+      const link = document.querySelector('link[rel="canonical"]');
+      return link ? link.href || "" : "";
+    })(),
+    robots: (() => {
+      const meta = document.querySelector('meta[name="robots"]');
+      return meta ? meta.content || "" : "";
+    })(),
+    links: Array.from(document.querySelectorAll("a[href]")).slice(0, 80).map((anchor) => ({
+      href: anchor.href || "",
+      text: (anchor.innerText || "").trim().slice(0, 80)
+    }))
   };
+  function collectSchemaTypes() {
+    const types = [];
+    const collect = (value) => {
+      if (!value || typeof value !== "object") return;
+      if (Array.isArray(value)) {
+        value.forEach(collect);
+        return;
+      }
+      const schemaType = value["@type"];
+      if (typeof schemaType === "string") types.push(schemaType);
+      else if (Array.isArray(schemaType)) {
+        schemaType.forEach((item) => {
+          if (typeof item === "string") types.push(item);
+        });
+      }
+      if (Array.isArray(value["@graph"])) value["@graph"].forEach(collect);
+    };
+    document.querySelectorAll('script[type="application/ld+json"]').forEach((node) => {
+      try {
+        collect(JSON.parse(node.textContent || ""));
+      } catch (error) {
+        return;
+      }
+    });
+    return types.slice(0, 20);
+  }
 }"""
+
+_AXE_PATH = Path(__file__).resolve().parents[1] / "vendor" / "axe.min.js"
+_AXE_RUN = """async () => {
+  if (!window.axe || !window.axe.run) {
+    throw new Error("missing");
+  }
+  const results = await window.axe.run(document, {
+    runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] },
+    resultTypes: ["violations"],
+    iframes: false
+  });
+  return (results.violations || []).slice(0, 12).map((violation) => ({
+    id: violation.id || "",
+    impact: violation.impact || "",
+    help: violation.help || "",
+    description: violation.description || "",
+    count: Array.isArray(violation.nodes) ? violation.nodes.length : 0
+  }));
+}"""
+_axe_source: str | None = None
 
 
 class AuditRunError(Exception):
@@ -124,8 +189,13 @@ async def _capture(browser: Any, url: str) -> CapturedPage:
         except Exception as exc:
             _raise_navigation_error(guard, exc)
         _raise_if_blocked(guard)
+        try:
+            await page.wait_for_load_state("load", timeout=8_000)
+        except Exception:
+            logger.info("audit_load_timeout")
         load_time_ms = int((time.perf_counter() - started) * 1000)
         facts = await page.evaluate(_PAGE_FACTS)
+        violations, accessibility_checked = await _accessibility(page)
         desktop = await page.screenshot(type="png", full_page=False)
         await page.set_viewport_size({"width": 390, "height": 844})
         await page.wait_for_timeout(300)
@@ -163,6 +233,15 @@ async def _capture(browser: Any, url: str) -> CapturedPage:
         horizontal_overflow=overflow,
         outdated_markup=bool(facts.get("outdated")),
         load_time_ms=load_time_ms,
+        lcp_ms=_count(facts.get("lcp")),
+        schema_types=_labels(facts.get("schemaTypes")),
+        schema_checked=True,
+        accessibility_violations=violations,
+        accessibility_checked=accessibility_checked,
+        canonical_url=_text(facts.get("canonical"), 500),
+        robots_meta=_text(facts.get("robots"), 120),
+        links=_links(facts.get("links")),
+        index_checked=True,
         desktop_png=desktop,
         mobile_png=mobile,
     )
@@ -197,6 +276,53 @@ def _redirect_count(request) -> int:  # noqa: ANN001
     return count
 
 
+async def _accessibility(page: Any) -> tuple[list[dict[str, object]], bool]:
+    source = _load_axe()
+    if not source:
+        return [], False
+    try:
+        await page.evaluate("(source) => { eval(source); }", source)
+        raw = await page.evaluate(_AXE_RUN)
+    except Exception:
+        logger.warning("audit_axe_failed")
+        return [], False
+    return _violations(raw), True
+
+
+def _load_axe() -> str:
+    global _axe_source
+    if _axe_source is None:
+        if _AXE_PATH.is_file():
+            _axe_source = _AXE_PATH.read_text(encoding="utf-8")
+        else:
+            _axe_source = ""
+    return _axe_source
+
+
+def _violations(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    parsed: list[dict[str, object]] = []
+    for item in value[:12]:
+        if not isinstance(item, dict):
+            continue
+        impact = item.get("impact")
+        help_text = item.get("help")
+        if not isinstance(impact, str) or not isinstance(help_text, str):
+            continue
+        count = item.get("count")
+        parsed.append(
+            {
+                "id": _text(item.get("id"), 80),
+                "impact": impact.strip().lower()[:20],
+                "help": help_text.strip()[:180],
+                "description": _text(item.get("description"), 240),
+                "count": count if isinstance(count, int) and count >= 0 else 0,
+            }
+        )
+    return parsed
+
+
 def _text(value: object, limit: int) -> str:
     if not isinstance(value, str):
         return ""
@@ -207,6 +333,20 @@ def _count(value: object) -> int:
     if isinstance(value, int) and value >= 0:
         return value
     return 0
+
+
+def _links(value: object) -> list[tuple[str, str]]:
+    if not isinstance(value, list):
+        return []
+    links: list[tuple[str, str]] = []
+    for item in value[:80]:
+        if not isinstance(item, dict):
+            continue
+        href = item.get("href")
+        text = item.get("text")
+        if isinstance(href, str) and href.startswith(("http://", "https://")):
+            links.append((href.strip()[:500], _text(text, 80)))
+    return links
 
 
 def _labels(value: object) -> list[str]:

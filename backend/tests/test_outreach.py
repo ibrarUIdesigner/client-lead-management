@@ -2,7 +2,12 @@ from unittest.mock import Mock
 from uuid import uuid4
 
 from app.models.enums import LeadStatus
-from app.services.outreach_copy import compose_outreach, findings_text, next_lead_status
+from app.services.outreach_copy import (
+    compose_outreach,
+    findings_message,
+    findings_text,
+    next_lead_status,
+)
 from tests.test_leads_api import _client
 
 
@@ -38,6 +43,43 @@ def test_compose_outreach_adds_audit_findings_when_the_template_omits_them() -> 
 
     assert "Hi there," in body
     assert "What stood out: Poor mobile UX and No clear call to action." in body
+
+
+def test_findings_message_is_written_from_the_audit_report() -> None:
+    text = findings_message(
+        [{"title": "Ignored title", "detail": "This should not be used."}],
+        [
+            {"title": "Weak CTA", "detail": "No clear call to action was found."},
+            {"title": "Slow", "detail": "The page took more than 4 seconds to load"},
+        ],
+    )
+
+    assert text is not None
+    assert "A few things stood out:" in text
+    assert "No clear call to action was found." in text
+    assert "The page took more than 4 seconds to load." in text
+    assert "Ignored title" not in text
+
+
+def test_builtin_email_uses_the_findings() -> None:
+    findings = findings_message(
+        None,
+        [{"title": "Weak CTA", "detail": "No clear call to action was found."}],
+    )
+    subject, body = compose_outreach(
+        None,
+        None,
+        business="AL-Tuaam",
+        name=None,
+        industry="Cafe",
+        website="https://altuaam.com/",
+        mockup=None,
+        audit_findings=findings,
+    )
+
+    assert subject == "A clearer homepage for AL-Tuaam"
+    assert "I looked at the AL-Tuaam website." in body
+    assert "No clear call to action was found." in body
 
 
 def test_findings_text_uses_the_first_two_issue_titles() -> None:

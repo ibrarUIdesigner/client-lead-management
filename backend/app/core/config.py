@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     discovery_hour: int = Field(default=6, ge=0, le=23)
     discovery_timezone: str = "UTC"
     google_places_api_key: str = ""
+    google_pagespeed_api_key: str = ""
     yelp_api_key: str = ""
     discovery_user_agent: str = "ClientAcquisitionTool/0.1 (local prospecting workspace)"
 

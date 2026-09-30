@@ -2,6 +2,29 @@ export type AuditFinding = {
   code: string;
   title: string;
   detail: string;
+  url?: string;
+};
+
+export type AuditReportItem = {
+  code: string;
+  title: string;
+  detail: string;
+  fix: string;
+  url: string;
+};
+
+export type AuditPageCheck = {
+  role: string;
+  url: string;
+  title: string;
+};
+
+export type AuditFieldData = {
+  status: string;
+  detail: string;
+  lcp?: string;
+  cls?: string;
+  inp?: string;
 };
 
 export type OpportunityItem = {
@@ -17,11 +40,21 @@ export type AuditBrand = {
   brand_description?: string | null;
 };
 
+export type AuditTool = {
+  name: string;
+  status: string;
+  detail: string;
+};
+
 export type AuditAnalysis = {
   opportunity_score?: number | null;
   opportunity_breakdown?: OpportunityItem[];
   title?: string;
   final_url?: string;
+  tools?: AuditTool[];
+  report?: AuditReportItem[];
+  pages?: AuditPageCheck[];
+  field_data?: AuditFieldData | null;
   error?: string | null;
   brand?: AuditBrand;
 };

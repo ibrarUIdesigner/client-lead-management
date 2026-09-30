@@ -45,7 +45,7 @@ export function MessageList({ leadId, focusId, expandFirstDraft = false }: Messa
           title="No outreach yet"
           description={
             leadId
-              ? "Create a draft above. You send it from your email app, then mark it here."
+              ? "The findings above become the email. Write the draft, send it from your email app, then mark it here."
               : "Open a lead to write an email. Drafts you can send will show up here."
           }
         />
@@ -53,7 +53,12 @@ export function MessageList({ leadId, focusId, expandFirstDraft = false }: Messa
       {messages.data && messages.data.length > 0 ? (
         <div className="space-y-4">
           {messages.data.map((item) => (
-            <MessageCard key={item.id} item={item} startEditing={item.id === openId} />
+            <MessageCard
+              key={item.id}
+              item={item}
+              startEditing={item.id === openId}
+              onLeadPage={Boolean(leadId)}
+            />
           ))}
         </div>
       ) : null}
@@ -61,7 +66,15 @@ export function MessageList({ leadId, focusId, expandFirstDraft = false }: Messa
   );
 }
 
-function MessageCard({ item, startEditing }: { item: OutreachMessageItem; startEditing: boolean }) {
+function MessageCard({
+  item,
+  startEditing,
+  onLeadPage,
+}: {
+  item: OutreachMessageItem;
+  startEditing: boolean;
+  onLeadPage: boolean;
+}) {
   const { notify } = useToast();
   const updateOutreach = useUpdateOutreach();
   const markContacted = useMarkContacted();
@@ -156,14 +169,20 @@ function MessageCard({ item, startEditing }: { item: OutreachMessageItem; startE
     <Card>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <Link
-            to={`/leads/${item.lead_id}`}
-            className={cn("font-semibold text-ink hover:text-primary-700", focusRing)}
-          >
-            {item.business_name}
-          </Link>
-          {editing ? null : (
-            <p className="mt-1 text-body text-ink">{item.subject || "No subject"}</p>
+          {onLeadPage ? null : (
+            <Link
+              to={`/leads/${item.lead_id}`}
+              className={cn("font-semibold text-ink hover:text-primary-700", focusRing)}
+            >
+              {item.business_name}
+            </Link>
+          )}
+          {editing ? (
+            <p className="font-semibold text-ink">Email draft</p>
+          ) : (
+            <p className={cn("text-body text-ink", onLeadPage ? "font-semibold" : "mt-1")}>
+              {item.subject || "No subject"}
+            </p>
           )}
           <p className="mt-1 text-small text-gray-600">
             {[item.contact_name, item.recipient_email, item.channel, formatWhen(when)]
@@ -196,65 +215,70 @@ function MessageCard({ item, startEditing }: { item: OutreachMessageItem; startE
       ) : item.message ? (
         <p className="mt-4 whitespace-pre-wrap text-body text-gray-700">{item.message}</p>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {draft && !editing ? (
+      <div className="mt-4">
+        <p className="text-caption font-semibold text-gray-500">
+          {draft ? "3. Send it yourself, then record it" : nextStep(item.status)}
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {draft && !editing ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setOpenedManually(true);
+              }}
+            >
+              Edit
+            </Button>
+          ) : null}
+          {draft && editing && dirty ? (
+            <Button
+              variant="secondary"
+              isLoading={updateOutreach.isPending && !busy}
+              disabled={pending}
+              onClick={() => {
+                setBusy(true);
+                persist()
+                  .then((saved) => {
+                    setSubject(saved.subject ?? "");
+                    setBody(saved.message ?? "");
+                    notify("Draft saved.", "success");
+                  })
+                  .catch((error: unknown) => {
+                    notify(apiErrorMessage(error, "Could not save the draft."), "danger");
+                  })
+                  .finally(() => {
+                    setBusy(false);
+                  });
+              }}
+            >
+              Save
+            </Button>
+          ) : null}
+          <Button variant="secondary" disabled={!ready || pending} onClick={() => void copy()}>
+            Copy
+          </Button>
           <Button
             variant="secondary"
-            onClick={() => {
-              setOpenedManually(true);
-            }}
+            disabled={!ready || !item.recipient_email || pending}
+            onClick={() => void openEmail()}
           >
-            Edit
+            Open in email
           </Button>
-        ) : null}
-        {draft && editing && dirty ? (
-          <Button
-            variant="secondary"
-            isLoading={updateOutreach.isPending && !busy}
-            disabled={pending}
-            onClick={() => {
-              setBusy(true);
-              persist()
-                .then((saved) => {
-                  setSubject(saved.subject ?? "");
-                  setBody(saved.message ?? "");
-                  notify("Draft saved.", "success");
-                })
-                .catch((error: unknown) => {
-                  notify(apiErrorMessage(error, "Could not save the draft."), "danger");
-                })
-                .finally(() => {
-                  setBusy(false);
-                });
-            }}
-          >
-            Save
-          </Button>
-        ) : null}
-        <Button variant="secondary" disabled={!ready || pending} onClick={() => void copy()}>
-          Copy
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!ready || !item.recipient_email || pending}
-          onClick={() => void openEmail()}
-        >
-          Open in email
-        </Button>
-        {draft ? (
-          <Button disabled={!ready || pending} onClick={() => void recordSent()}>
-            I sent this
-          </Button>
-        ) : null}
-        {item.status !== "REPLIED" && item.status !== "CANCELLED" ? (
-          <Button
-            variant="secondary"
-            disabled={!ready || pending}
-            onClick={() => void recordReply()}
-          >
-            They replied
-          </Button>
-        ) : null}
+          {draft ? (
+            <Button disabled={!ready || pending} onClick={() => void recordSent()}>
+              I sent this
+            </Button>
+          ) : null}
+          {item.status !== "REPLIED" && item.status !== "CANCELLED" ? (
+            <Button
+              variant="secondary"
+              disabled={!ready || pending}
+              onClick={() => void recordReply()}
+            >
+              They replied
+            </Button>
+          ) : null}
+        </div>
       </div>
       {draft ? (
         <p className="mt-3 text-small text-gray-600">
@@ -271,4 +295,14 @@ function MessageCard({ item, startEditing }: { item: OutreachMessageItem; startE
 
 function isDraft(status: string): boolean {
   return status === "DRAFT" || status === "READY";
+}
+
+function nextStep(status: string): string {
+  if (status === "REPLIED") {
+    return "They replied. Move the lead on the pipeline when you are ready.";
+  }
+  if (status === "CANCELLED") {
+    return "This note was cancelled.";
+  }
+  return "Waiting for a reply. Set a follow-up if you want a reminder.";
 }

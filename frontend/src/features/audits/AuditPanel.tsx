@@ -91,7 +91,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
           title="No website audit yet"
           description={
             websiteUrl
-              ? "Analyze the website to see what is worth improving."
+              ? "Checks the homepage plus About, Contact, and a service page when they are linked."
               : "This lead has no website address. You can still record that as an opportunity."
           }
           action={
@@ -111,7 +111,7 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
           <Spinner />
           <div>
             <h2 className="text-h4 font-semibold text-ink">Analyzing the website</h2>
-            <p className="mt-1 text-body text-gray-600">This usually takes less than a minute.</p>
+            <p className="mt-1 text-body text-gray-600">This usually takes one to two minutes.</p>
           </div>
         </div>
       </Card>
@@ -199,6 +199,39 @@ function AuditResults({
         )}
       </Card>
 
+      {analysis?.report && analysis.report.length > 0 ? (
+        <Card>
+          <h2 className="text-h4 font-semibold text-ink">What to mention</h2>
+          <p className="mt-2 text-small text-gray-600">
+            {analysis.pages && analysis.pages.length > 0
+              ? `The strongest checked issues from ${pageList(analysis.pages)}.`
+              : "The strongest checked issues."}
+          </p>
+          <ol className="mt-4 space-y-4">
+            {analysis.report.map((item) => (
+              <li key={`${item.code}-${item.url}`}>
+                <p className="font-medium text-ink">{item.title}</p>
+                <p className="text-small text-gray-600">{item.detail}</p>
+                {item.fix ? <p className="mt-1 text-small text-gray-700">Fix: {item.fix}</p> : null}
+                {item.url ? (
+                  <a
+                    href={item.url}
+                    className="mt-1 block truncate text-caption text-primary-700"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {item.url}
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          {analysis.field_data?.detail ? (
+            <p className="mt-4 text-small text-gray-600">{analysis.field_data.detail}</p>
+          ) : null}
+        </Card>
+      ) : null}
+
       <div className="grid gap-3 sm:grid-cols-5">
         {scores.map((score) => (
           <Card key={score.label}>
@@ -207,6 +240,23 @@ function AuditResults({
           </Card>
         ))}
       </div>
+
+      {analysis?.tools && analysis.tools.length > 0 ? (
+        <Card>
+          <h2 className="text-h4 font-semibold text-ink">Audit tools</h2>
+          <ul className="mt-4 space-y-3">
+            {analysis.tools.map((tool) => (
+              <li
+                key={tool.name}
+                className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3"
+              >
+                <Badge tone={tool.status === "used" ? "green" : "orange"}>{tool.name}</Badge>
+                <p className="text-small text-gray-600">{tool.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       <Card>
         <h2 className="text-h4 font-semibold text-ink">Checks</h2>
@@ -280,6 +330,14 @@ function AuditResults({
       ) : null}
     </div>
   );
+}
+
+function pageList(pages: { role: string }[]): string {
+  const names = pages.map((page) => page.role.toLowerCase());
+  if (names.length < 2) {
+    return names[0] ?? "";
+  }
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
 function Screenshot({

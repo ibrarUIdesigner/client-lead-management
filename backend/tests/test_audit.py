@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from unittest.mock import Mock
 from uuid import uuid4
@@ -5,7 +6,13 @@ from uuid import uuid4
 import pytest
 
 from app.core.errors import AppError
-from app.services.audit_analysis import CapturedPage, analyze_missing_website, analyze_page
+from app.services.audit_analysis import (
+    CapturedPage,
+    analyze_missing_website,
+    analyze_page,
+    apply_pagespeed,
+)
+from app.services.audit_pagespeed import PageSpeedReport, fetch_pagespeed, parse_pagespeed
 from app.services.audits import AuditService
 from app.services.storage import resolve_storage_path, save_screenshot
 from app.services.url_safety import assert_public_http_url
@@ -111,7 +118,10 @@ def test_weak_page_explains_the_opportunity_score() -> None:
     assert points["weak_cta"] == 10
     assert points["no_contact_form"] == 10
     assert points["poor_performance"] == 5
-    assert analysis.opportunity_score == 70
+    assert points["missing_phone"] == 5
+    assert analysis.opportunity_score == 75
+    assert analysis.report[0]["title"] == "Poor mobile UX"
+    assert len(analysis.report) == 5
     assert analysis.has_ssl is False
     assert analysis.is_mobile_responsive is False
 
@@ -131,3 +141,182 @@ def test_prepare_rejects_a_private_website_before_the_job_runs(tmp_path: Path) -
         AuditService(session, tmp_path).prepare(lead.id)
 
     assert error.value.code == "URL_BLOCKED"
+
+
+def test_business_schema_and_accessibility_change_the_opportunity() -> None:
+    plain = analyze_page(_healthy_page())
+    flagged = analyze_page(
+        _healthy_page(
+            schema_checked=True,
+            schema_types=["WebSite"],
+            accessibility_checked=True,
+            accessibility_violations=[
+                {
+                    "id": "color-contrast",
+                    "impact": "serious",
+                    "help": "Elements must have sufficient color contrast",
+                    "description": "Contrast is too low.",
+                    "count": 2,
+                }
+            ],
+        )
+    )
+
+    assert all(item["code"] != "missing_schema" for item in plain.issues)
+    points = {str(item["code"]): int(item["points"]) for item in flagged.opportunity_breakdown}
+    assert points["missing_schema"] == 5
+    assert points["accessibility"] == 10
+    assert flagged.opportunity_score == plain.opportunity_score + 15
+    assert "color contrast" in flagged.issues[-1]["detail"]
+
+
+def test_local_business_schema_is_accepted() -> None:
+    analysis = analyze_page(_healthy_page(schema_checked=True, schema_types=["LocalBusiness"]))
+
+    assert all(item["code"] != "missing_schema" for item in analysis.issues)
+
+
+def test_slow_paint_is_a_performance_issue() -> None:
+    analysis = analyze_page(_healthy_page(lcp_ms=5200, load_time_ms=800))
+
+    assert analysis.performance_score == 40
+    assert any(item["code"] == "poor_performance" for item in analysis.issues)
+
+
+def test_pagespeed_replaces_a_misleading_load_time() -> None:
+    analysis = analyze_page(_healthy_page(load_time_ms=5000))
+    apply_pagespeed(
+        analysis,
+        PageSpeedReport(performance=88, seo=91, accessibility=73, findings=[]),
+    )
+
+    assert analysis.performance_score == 88
+    assert analysis.seo_score == 91
+    assert all(item["code"] != "poor_performance" for item in analysis.issues)
+    assert analysis.tools[-1]["name"] == "PageSpeed Insights"
+    assert analysis.tools[-1]["status"] == "used"
+
+
+def test_pagespeed_records_a_slow_lighthouse_result() -> None:
+    analysis = analyze_page(_healthy_page())
+    apply_pagespeed(
+        analysis,
+        PageSpeedReport(
+            performance=32,
+            seo=80,
+            accessibility=70,
+            findings=[
+                (
+                    "largest_contentful_paint",
+                    "Largest Contentful Paint",
+                    "Largest Contentful Paint is 6.2 s.",
+                )
+            ],
+        ),
+    )
+
+    assert analysis.performance_score == 32
+    performance = next(item for item in analysis.issues if item["code"] == "poor_performance")
+    assert performance["detail"] == "Largest Contentful Paint is 6.2 s."
+    assert any(item["code"] == "poor_performance" for item in analysis.opportunity_breakdown)
+
+
+def test_pagespeed_parser_reads_lighthouse_scores() -> None:
+    report = parse_pagespeed(
+        {
+            "lighthouseResult": {
+                "categories": {
+                    "performance": {"score": 0.42},
+                    "seo": {"score": 0.8},
+                    "accessibility": {"score": 0.71},
+                },
+                "audits": {
+                    "largest-contentful-paint": {
+                        "score": 0.2,
+                        "title": "Largest Contentful Paint",
+                        "displayValue": "6.2 s",
+                    },
+                    "cumulative-layout-shift": {"score": 1, "title": "Cumulative Layout Shift"},
+                },
+            }
+        }
+    )
+
+    assert report is not None
+    assert report.performance == 42
+    assert report.seo == 80
+    assert report.accessibility == 71
+    assert report.findings[0][0] == "largest_contentful_paint"
+
+
+def test_pagespeed_without_a_key_is_skipped() -> None:
+    outcome = asyncio.run(fetch_pagespeed("https://example.com/", ""))
+
+    assert outcome.status == "skipped"
+
+
+def test_axe_library_is_packaged() -> None:
+    source = (Path(__file__).resolve().parents[1] / "app" / "vendor" / "axe.min.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "axe v4.10.3" in source[:80]
+
+
+def _healthy_page(**overrides: object) -> CapturedPage:
+    values: dict[str, object] = {
+        "final_url": "https://example.com/",
+        "title": "North Cafe in Lahore",
+        "meta_description": "Coffee, breakfast, and catering for offices in Lahore.",
+        "h1": "North Cafe",
+        "text": "We serve coffee and breakfast. Clients trust our catering. " * 8,
+        "link_count": 6,
+        "nav_link_count": 4,
+        "form_count": 1,
+        "input_count": 2,
+        "cta_labels": ["Contact"],
+        "image_urls": [],
+        "phone_visible": True,
+        "background_color": "rgb(255, 255, 255)",
+        "text_color": "rgb(0, 0, 0)",
+        "font_family": "Inter",
+        "heading_font": "Inter",
+        "theme_color": "#111111",
+        "horizontal_overflow": False,
+        "outdated_markup": False,
+        "load_time_ms": 800,
+    }
+    values.update(overrides)
+    return CapturedPage(
+        final_url=str(values["final_url"]),
+        title=str(values["title"]),
+        meta_description=str(values["meta_description"]),
+        h1=str(values["h1"]),
+        text=str(values["text"]),
+        link_count=int(values["link_count"]),  # type: ignore[arg-type]
+        nav_link_count=int(values["nav_link_count"]),  # type: ignore[arg-type]
+        form_count=int(values["form_count"]),  # type: ignore[arg-type]
+        input_count=int(values["input_count"]),  # type: ignore[arg-type]
+        cta_labels=list(values["cta_labels"]),  # type: ignore[arg-type]
+        image_urls=list(values["image_urls"]),  # type: ignore[arg-type]
+        phone_visible=bool(values["phone_visible"]),
+        background_color=str(values["background_color"]),
+        text_color=str(values["text_color"]),
+        font_family=str(values["font_family"]),
+        heading_font=str(values["heading_font"]),
+        theme_color=str(values["theme_color"]),
+        horizontal_overflow=bool(values["horizontal_overflow"]),
+        outdated_markup=bool(values["outdated_markup"]),
+        load_time_ms=int(values["load_time_ms"]),  # type: ignore[arg-type]
+        lcp_ms=int(values["lcp_ms"]) if "lcp_ms" in values else 0,  # type: ignore[arg-type]
+        schema_types=list(values["schema_types"]) if "schema_types" in values else [],  # type: ignore[arg-type]
+        schema_checked=bool(values["schema_checked"]) if "schema_checked" in values else False,
+        accessibility_violations=(
+            list(values["accessibility_violations"])  # type: ignore[arg-type]
+            if "accessibility_violations" in values
+            else []
+        ),
+        accessibility_checked=(
+            bool(values["accessibility_checked"]) if "accessibility_checked" in values else False
+        ),
+    )

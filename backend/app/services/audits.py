@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,8 +14,18 @@ from app.models.lead import Lead
 from app.models.website_audit import WebsiteAudit
 from app.repositories.activities import ActivityRepository
 from app.repositories.audits import AuditRepository
-from app.services.audit_analysis import AuditAnalysis, analyze_missing_website, analyze_page
+from app.services.audit_analysis import (
+    AuditAnalysis,
+    analyze_missing_website,
+    analyze_page,
+    apply_crawl,
+    apply_pagespeed,
+    build_report,
+)
 from app.services.audit_browser import AuditRunError, capture_website
+from app.services.audit_crawl import crawl_site
+from app.services.audit_crux import fetch_crux
+from app.services.audit_pagespeed import fetch_pagespeed, pagespeed_tool
 from app.services.storage import save_screenshot, screenshot_key
 from app.services.url_safety import assert_public_http_url
 
@@ -29,9 +40,17 @@ _PROGRESS = {
 
 
 class AuditService:
-    def __init__(self, session: Session, storage_dir: Path) -> None:
+    def __init__(
+        self,
+        session: Session,
+        storage_dir: Path,
+        pagespeed_api_key: str = "",
+        user_agent: str = "",
+    ) -> None:
         self.session = session
         self.storage_dir = storage_dir
+        self.pagespeed_api_key = pagespeed_api_key
+        self.user_agent = user_agent
         self.audits = AuditRepository(session)
         self.activities = ActivityRepository(session)
 
@@ -97,8 +116,33 @@ class AuditService:
         audit.mobile_screenshot_url = None
         self.session.commit()
         try:
-            captured = await capture_website(audit.url)
+            captured, pagespeed, field_data = await asyncio.gather(
+                capture_website(audit.url),
+                fetch_pagespeed(audit.url, self.pagespeed_api_key),
+                fetch_crux(audit.url, self.pagespeed_api_key),
+            )
             analysis = analyze_page(captured)
+            try:
+                crawled = await crawl_site(captured.final_url, captured.links, self.user_agent)
+                apply_crawl(analysis, crawled)
+            except Exception:
+                logger.warning("audit_crawl_failed")
+                analysis.tools.append(
+                    {
+                        "name": "SEO crawler",
+                        "status": "failed",
+                        "detail": "Extra pages could not be checked. Homepage results were saved.",
+                    }
+                )
+                analysis.report = build_report(analysis)
+            if pagespeed.status == "ok" and pagespeed.report is not None:
+                apply_pagespeed(analysis, pagespeed.report)
+            else:
+                analysis.tools.append(pagespeed_tool(pagespeed.status))
+                analysis.report = build_report(analysis)
+            analysis.field_data = field_data.as_dict()
+            analysis.tools.append(field_data.tool())
+            analysis.report = build_report(analysis)
             audit.desktop_screenshot_url = self._store(audit, "desktop", captured.desktop_png)
             audit.mobile_screenshot_url = self._store(audit, "mobile", captured.mobile_png)
             self._apply(audit, analysis, website_status="analyzed")
@@ -172,6 +216,10 @@ class AuditService:
             "opportunity_breakdown": analysis.opportunity_breakdown,
             "title": analysis.title,
             "final_url": analysis.final_url,
+            "tools": analysis.tools,
+            "report": analysis.report,
+            "pages": analysis.pages,
+            "field_data": analysis.field_data,
             "error": None,
             "brand": {
                 "primary_color": analysis.brand.get("primary_color"),

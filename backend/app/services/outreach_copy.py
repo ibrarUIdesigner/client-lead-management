@@ -7,8 +7,9 @@ _TOKEN = re.compile(r"\{([a-z_]+)\}")
 BUILTIN_SUBJECT = "A clearer homepage for {business}"
 BUILTIN_BODY = (
     "Hi {name},\n\n"
-    "I put together a homepage concept for {business}. {findings}\n\n"
-    "Happy to walk through it if it is useful.\n"
+    "I looked at the {business} website.\n\n"
+    "{findings}\n\n"
+    "I can show a clearer version if that would help.\n"
 )
 FALLBACK_FINDINGS = "The current page could make the next step easier to find."
 
@@ -46,6 +47,14 @@ def render_template(template: str | None, context: dict[str, str]) -> str:
         return match.group(0)
 
     return _TOKEN.sub(replace, template)
+
+
+def findings_message(issues: list[object] | None, report: object = None) -> str | None:
+    lines = _report_lines(report) or _issue_lines(issues)
+    if not lines:
+        return None
+    bullets = "\n".join(f"- {line}" for line in lines[:5])
+    return f"A few things stood out:\n\n{bullets}"
 
 
 def findings_text(issues: list[object] | None) -> str | None:
@@ -103,11 +112,55 @@ def _compose_body(
 ) -> str:
     rendered = render_template(template_body, context).strip()
     if audit_findings and "{findings}" not in template_body:
-        extra = f"What stood out: {audit_findings}."
+        extra = audit_findings if "\n" in audit_findings else f"What stood out: {audit_findings}."
         rendered = f"{rendered}\n\n{extra}" if rendered else extra
     if rendered and not rendered.endswith("\n"):
         rendered = f"{rendered}\n"
     return rendered
+
+
+def _report_lines(report: object) -> list[str]:
+    if not isinstance(report, list):
+        return []
+    lines: list[str] = []
+    for item in report:
+        line = _sentence(_issue_detail(item))
+        if line and line not in lines:
+            lines.append(line)
+        if len(lines) == 5:
+            break
+    return lines
+
+
+def _issue_lines(issues: list[object] | None) -> list[str]:
+    lines: list[str] = []
+    for issue in issues or []:
+        line = _sentence(_issue_detail(issue) or _issue_title(issue))
+        if line and line not in lines:
+            lines.append(line)
+        if len(lines) == 5:
+            break
+    return lines
+
+
+def _issue_detail(issue: object) -> str | None:
+    if not isinstance(issue, dict):
+        return None
+    detail = issue.get("detail")
+    if isinstance(detail, str) and detail.strip():
+        return detail.strip()
+    return None
+
+
+def _sentence(text: str | None) -> str | None:
+    if not text:
+        return None
+    cleaned = " ".join(text.split())
+    if not cleaned:
+        return None
+    if cleaned[-1] not in ".!?":
+        cleaned = f"{cleaned}."
+    return cleaned
 
 
 def _issue_title(issue: object) -> str | None:

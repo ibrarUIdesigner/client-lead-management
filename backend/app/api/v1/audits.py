@@ -22,10 +22,12 @@ async def run_audit(
     audit_id: UUID,
     session_factory: Callable[[], Session],
     storage_dir: Path,
+    pagespeed_api_key: str = "",
+    user_agent: str = "",
 ) -> None:
     session = session_factory()
     try:
-        await AuditService(session, storage_dir).execute(audit_id)
+        await AuditService(session, storage_dir, pagespeed_api_key, user_agent).execute(audit_id)
         session.commit()
     except Exception:
         session.rollback()
@@ -50,6 +52,8 @@ async def start_audit(
             audit.id,
             request.app.state.session_factory,
             request.app.state.settings.storage_dir,
+            request.app.state.settings.google_pagespeed_api_key,
+            request.app.state.settings.discovery_user_agent,
         )
     return AuditRead.model_validate(audit)
 
@@ -82,6 +86,8 @@ async def rerun_audit(
             audit.id,
             request.app.state.session_factory,
             request.app.state.settings.storage_dir,
+            request.app.state.settings.google_pagespeed_api_key,
+            request.app.state.settings.discovery_user_agent,
         )
     return AuditRead.model_validate(audit)
 

@@ -16,7 +16,7 @@ from app.repositories.contacts import ContactRepository
 from app.repositories.leads import LeadRepository
 from app.schemas.outreach import OutreachCreate, OutreachGenerate, OutreachUpdate
 from app.schemas.workspace import OutreachMessageRead
-from app.services.outreach_copy import compose_outreach, findings_text, next_lead_status
+from app.services.outreach_copy import compose_outreach, findings_message, next_lead_status
 from app.services.persistence import flush_or_reject
 from app.services.workspace import WorkspaceService
 
@@ -230,7 +230,8 @@ class OutreachService:
         audit = next((item for item in rows if item.status == AuditStatus.COMPLETED.value), None)
         if audit is None:
             return None
-        return findings_text(audit.issues)
+        report = audit.raw_analysis.get("report") if isinstance(audit.raw_analysis, dict) else None
+        return findings_message(audit.issues, report)
 
     def _mockup_label(self, lead_id: UUID) -> str | None:
         ready = self.session.scalar(
