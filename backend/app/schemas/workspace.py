@@ -15,6 +15,8 @@ class MockupRead(BaseModel):
     notes: str | None
     prompt: str | None
     primary_color: str | None
+    design_guide_id: UUID | None
+    design_guide_name: str | None
     completed_at: datetime | None
     created_at: datetime
 

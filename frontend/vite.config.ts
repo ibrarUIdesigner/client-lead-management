@@ -8,7 +8,8 @@ export default defineConfig({
     port: 5175,
     strictPort: true,
     proxy: {
-      "/api": "http://localhost:8000",
+      // Match the API prefix only. "/api" would also capture the /apify page.
+      "/api/": "http://localhost:8000",
     },
   },
 });

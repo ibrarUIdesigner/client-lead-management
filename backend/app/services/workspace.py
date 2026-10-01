@@ -41,6 +41,8 @@ class WorkspaceService:
                 Mockup.notes,
                 Mockup.prompt,
                 BrandProfile.primary_color,
+                Mockup.design_guide_id,
+                Mockup.design_guide_name,
                 Mockup.completed_at,
                 Mockup.created_at,
             )

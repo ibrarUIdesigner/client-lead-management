@@ -47,6 +47,13 @@ const statusLabels: Record<string, string> = {
   LOST: "Lost",
   NOT_INTERESTED: "Not interested",
   DO_NOT_CONTACT: "Do not contact",
+  RUNNING: "Running",
+  SUCCEEDED: "Succeeded",
+  FAILED: "Failed",
+  "TIMING-OUT": "Timing out",
+  "TIMED-OUT": "Timed out",
+  ABORTING: "Aborting",
+  ABORTED: "Aborted",
 };
 
 const statusTones: Record<string, BadgeTone> = {
@@ -69,6 +76,12 @@ const statusTones: Record<string, BadgeTone> = {
   GENERATING: "indigo",
   READY: "green",
   FAILED: "red",
+  RUNNING: "blue",
+  SUCCEEDED: "green",
+  "TIMING-OUT": "orange",
+  "TIMED-OUT": "orange",
+  ABORTING: "orange",
+  ABORTED: "gray",
   ARCHIVED: "gray",
   DRAFT: "gray",
   SENT: "blue",

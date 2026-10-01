@@ -1,12 +1,14 @@
 import {
   BarChart3,
+  Bot,
   CalendarClock,
+  FileText,
   Images,
   LayoutDashboard,
   Mail,
+  MapPinned,
   Settings,
   SquareKanban,
-  MapPinned,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -34,10 +36,22 @@ export const navItems: NavItem[] = [
     description: "Daily searches for businesses you can pitch.",
   },
   {
+    to: "/apify",
+    label: "Apify",
+    icon: Bot,
+    description: "Actors you connect from Apify will show up here.",
+  },
+  {
     to: "/pipeline",
     label: "Pipeline",
     icon: SquareKanban,
     description: "Prospects will move through stages here.",
+  },
+  {
+    to: "/design-md",
+    label: "Design MD",
+    icon: FileText,
+    description: "Markdown design guides for homepage mockups.",
   },
   {
     to: "/mockups",

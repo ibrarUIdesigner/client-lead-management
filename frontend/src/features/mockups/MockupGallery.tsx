@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
 import { QueryGate } from "../../components/feedback/QueryGate";
+import { useToast } from "../../components/feedback/useToast";
 import { StatusBadge } from "../../components/ui/Badge";
+import { Button } from "../../components/ui/Button";
 import { useMockups } from "../../hooks/useWorkspace";
 import { cn, focusRing } from "../../lib/cn";
 import type { MockupItem } from "../../types/workspace";
+import { CreateMockupDialog } from "./CreateMockupDialog";
 
 type MockupGalleryProps = {
   leadId?: string;
@@ -47,6 +51,8 @@ export function MockupGallery({ leadId }: MockupGalleryProps) {
 function MockupCard({ item }: { item: MockupItem }) {
   const color = swatch(item.primary_color);
   const preparing = item.status === "PENDING" || item.status === "GENERATING";
+  const [open, setOpen] = useState(false);
+  const { notify } = useToast();
 
   return (
     <article className="overflow-hidden rounded-card border border-gray-200 bg-white">
@@ -84,7 +90,33 @@ function MockupCard({ item }: { item: MockupItem }) {
           </div>
           <StatusBadge status={item.status} />
         </div>
+        {item.design_guide_name ? (
+          <p className="text-small text-gray-600">Design guide: {item.design_guide_name}</p>
+        ) : null}
         {item.notes ? <p className="text-small text-gray-600">{item.notes}</p> : null}
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          Regenerate
+        </Button>
+        {open ? (
+          <CreateMockupDialog
+            open
+            leadId={item.lead_id}
+            sourceMockupId={item.id}
+            savedGuideName={item.design_guide_name}
+            onClose={() => {
+              setOpen(false);
+            }}
+            onCreated={() => {
+              notify("Mockup brief saved. No image was generated.", "success");
+              setOpen(false);
+            }}
+          />
+        ) : null}
       </div>
     </article>
   );

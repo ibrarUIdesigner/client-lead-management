@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     gmail_sync_enabled: bool = True
     gmail_sync_interval_minutes: int = Field(default=3, ge=1, le=60)
     gmail_api_max_retries: int = Field(default=4, ge=1, le=10)
+    apify_token: str = ""
+    apify_api_base: str = "https://api.apify.com/v2"
+    design_md_max_bytes: int = Field(default=262_144, ge=1_024, le=5_000_000)
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),

@@ -9,6 +9,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { Spinner } from "../../components/ui/Spinner";
+import { CreateMockupDialog } from "../mockups/CreateMockupDialog";
 import { useLatestAudit, useRerunAudit, useStartAudit } from "../../hooks/useAudit";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
@@ -33,6 +34,7 @@ const checks = [
 export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
   const navigate = useNavigate();
   const { notify } = useToast();
+  const [mockupOpen, setMockupOpen] = useState(false);
   const audit = useLatestAudit(leadId);
   const startAudit = useStartAudit(leadId);
   const rerunAudit = useRerunAudit(leadId);
@@ -155,16 +157,31 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
   }
 
   return (
-    <AuditResults
-      audit={audit.data}
-      leadId={leadId}
-      hasWebsite={hasWebsite}
-      onRetry={retry}
-      retrying={rerunAudit.isPending}
-      onCreateMockup={() => {
-        navigate("/mockups");
-      }}
-    />
+    <>
+      <AuditResults
+        audit={audit.data}
+        leadId={leadId}
+        hasWebsite={hasWebsite}
+        onRetry={retry}
+        retrying={rerunAudit.isPending}
+        onCreateMockup={() => {
+          setMockupOpen(true);
+        }}
+      />
+      {mockupOpen ? (
+        <CreateMockupDialog
+          open
+          leadId={leadId}
+          onClose={() => {
+            setMockupOpen(false);
+          }}
+          onCreated={() => {
+            notify("Mockup brief saved. No image was generated.", "success");
+            navigate("/mockups");
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

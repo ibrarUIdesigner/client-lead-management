@@ -9,6 +9,8 @@ export type MockupItem = {
   notes: string | null;
   prompt: string | null;
   primary_color: string | null;
+  design_guide_id: string | null;
+  design_guide_name: string | null;
   completed_at: string | null;
   created_at: string;
 };

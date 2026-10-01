@@ -12,6 +12,7 @@ from app.models.enums import MockupStatus
 from app.models.mixins import CreatedAtMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.design_guide import DesignGuide
     from app.models.lead import Lead
     from app.models.website_audit import WebsiteAudit
 
@@ -24,6 +25,7 @@ class Mockup(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         Index("ix_mockups_lead_id", "lead_id"),
         Index("ix_mockups_status", "status"),
         Index("ix_mockups_created_at", "created_at"),
+        Index("ix_mockups_design_guide_id", "design_guide_id"),
     )
 
     lead_id: Mapped[uuid.UUID] = mapped_column(
@@ -51,6 +53,13 @@ class Mockup(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    design_guide_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("design_guides.id", ondelete="SET NULL"),
+    )
+    design_guide_name: Mapped[str | None] = mapped_column(String(120))
+    design_guide_snapshot: Mapped[str | None] = mapped_column(Text)
 
     lead: Mapped["Lead"] = relationship(back_populates="mockups")
     audit: Mapped["WebsiteAudit | None"] = relationship(back_populates="mockups")
+    design_guide: Mapped["DesignGuide | None"] = relationship()

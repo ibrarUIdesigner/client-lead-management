@@ -3,6 +3,7 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 import app.models  # noqa: F401
 from app.db.base import Base
 from app.models.enums import (
+    ApifyRunStatus,
     AuditStatus,
     DiscoveryRunStatus,
     DiscoveryTrigger,
@@ -27,6 +28,12 @@ EXPECTED_TABLES = {
     "gmail_accounts",
     "gmail_oauth_states",
     "lead_emails",
+    "apify_connectors",
+    "apify_runs",
+    "apify_dataset_items",
+    "apify_imports",
+    "apify_dismissed_actors",
+    "design_guides",
 }
 
 
@@ -84,6 +91,7 @@ def test_status_constraints_list_every_enum_value() -> None:
         ("followups", "ck_followups_status"): FollowupStatus,
         ("discovery_runs", "ck_discovery_runs_status"): DiscoveryRunStatus,
         ("discovery_runs", "ck_discovery_runs_run_trigger"): DiscoveryTrigger,
+        ("apify_runs", "ck_apify_runs_status"): ApifyRunStatus,
     }
 
     for (table_name, constraint_name), enum_cls in expected.items():
@@ -119,6 +127,17 @@ def test_required_indexes_and_unique_keys_exist() -> None:
         "ix_activities_lead_id_created_at",
         "uq_leads_source_key",
         "ix_discovery_runs_search_id_started_at",
+        "uq_apify_connectors_actor_id",
+        "ix_apify_runs_connector_id_started_at",
+        "ix_apify_runs_status",
+        "uq_apify_runs_apify_run_id",
+        "uq_apify_runs_connector_request",
+        "uq_apify_dataset_items_run_item",
+        "uq_apify_imports_source_key",
+        "uq_apify_imports_lead_id",
+        "uq_apify_dismissed_actors_actor_id",
+        "ix_design_guides_updated_at",
+        "ix_mockups_design_guide_id",
     } <= index_names
 
     mockup_uniques = {
@@ -130,6 +149,21 @@ def test_required_indexes_and_unique_keys_exist() -> None:
 
     brand_lead = Base.metadata.tables["brand_profiles"].c.lead_id
     assert brand_lead.unique is True
+
+
+def test_apify_rows_follow_their_parent() -> None:
+    pairs = {
+        ("apify_runs", "connector_id"): ("apify_connectors", "CASCADE"),
+        ("apify_dataset_items", "run_id"): ("apify_runs", "CASCADE"),
+        ("apify_imports", "lead_id"): ("leads", "CASCADE"),
+        ("apify_imports", "run_id"): ("apify_runs", "SET NULL"),
+        ("mockups", "design_guide_id"): ("design_guides", "SET NULL"),
+    }
+
+    for (table_name, column_name), (target, ondelete) in pairs.items():
+        foreign_key = next(iter(Base.metadata.tables[table_name].c[column_name].foreign_keys))
+        assert foreign_key.column.table.name == target
+        assert foreign_key.ondelete == ondelete
 
 
 def test_activity_metadata_column_keeps_the_schema_name() -> None:

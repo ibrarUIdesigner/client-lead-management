@@ -10,7 +10,10 @@ import { Topbar } from "./Topbar";
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
-  const wide = location.pathname === "/leads";
+  const wide =
+    location.pathname === "/leads" ||
+    location.pathname === "/apify" ||
+    location.pathname.startsWith("/design-md");
 
   useEffect(() => {
     const media = window.matchMedia("(min-width: 1024px)");

@@ -83,5 +83,16 @@ class DiscoveryTrigger(StrEnum):
     MANUAL = "manual"
 
 
+class ApifyRunStatus(StrEnum):
+    READY = "READY"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    TIMING_OUT = "TIMING-OUT"
+    TIMED_OUT = "TIMED-OUT"
+    ABORTING = "ABORTING"
+    ABORTED = "ABORTED"
+
+
 def enum_values(enum_cls: type[StrEnum]) -> tuple[str, ...]:
     return tuple(item.value for item in enum_cls)
