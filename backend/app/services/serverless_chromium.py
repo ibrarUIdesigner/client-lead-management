@@ -50,8 +50,9 @@ SERVERLESS_ARGS = (
     "--allow-running-insecure-content",
     "--disable-setuid-sandbox",
     "--disable-site-isolation-trials",
+    "--disable-dev-shm-usage",
     "--disable-web-security",
-    "--headless='shell'",
+    "--headless=shell",
     "--no-sandbox",
     "--no-zygote",
 )
@@ -102,19 +103,21 @@ def ensure_serverless_chromium(
         and libraries.is_dir()
     ):
         _apply_environment(root)
-        return str(executable)
+        return _launcher(root, executable)
 
     archive = root / "chromium-pack.tar"
     pack_dir = root / "chromium-pack"
     try:
         _download(chromium_pack_url(), archive)
         _extract_pack(archive, pack_dir)
+        # Free the archive before the 200 MB binary is written into /tmp.
+        archive.unlink(missing_ok=True)
         _inflate_pack(pack_dir, root)
     except ServerlessBrowserError:
         raise
     except Exception as exc:
         logger.exception("serverless_chromium_setup_failed")
-        raise ServerlessBrowserError("serverless chromium could not be installed") from exc
+        raise ServerlessBrowserError("The browser files could not be unpacked.") from exc
     finally:
         archive.unlink(missing_ok=True)
         shutil.rmtree(pack_dir, ignore_errors=True)
@@ -127,9 +130,9 @@ def ensure_serverless_chromium(
     if not ready:
         executable.unlink(missing_ok=True)
         logger.error("serverless_chromium_incomplete")
-        raise ServerlessBrowserError("serverless chromium could not be installed")
+        raise ServerlessBrowserError("The browser files could not be unpacked.")
     _apply_environment(root)
-    return str(executable)
+    return _launcher(root, executable)
 
 
 def _apply_environment(root: Path) -> None:
@@ -163,7 +166,7 @@ def _download(url: str, dest: Path) -> None:
             partial.unlink(missing_ok=True)
             dest.unlink(missing_ok=True)
             logger.warning("serverless_chromium_download_failed")
-    raise ServerlessBrowserError("serverless chromium could not be downloaded") from last_error
+    raise ServerlessBrowserError("The browser download did not finish.") from last_error
 
 
 def _extract_pack(archive: Path, dest: Path) -> None:
@@ -186,7 +189,7 @@ def _extract_pack(archive: Path, dest: Path) -> None:
             found.add(name)
     missing = [name for name in _PACK_FILES if name not in found]
     if missing:
-        raise ServerlessBrowserError("serverless chromium pack is incomplete")
+        raise ServerlessBrowserError("The browser files could not be unpacked.")
 
 
 def _inflate_pack(pack_dir: Path, root: Path) -> None:
@@ -200,10 +203,36 @@ def _inflate_pack(pack_dir: Path, root: Path) -> None:
 
 def _decompress_file(source: Path, target: Path, *, executable: bool) -> None:
     temporary = target.with_name(f"{target.name}.partial")
-    temporary.write_bytes(brotli.decompress(source.read_bytes()))
+    decompressor = brotli.Decompressor()
+    with source.open("rb") as infile, temporary.open("wb") as outfile:
+        while chunk := infile.read(1024 * 1024):
+            outfile.write(decompressor.process(chunk))
+        if not decompressor.is_finished():
+            outfile.write(decompressor.process(b""))
     if executable:
         temporary.chmod(0o755)
     temporary.replace(target)
+
+
+def _launcher(root: Path, binary: Path) -> str:
+    """Launch Chromium with the library path Playwright would otherwise drop."""
+    script = root / "chromium-launcher"
+    library = root / "al2023" / "lib"
+    script.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                f'export LD_LIBRARY_PATH="{library}${{LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}"',
+                f'export FONTCONFIG_PATH="{root / "fonts"}"',
+                f'export HOME="{root}"',
+                f'exec "{binary}" "$@"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    return str(script)
 
 
 def _extract_tar_brotli(source: Path, dest: Path) -> None:

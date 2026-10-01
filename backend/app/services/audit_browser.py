@@ -195,9 +195,9 @@ async def _capture_website(url: str) -> CapturedPage:
         # inherits the library path the serverless Chromium needs.
         try:
             ensure_serverless_chromium()
-        except ServerlessBrowserError:
+        except ServerlessBrowserError as exc:
             logger.exception("audit_serverless_browser_failed")
-            raise AuditRunError("The website browser could not be started.") from None
+            raise _browser_start_error(exc) from None
     async with async_playwright() as playwright:
         browser = await _launch_browser(playwright)
         try:
@@ -213,14 +213,17 @@ async def _launch_browser(playwright: Any) -> Any:
             executable = ensure_serverless_chromium()
             return await playwright.chromium.launch(
                 executable_path=executable,
+                # The serverless build is chrome-headless-shell. Playwright's default
+                # --headless flag makes that binary exit immediately.
+                headless=False,
                 args=list(SERVERLESS_ARGS),
                 env=browser_environment(),
             )
         except AuditRunError:
             raise
-        except Exception:
+        except Exception as exc:
             logger.exception("audit_serverless_browser_failed")
-            raise AuditRunError("The website browser could not be started.") from None
+            raise _browser_start_error(exc) from None
     attempts: list[dict[str, object]] = [
         {},
         {"channel": "chrome"},
@@ -242,6 +245,23 @@ async def _launch_browser(playwright: Any) -> Any:
         ) from None
     logger.warning("audit_browser_unavailable")
     raise AuditRunError("The website browser could not be started.") from None
+
+
+def _browser_start_error(exc: BaseException) -> AuditRunError:
+    detail = ""
+    for line in str(exc).splitlines():
+        cleaned = " ".join(line.split())
+        if not cleaned or cleaned.startswith("File ") or cleaned.startswith("Traceback"):
+            continue
+        if "browser logs" in cleaned.lower() or cleaned.startswith("Call log"):
+            continue
+        detail = cleaned
+    if len(detail) > 180:
+        detail = detail[:180].rstrip() + "..."
+    message = "The website browser could not be started."
+    if detail and detail != message:
+        message = f"{message} {detail}"
+    return AuditRunError(message)
 
 
 async def _capture(browser: Any, url: str) -> CapturedPage:

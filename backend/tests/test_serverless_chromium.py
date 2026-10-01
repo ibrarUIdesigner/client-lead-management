@@ -66,12 +66,13 @@ def test_serverless_chromium_is_unpacked_for_vercel(
         dest.write_bytes(pack)
 
     monkeypatch.setattr("app.services.serverless_chromium._download", fake_download)
-    executable = Path(ensure_serverless_chromium(tmp_path, minimum_bytes=1))
+    launched = Path(ensure_serverless_chromium(tmp_path, minimum_bytes=1))
 
-    assert executable.read_bytes() == b"fake-chromium-binary"
+    assert (tmp_path / "chromium").read_bytes() == b"fake-chromium-binary"
     assert (tmp_path / "al2023" / "lib" / "libnss3.so").is_file()
     assert (tmp_path / "fonts" / "fonts.conf").is_file()
     assert (tmp_path / "libGLESv2.so").is_file()
+    assert 'exec "' in launched.read_text(encoding="utf-8")
     assert not (tmp_path / "chromium-pack.tar").exists()
 
 
@@ -87,7 +88,7 @@ def test_installed_serverless_chromium_is_reused(
 
     monkeypatch.setattr("app.services.serverless_chromium._download", fail_download)
 
-    assert ensure_serverless_chromium(tmp_path, minimum_bytes=1) == str(binary)
+    assert Path(ensure_serverless_chromium(tmp_path, minimum_bytes=1)).name == "chromium-launcher"
 
 
 def test_vercel_capture_installs_chromium_before_playwright(
@@ -148,8 +149,9 @@ def test_vercel_launch_uses_the_serverless_binary(monkeypatch: pytest.MonkeyPatc
 
     assert asyncio.run(_launch_browser(Playwright())) == "browser"
     assert seen["executable_path"] == "/tmp/chromium"
+    assert seen["headless"] is False
+    assert "--headless=shell" in seen["args"]
     assert "--no-sandbox" in seen["args"]
-    assert "playwright install" not in str(seen)
 
 
 def test_vercel_browser_failure_does_not_ask_for_a_local_install(
