@@ -78,6 +78,59 @@ def test_screenshot_must_be_a_png(tmp_path: Path) -> None:
         save_screenshot(tmp_path, "leads/a/audits/b/desktop.png", b"<html>")
 
 
+def test_stored_screenshot_is_served_when_the_file_is_gone(tmp_path: Path) -> None:
+    from app.services.storage import encode_png, read_screenshot
+
+    png = b"\x89PNG\r\n\x1a\n" + b"pixels"
+    encoded = encode_png(png)
+
+    assert encoded is not None
+    loaded = read_screenshot(
+        tmp_path,
+        "leads/a/audits/b/desktop.png",
+        {"desktop_png": encoded},
+        "desktop",
+    )
+
+    assert loaded == png
+
+
+def test_audit_response_omits_stored_screenshot_bytes() -> None:
+    from datetime import UTC, datetime
+
+    from app.schemas.audits import AuditRead
+
+    audit = AuditRead.model_validate(
+        {
+            "id": uuid4(),
+            "lead_id": uuid4(),
+            "url": "https://example.com",
+            "status": "COMPLETED",
+            "desktop_screenshot_url": "leads/a/desktop.png",
+            "performance_score": None,
+            "design_score": None,
+            "mobile_score": None,
+            "ux_score": None,
+            "seo_score": None,
+            "overall_score": None,
+            "has_ssl": True,
+            "is_mobile_responsive": True,
+            "has_clear_cta": True,
+            "has_contact_form": False,
+            "has_social_proof": False,
+            "has_modern_navigation": True,
+            "issues": [],
+            "recommendations": [],
+            "raw_analysis": {"title": "Cafe", "desktop_png": "abc", "mobile_png": "def"},
+            "completed_at": datetime.now(UTC),
+            "created_at": datetime.now(UTC),
+        }
+    )
+
+    assert audit.raw_analysis == {"title": "Cafe"}
+    assert audit.has_desktop_screenshot is True
+
+
 def test_missing_website_scores_thirty_points() -> None:
     analysis = analyze_missing_website()
 

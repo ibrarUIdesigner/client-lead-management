@@ -45,4 +45,11 @@ class AuditRead(BaseModel):
     def screenshot_flags(self) -> Self:
         self.has_desktop_screenshot = bool(self.desktop_screenshot_url)
         self.has_mobile_screenshot = bool(self.mobile_screenshot_url)
+        raw = self.raw_analysis
+        if isinstance(raw, dict):
+            self.raw_analysis = {
+                key: value
+                for key, value in raw.items()
+                if key not in {"desktop_png", "mobile_png"}
+            }
         return self

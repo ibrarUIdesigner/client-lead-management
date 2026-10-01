@@ -38,6 +38,7 @@ from app.schemas.gmail import (
 from app.services.gmail_accounts import GmailAccountService
 from app.services.outreach_copy import next_lead_status
 from app.services.persistence import flush_or_reject
+from app.services.storage import read_screenshot, resolve_storage_path
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +386,6 @@ class GmailMailService:
         audit_id: UUID | None,
         mockup_ids: list[UUID],
     ) -> list[GmailAttachment]:
-        from app.services.storage import resolve_storage_path
-
         attachments: list[GmailAttachment] = []
         if audit_id is not None:
             audit = self.session.get(WebsiteAudit, audit_id)
@@ -396,14 +395,20 @@ class GmailMailService:
                     message="That audit could not be found.",
                     status_code=404,
                 )
+            variant = "desktop" if audit.desktop_screenshot_url else "mobile"
             relative = audit.desktop_screenshot_url or audit.mobile_screenshot_url
-            if relative:
-                path = resolve_storage_path(self.settings.storage_dir, relative)
+            content = read_screenshot(
+                self.settings.storage_dir,
+                relative,
+                audit.raw_analysis,
+                variant,
+            )
+            if content:
                 attachments.append(
                     GmailAttachment(
-                        filename=path.name or f"audit-{audit.id}.png",
+                        filename=f"audit-{audit.id}.png",
                         content_type="image/png",
-                        content=self._read_attachment_bytes(path),
+                        content=self._limit_attachment(content),
                     )
                 )
         for mockup_id in mockup_ids:
@@ -421,13 +426,15 @@ class GmailMailService:
                     GmailAttachment(
                         filename=path.name or f"mockup-{mockup.id}.png",
                         content_type="image/png",
-                        content=self._read_attachment_bytes(path),
+                        content=self._limit_attachment(self._read_attachment_bytes(path)),
                     )
                 )
         return attachments
 
     def _read_attachment_bytes(self, path: Path) -> bytes:
-        content = path.read_bytes()
+        return path.read_bytes()
+
+    def _limit_attachment(self, content: bytes) -> bytes:
         if len(content) > 20 * 1024 * 1024:
             raise AppError(
                 code="ATTACHMENT_TOO_LARGE",

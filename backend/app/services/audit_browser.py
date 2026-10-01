@@ -8,6 +8,13 @@ from urllib.parse import urlsplit
 
 from app.core.errors import AppError
 from app.services.audit_analysis import CapturedPage
+from app.services.serverless_chromium import (
+    SERVERLESS_ARGS,
+    ServerlessBrowserError,
+    browser_environment,
+    ensure_serverless_chromium,
+    serverless_runtime,
+)
 from app.services.url_safety import assert_public_http_url
 
 logger = logging.getLogger(__name__)
@@ -183,6 +190,14 @@ async def _capture_website(url: str) -> CapturedPage:
         raise AuditRunError(
             "The website browser is not available. Install Playwright in the API environment."
         ) from None
+    if serverless_runtime():
+        # Install the browser before Playwright starts its driver, so the driver
+        # inherits the library path the serverless Chromium needs.
+        try:
+            ensure_serverless_chromium()
+        except ServerlessBrowserError:
+            logger.exception("audit_serverless_browser_failed")
+            raise AuditRunError("The website browser could not be started.") from None
     async with async_playwright() as playwright:
         browser = await _launch_browser(playwright)
         try:
@@ -193,6 +208,19 @@ async def _capture_website(url: str) -> CapturedPage:
 
 async def _launch_browser(playwright: Any) -> Any:
     """Prefer Playwright Chromium, then the system Chrome or Edge install."""
+    if serverless_runtime():
+        try:
+            executable = ensure_serverless_chromium()
+            return await playwright.chromium.launch(
+                executable_path=executable,
+                args=list(SERVERLESS_ARGS),
+                env=browser_environment(),
+            )
+        except AuditRunError:
+            raise
+        except Exception:
+            logger.exception("audit_serverless_browser_failed")
+            raise AuditRunError("The website browser could not be started.") from None
     attempts: list[dict[str, object]] = [
         {},
         {"channel": "chrome"},

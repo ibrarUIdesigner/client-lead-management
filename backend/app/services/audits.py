@@ -26,7 +26,7 @@ from app.services.audit_browser import AuditRunError, capture_website
 from app.services.audit_crawl import crawl_site
 from app.services.audit_crux import fetch_crux
 from app.services.audit_pagespeed import fetch_pagespeed, pagespeed_tool
-from app.services.storage import save_screenshot, screenshot_key
+from app.services.storage import encode_png, save_screenshot, screenshot_key
 from app.services.url_safety import assert_public_http_url
 
 logger = logging.getLogger(__name__)
@@ -150,6 +150,7 @@ class AuditService:
             audit.desktop_screenshot_url = self._store(audit, "desktop", captured.desktop_png)
             audit.mobile_screenshot_url = self._store(audit, "mobile", captured.mobile_png)
             self._apply(audit, analysis, website_status="analyzed")
+            self._remember_screenshots(audit, captured.desktop_png, captured.mobile_png)
             self.activities.add(
                 audit.lead_id,
                 "audit_completed",
@@ -280,9 +281,23 @@ class AuditService:
         try:
             key = screenshot_key(str(audit.lead_id), str(audit.id), variant)
             return save_screenshot(self.storage_dir, key, data)
-        except AppError:
+        except (AppError, OSError):
             logger.warning("audit_screenshot_rejected")
             return None
+
+    def _remember_screenshots(self, audit: WebsiteAudit, desktop: bytes, mobile: bytes) -> None:
+        raw = audit.raw_analysis
+        if not isinstance(raw, dict):
+            return
+        stored = dict(raw)
+        desktop_png = encode_png(desktop)
+        mobile_png = encode_png(mobile)
+        if desktop_png:
+            stored["desktop_png"] = desktop_png
+        if mobile_png:
+            stored["mobile_png"] = mobile_png
+        if desktop_png or mobile_png:
+            audit.raw_analysis = stored
 
     def _touch_lead_status(self, lead: Lead, audit_status: str) -> None:
         if lead.lead_status not in _PROGRESS:

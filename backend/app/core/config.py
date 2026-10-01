@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -52,6 +53,11 @@ class Settings(BaseSettings):
         if hosted and _is_local_database(url):
             url = hosted
         self.database_url = _normalize_database_url(url)
+        if os.environ.get("VERCEL") == "1" and "STORAGE_DIR" not in os.environ:
+            default_storage = (ROOT_DIR / "storage").resolve()
+            if self.storage_dir.resolve() == default_storage:
+                # The deployment filesystem is read-only. Screenshots go to /tmp.
+                self.storage_dir = Path("/tmp/storage")
         return self
 
     @property

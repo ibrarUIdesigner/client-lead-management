@@ -4,14 +4,14 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Request
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from starlette.responses import Response
 
 from app.api.deps import SessionDep
 from app.core.errors import AppError
 from app.schemas.audits import AuditRead
 from app.services.audits import AuditService
-from app.services.storage import resolve_storage_path
+from app.services.storage import read_screenshot
 
 logger = logging.getLogger(__name__)
 
@@ -95,29 +95,33 @@ async def rerun_audit(
 @router.get("/audits/{audit_id}/screenshots/{variant}")
 def get_screenshot(
     audit_id: UUID, variant: str, request: Request, session: SessionDep
-) -> FileResponse:
+) -> Response:
     service = AuditService(session, request.app.state.settings.storage_dir)
     audit = service.get(audit_id)
-    relative = audit.desktop_screenshot_url if variant == "desktop" else None
-    if variant == "mobile":
+    relative = None
+    if variant == "desktop":
+        relative = audit.desktop_screenshot_url
+    elif variant == "mobile":
         relative = audit.mobile_screenshot_url
-    if variant not in {"desktop", "mobile"} or not relative:
+    data = None
+    if variant in {"desktop", "mobile"}:
+        data = read_screenshot(
+            request.app.state.settings.storage_dir,
+            relative,
+            audit.raw_analysis,
+            variant,
+        )
+    if data is None:
         raise AppError(
             code="NOT_FOUND",
             message="That screenshot could not be found.",
             status_code=404,
         )
-    path = resolve_storage_path(request.app.state.settings.storage_dir, relative)
-    if not path.is_file():
-        raise AppError(
-            code="NOT_FOUND",
-            message="That screenshot could not be found.",
-            status_code=404,
-        )
-    return FileResponse(
-        path,
+    return Response(
+        content=data,
         media_type="image/png",
-        filename=f"{variant}.png",
-        content_disposition_type="inline",
-        headers={"Cache-Control": "private, max-age=300"},
+        headers={
+            "Content-Disposition": f'inline; filename="{variant}.png"',
+            "Cache-Control": "private, max-age=300",
+        },
     )
