@@ -8,6 +8,7 @@ from app.api.v1 import (
     followups,
     gmail,
     health,
+    jobs,
     leads,
     mockups,
     outreach,
@@ -16,6 +17,7 @@ from app.api.v1 import (
 
 api_router = APIRouter()
 api_router.include_router(health.router)
+api_router.include_router(jobs.router)
 api_router.include_router(leads.router)
 api_router.include_router(audits.router)
 api_router.include_router(outreach.router)

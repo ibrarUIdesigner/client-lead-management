@@ -1,0 +1,14 @@
+node_modules
+.venv
+.tools
+storage
+.git
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+frontend/dist
+.env
+.env.*
+!.env.example
+*.log

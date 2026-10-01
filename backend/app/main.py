@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -44,7 +45,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     discovery_scheduler = None
     gmail_scheduler = None
     settings = app.state.settings
-    if settings.app_env != "test":
+    # In-process schedulers do not survive serverless instances. Vercel Cron calls
+    # the job routes instead.
+    if settings.app_env != "test" and os.environ.get("VERCEL") != "1":
         if settings.discovery_enabled:
             discovery_scheduler = start_discovery_scheduler(app)
             app.state.discovery_scheduler = discovery_scheduler

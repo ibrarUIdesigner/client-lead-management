@@ -196,6 +196,7 @@ def start_discovery_run(
     *,
     search_id: UUID | None,
     trigger: DiscoveryTrigger,
+    wait: bool = False,
 ) -> str:
     """Return started, busy, empty, or skipped."""
     if not _begin_run():
@@ -210,6 +211,9 @@ def start_discovery_run(
         if trigger is DiscoveryTrigger.DAILY:
             return "skipped"
         return "empty"
+    if wait:
+        _execute_runs(session_factory, settings, run_ids)
+        return "started"
     threading.Thread(
         target=_execute_runs,
         args=(session_factory, settings, run_ids),

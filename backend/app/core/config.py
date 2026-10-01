@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -38,11 +38,21 @@ class Settings(BaseSettings):
     apify_token: str = ""
     apify_api_base: str = "https://api.apify.com/v2"
     design_md_max_bytes: int = Field(default=262_144, ge=1_024, le=5_000_000)
+    postgres_url: str = ""
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def use_hosted_database(self) -> "Settings":
+        url = self.database_url
+        hosted = self.postgres_url.strip()
+        if hosted and _is_local_database(url):
+            url = hosted
+        self.database_url = _normalize_database_url(url)
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -51,6 +61,19 @@ class Settings(BaseSettings):
     @property
     def gmail_oauth_configured(self) -> bool:
         return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
+
+
+def _is_local_database(url: str) -> bool:
+    return "127.0.0.1" in url or "localhost" in url
+
+
+def _normalize_database_url(url: str) -> str:
+    cleaned = url.strip()
+    if cleaned.startswith("postgres://"):
+        cleaned = "postgresql://" + cleaned[len("postgres://") :]
+    if cleaned.startswith("postgresql://"):
+        cleaned = "postgresql+psycopg://" + cleaned[len("postgresql://") :]
+    return cleaned
 
 
 @lru_cache
