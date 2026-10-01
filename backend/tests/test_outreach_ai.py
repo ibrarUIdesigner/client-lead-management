@@ -69,6 +69,7 @@ def test_offer_from_findings_mentions_the_weak_point() -> None:
     assert "performance" in offer.lower()
     assert "Slow pages" in offer
     assert "dentist" in offer.lower()
+    assert "$1,450" in offer
 
 
 def test_offer_from_findings_without_a_website() -> None:

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -133,18 +134,8 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
     );
   }
 
-  if (running) {
-    return (
-      <Card>
-        <div className="flex items-center gap-3" aria-live="polite">
-          <Spinner />
-          <div>
-            <h2 className="text-h4 font-semibold text-ink">Analyzing the website</h2>
-            <p className="mt-1 text-body text-gray-600">This usually takes one to two minutes.</p>
-          </div>
-        </div>
-      </Card>
-    );
+  if (running && audit.data) {
+    return <AnalyzingAudit url={audit.data.url ?? websiteUrl} startedAt={audit.data.created_at} />;
   }
 
   if (audit.data.status === "FAILED") {
@@ -175,6 +166,125 @@ export function AuditPanel({ leadId, websiteUrl }: AuditPanelProps) {
       }}
     />
   );
+}
+
+const analysisStages = [
+  {
+    title: "Homepage",
+    detail: "Open the public URL and read the page that customers see first.",
+    at: 0,
+  },
+  {
+    title: "Screenshots",
+    detail: "Capture the desktop layout and the phone layout.",
+    at: 12,
+  },
+  {
+    title: "Speed and mobile",
+    detail: "Measure loading, responsiveness, and real-visitor data when Chrome has it.",
+    at: 28,
+  },
+  {
+    title: "Linked pages",
+    detail: "Follow About, Contact, and a service page when those links exist.",
+    at: 50,
+  },
+  {
+    title: "Scores and findings",
+    detail: "Score performance, design, SEO, usability, and mobile, then list what to fix.",
+    at: 75,
+  },
+];
+
+function AnalyzingAudit({ url, startedAt }: { url: string | null; startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const started = Date.parse(startedAt);
+  const elapsed = Number.isNaN(started) ? 0 : Math.max(0, Math.floor((now - started) / 1000));
+  const current = analysisStages.findLastIndex((stage) => elapsed >= stage.at);
+  const active = current < 0 ? 0 : current;
+  const progress = Math.min(92, Math.round((elapsed / 90) * 92));
+
+  return (
+    <Card className="shadow-sm" aria-live="polite">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-caption font-semibold text-gray-500">Website audit</p>
+          <h2 className="mt-1 text-h4 font-semibold text-ink">Analyzing the website</h2>
+          <p className="mt-1 text-body text-gray-600">
+            Homepage, screenshots, speed, linked pages, and scores run as one check. Results
+            replace this view when the full audit is ready. That is usually one to two minutes.
+          </p>
+        </div>
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-700">
+          <Spinner />
+        </span>
+      </div>
+
+      {url ? (
+        <p className="mt-4 truncate text-small font-medium text-ink" title={url}>
+          {url}
+        </p>
+      ) : null}
+
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between gap-3 text-caption text-gray-500">
+          <span>{formatElapsed(elapsed)} elapsed</span>
+          <span>Estimate, not a finished percent</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+
+      <ol className="mt-5 space-y-3">
+        {analysisStages.map((stage, index) => {
+          const state = index === active ? "now" : index < active ? "started" : "next";
+          return (
+            <li key={stage.title} className="flex gap-3">
+              <span
+                className={cn(
+                  "mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-caption font-bold",
+                  state === "now" && "bg-primary text-white",
+                  state === "started" && "bg-primary-50 text-primary-700",
+                  state === "next" && "bg-gray-100 text-gray-500",
+                )}
+              >
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="text-body font-semibold text-ink">
+                  {stage.title}
+                  <span className="ml-2 text-caption font-medium text-gray-500">
+                    {state === "now" ? "Checking now" : state === "started" ? "Underway" : "Next"}
+                  </span>
+                </p>
+                <p className="mt-0.5 text-small text-gray-600">{stage.detail}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
+  );
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) {
+    return `${seconds}s`;
+  }
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
 function AuditResults({

@@ -165,7 +165,11 @@ export function ConversationPanel({ leadId }: ConversationPanelProps) {
         </div>
       </div>
 
-      {summary ? (
+      {summary &&
+      (summary.items.length > 0 ||
+        summary.email_unread ||
+        summary.do_not_contact ||
+        summary.email_suppressed) ? (
         <div className="flex flex-wrap gap-2">
           <Badge tone={summary.email_unread ? "orange" : "gray"}>
             {summary.email_unread ? `Unread (${summary.unread_count})` : "No unread"}
@@ -204,8 +208,9 @@ export function ConversationPanel({ leadId }: ConversationPanelProps) {
       >
         {summary && summary.items.length === 0 ? (
           <EmptyState
+            compact
             title="No Gmail messages yet"
-            description="Send from the composer or an outreach draft after Gmail is connected."
+            description="Sent mail and replies show up here after Gmail is connected."
           />
         ) : null}
         {summary && summary.items.length > 0 ? (

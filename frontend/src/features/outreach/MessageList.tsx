@@ -23,12 +23,23 @@ type MessageListProps = {
   leadId?: string;
   focusId?: string | null;
   expandFirstDraft?: boolean;
+  statuses?: string[];
+  onSelect?: (item: OutreachMessageItem) => void;
 };
 
-export function MessageList({ leadId, focusId, expandFirstDraft = false }: MessageListProps) {
+export function MessageList({
+  leadId,
+  focusId,
+  expandFirstDraft = false,
+  statuses,
+  onSelect,
+}: MessageListProps) {
   const messages = useOutreachMessages(leadId);
+  const visible = (messages.data ?? []).filter(
+    (item) => !statuses || statuses.includes(item.status),
+  );
   const firstDraftId = expandFirstDraft
-    ? messages.data?.find((item) => isDraft(item.status))?.id
+    ? visible.find((item) => isDraft(item.status))?.id
     : undefined;
   const openId = focusId || firstDraftId;
 
@@ -41,24 +52,28 @@ export function MessageList({ leadId, focusId, expandFirstDraft = false }: Messa
       }}
       fallback="Outreach could not be loaded."
     >
-      {messages.data && messages.data.length === 0 ? (
+      {messages.data && visible.length === 0 ? (
         <EmptyState
-          title="No outreach yet"
+          compact={Boolean(leadId) || Boolean(statuses)}
+          title={messages.data.length === 0 ? "No outreach yet" : "Nothing in this view"}
           description={
-            leadId
-              ? "The findings above become the email. Write the draft, send it from your email app, then mark it here."
-              : "Open a lead to write an email. Drafts you can send will show up here."
+            messages.data.length === 0
+              ? leadId
+                ? "Write the draft above. It shows up here, ready to send."
+                : "Open a lead, write a draft from its audit, then send it from here."
+              : "Try another filter. Drafts, sent notes, and replies are kept."
           }
         />
       ) : null}
-      {messages.data && messages.data.length > 0 ? (
+      {visible.length > 0 ? (
         <div className="space-y-4">
-          {messages.data.map((item) => (
+          {visible.map((item) => (
             <MessageCard
               key={item.id}
               item={item}
               startEditing={item.id === openId}
               onLeadPage={Boolean(leadId)}
+              onSelect={onSelect}
             />
           ))}
         </div>
@@ -71,10 +86,12 @@ function MessageCard({
   item,
   startEditing,
   onLeadPage,
+  onSelect,
 }: {
   item: OutreachMessageItem;
   startEditing: boolean;
   onLeadPage: boolean;
+  onSelect?: (item: OutreachMessageItem) => void;
 }) {
   const { notify } = useToast();
   const updateOutreach = useUpdateOutreach();
@@ -199,10 +216,28 @@ function MessageCard({
   };
 
   return (
-    <Card>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <Card
+      className={onSelect ? "cursor-pointer transition-colors hover:border-primary-200" : undefined}
+    >
+      <div
+        className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        onClick={() => {
+          onSelect?.(item);
+        }}
+        onKeyDown={(event) => {
+          if (!onSelect) {
+            return;
+          }
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect(item);
+          }
+        }}
+        role={onSelect ? "button" : undefined}
+        tabIndex={onSelect ? 0 : undefined}
+      >
         <div>
-          {onLeadPage ? null : (
+          {onLeadPage || onSelect ? null : (
             <Link
               to={`/leads/${item.lead_id}`}
               className={cn("font-semibold text-ink hover:text-primary-700", focusRing)}
@@ -210,6 +245,7 @@ function MessageCard({
               {item.business_name}
             </Link>
           )}
+          {onSelect ? <p className="font-semibold text-ink">{item.business_name}</p> : null}
           {editing ? (
             <p className="font-semibold text-ink">Email draft</p>
           ) : (
@@ -220,6 +256,9 @@ function MessageCard({
           <p className="mt-1 text-small text-gray-600">
             {[item.recipient_email, item.channel, formatWhen(when)].filter(Boolean).join(" · ")}
           </p>
+          {onSelect ? (
+            <p className="mt-2 text-small font-semibold text-primary-700">Open conversation</p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           {item.channel ? <Badge>{item.channel}</Badge> : null}
@@ -244,11 +283,24 @@ function MessageCard({
           />
         </div>
       ) : item.message ? (
-        <p className="mt-4 rounded-control border border-gray-100 bg-gray-50 px-4 py-3 whitespace-pre-wrap text-body text-gray-700">
+        <p
+          className="mt-4 rounded-control border border-gray-100 bg-gray-50 px-4 py-3 whitespace-pre-wrap text-body text-gray-700"
+          onClick={() => {
+            onSelect?.(item);
+          }}
+        >
           {item.message}
         </p>
       ) : null}
-      <div className="mt-4">
+      <div
+        className="mt-4"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+        }}
+      >
         <p className="text-caption font-semibold text-gray-500">
           {draft ? "3. Send it yourself, then record it" : nextStep(item.status)}
         </p>

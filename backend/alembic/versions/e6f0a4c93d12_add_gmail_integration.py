@@ -37,6 +37,27 @@ _LEAD_STATUSES = (
 
 
 def upgrade() -> None:
+    # The baseline migration creates the current models, including these tables.
+    # Skip when they are already present so a fresh database can still migrate.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    tables = set(inspector.get_table_names())
+    lead_columns: set[str] = set()
+    if "leads" in tables:
+        lead_columns = {column["name"] for column in inspector.get_columns("leads")}
+    if {
+        "gmail_accounts",
+        "gmail_oauth_states",
+        "lead_emails",
+    } <= tables and {
+        "last_replied_at",
+        "email_unread",
+        "do_not_contact",
+        "email_suppressed",
+        "suppressed_email",
+    } <= lead_columns:
+        return
+
     op.create_table(
         "gmail_accounts",
         sa.Column("id", sa.Uuid(), server_default=sa.text("gen_random_uuid()"), nullable=False),

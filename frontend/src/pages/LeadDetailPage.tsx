@@ -179,28 +179,30 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
             id: "outreach",
             label: "Outreach",
             content: (
-              <div className="space-y-6">
-                <div className="grid items-start gap-6 xl:grid-cols-2">
-                  <OutreachComposer
-                    leadId={lead.id}
-                    email={lead.email}
-                    hasWebsite={Boolean(lead.website_url) && lead.website_status !== "missing"}
-                    onCreated={setOutreachFocus}
-                  />
-                  <section>
-                    <h2 className="text-h4 font-semibold text-ink">Messages</h2>
-                    <p className="mt-1 text-small text-gray-600">
-                      Review a draft, send it with Gmail or your mail app, then track replies here.
-                    </p>
-                    <div className="mt-4">
-                      <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
-                    </div>
-                  </section>
-                </div>
-                <div className="grid items-start gap-6 xl:grid-cols-2">
-                  <GmailComposer leadId={lead.id} defaultTo={lead.email} />
-                  <ConversationPanel leadId={lead.id} />
-                </div>
+              <div className="space-y-4">
+                <OutreachComposer
+                  leadId={lead.id}
+                  email={lead.email}
+                  hasWebsite={Boolean(lead.website_url) && lead.website_status !== "missing"}
+                  onCreated={setOutreachFocus}
+                />
+                <Card className="overflow-hidden p-0 shadow-sm">
+                  <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
+                    <section className="p-5">
+                      <h2 className="text-h4 font-semibold text-ink">Messages</h2>
+                      <p className="mt-1 text-small text-gray-600">
+                        Drafts from the form above land here.
+                      </p>
+                      <div className="mt-3">
+                        <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
+                      </div>
+                    </section>
+                    <section className="border-t border-gray-100 p-5 lg:border-t-0">
+                      <ConversationPanel leadId={lead.id} />
+                    </section>
+                  </div>
+                </Card>
+                <GmailComposer leadId={lead.id} defaultTo={lead.email} />
               </div>
             ),
           },

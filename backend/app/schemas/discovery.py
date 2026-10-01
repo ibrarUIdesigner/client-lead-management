@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.services.discovery_markets import ANYWHERE_CITY, ANYWHERE_COUNTRY
 from app.services.place_listings import category_is_valid
 
 
@@ -11,8 +12,8 @@ class DiscoverySearchCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     category: str = Field(min_length=2, max_length=80)
-    city: str = Field(min_length=2, max_length=120)
-    country: str = Field(min_length=2, max_length=120)
+    city: str = Field(default="", max_length=120)
+    country: str = Field(default="", max_length=120)
     use_openstreetmap: bool = True
     use_google: bool = True
     use_yelp: bool = True
@@ -26,6 +27,20 @@ class DiscoverySearchCreate(BaseModel):
         if any(ord(char) < 32 for char in value):
             raise ValueError("Use letters, numbers, and regular punctuation.")
         return value
+
+    @model_validator(mode="after")
+    def location_or_anywhere(self) -> Self:
+        city = self.city.strip()
+        country = self.country.strip()
+        if not city and not country:
+            self.city = ANYWHERE_CITY
+            self.country = ANYWHERE_COUNTRY
+            return self
+        if len(city) < 2 or len(country) < 2:
+            raise ValueError("Enter both a city and a country, or leave both empty.")
+        self.city = city
+        self.country = country
+        return self
 
     @field_validator("category")
     @classmethod

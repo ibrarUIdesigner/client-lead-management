@@ -48,10 +48,11 @@ export function GmailComposer({
 
   if (!connected) {
     return (
-      <Card>
+      <Card className="shadow-sm">
         <h2 className="text-h4 font-semibold text-ink">Send with Gmail</h2>
         <p className="mt-2 text-body text-gray-600">
-          Connect Gmail in Settings to send from this workspace.
+          Connect Gmail in Settings when you want to send from this workspace. Until then, open a
+          draft in your own mail app.
         </p>
       </Card>
     );

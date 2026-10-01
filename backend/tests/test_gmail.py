@@ -21,10 +21,12 @@ from app.models.enums import (
     FollowupStatus,
     GmailAccountStatus,
     LeadStatus,
+    OutreachStatus,
 )
 from app.models.followup import Followup
 from app.models.gmail import GmailAccount, GmailOAuthState, LeadEmail
 from app.models.lead import Lead
+from app.models.outreach import OutreachMessage
 from app.schemas.gmail import LeadEmailSendRequest
 from app.services.gmail_accounts import GmailAccountService
 from app.services.gmail_classify import classify_inbound_message
@@ -509,6 +511,173 @@ def test_ambiguous_match_flags_for_review() -> None:
     stored = next(item for item in added if isinstance(item, LeadEmail))
     assert stored.needs_review is True
     assert stored.classification == EmailClassification.AMBIGUOUS.value
+
+
+def test_self_reply_on_connected_address_is_a_human_reply() -> None:
+    session = MagicMock()
+    settings = _settings()
+    account = GmailAccount(email="me@example.com", status=GmailAccountStatus.ACTIVE.value)
+    account.id = uuid4()
+    lead = Lead(
+        business_name="Cafe",
+        email="me@example.com",
+        lead_status=LeadStatus.CONTACTED.value,
+    )
+    lead.id = uuid4()
+    outreach = OutreachMessage(
+        lead_id=lead.id,
+        subject="Hi",
+        message="Hello",
+        status=OutreachStatus.SENT.value,
+    )
+    service = GmailSyncService(session, settings, client=MagicMock())
+    service._match_leads = MagicMock(return_value=[lead.id])  # type: ignore[method-assign]
+    session.get.return_value = lead
+
+    class _Result:
+        def __init__(self, rows: list[object]) -> None:
+            self._rows = rows
+
+        def __iter__(self):
+            return iter(self._rows)
+
+        def first(self):
+            return self._rows[0] if self._rows else None
+
+    def scalars_for(statement=None, *args, **kwargs):  # noqa: ANN001
+        sql = str(statement)
+        if "OutreachMessage" in sql or "outreach_messages" in sql:
+            return _Result([outreach])
+        return _Result([])
+
+    session.scalars.side_effect = scalars_for
+    added: list[object] = []
+    session.add.side_effect = added.append
+    outcome = service._process_message(
+        account,
+        ParsedGmailMessage(
+            gmail_message_id="reply-1",
+            gmail_thread_id="thr-1",
+            rfc_message_id="<reply@mail.gmail.com>",
+            in_reply_to="<out@mail.gmail.com>",
+            references="<out@mail.gmail.com>",
+            subject="Re: Hi",
+            sender_email="me@example.com",
+            recipient_email="me@example.com",
+            body_text="Yes, let's talk.",
+            body_html=None,
+            label_ids=("SENT", "INBOX"),
+            internal_date=datetime.now(UTC),
+            snippet="Yes",
+        ),
+    )
+    assert outcome == "matched"
+    stored = next(item for item in added if isinstance(item, LeadEmail))
+    assert stored.direction == EmailDirection.INBOUND.value
+    assert stored.classification == EmailClassification.HUMAN_REPLY.value
+    assert lead.lead_status == LeadStatus.REPLIED.value
+    assert outreach.status == OutreachStatus.REPLIED.value
+
+
+def test_follow_up_sent_from_connected_account_stays_outbound() -> None:
+    session = MagicMock()
+    settings = _settings()
+    account = GmailAccount(email="me@example.com", status=GmailAccountStatus.ACTIVE.value)
+    account.id = uuid4()
+    lead = Lead(
+        business_name="Cafe",
+        email="lead@example.com",
+        lead_status=LeadStatus.CONTACTED.value,
+    )
+    lead.id = uuid4()
+    service = GmailSyncService(session, settings, client=MagicMock())
+    service._match_leads = MagicMock(return_value=[lead.id])  # type: ignore[method-assign]
+    session.get.return_value = lead
+    added: list[object] = []
+    session.add.side_effect = added.append
+    outcome = service._process_message(
+        account,
+        ParsedGmailMessage(
+            gmail_message_id="follow-1",
+            gmail_thread_id="thr-1",
+            rfc_message_id="<follow@mail.gmail.com>",
+            in_reply_to="<out@mail.gmail.com>",
+            references="<out@mail.gmail.com>",
+            subject="Re: Hi",
+            sender_email="me@example.com",
+            recipient_email="lead@example.com",
+            body_text="Checking in.",
+            body_html=None,
+            label_ids=("SENT",),
+            internal_date=datetime.now(UTC),
+            snippet="Checking",
+        ),
+    )
+    assert outcome == "matched"
+    stored = next(item for item in added if isinstance(item, LeadEmail))
+    assert stored.direction == EmailDirection.OUTBOUND.value
+    assert lead.lead_status == LeadStatus.CONTACTED.value
+
+
+def test_repair_reclassifies_self_reply_stored_as_outgoing() -> None:
+    session = MagicMock()
+    settings = _settings()
+    account = GmailAccount(email="me@example.com", status=GmailAccountStatus.ACTIVE.value)
+    account.id = uuid4()
+    lead = Lead(
+        business_name="Cafe",
+        email="me@example.com",
+        lead_status=LeadStatus.CONTACTED.value,
+    )
+    lead.id = uuid4()
+    existing = LeadEmail(
+        lead_id=lead.id,
+        gmail_account_id=account.id,
+        direction=EmailDirection.OUTBOUND.value,
+        classification=EmailClassification.OUTGOING.value,
+        sender_email="me@example.com",
+        recipient_email="me@example.com",
+        subject="Re: Hi",
+        body_text="Yes, let's talk.",
+        gmail_message_id="reply-1",
+        gmail_thread_id="thr-1",
+        rfc_message_id="<reply@mail.gmail.com>",
+        in_reply_to="<out@mail.gmail.com>",
+        occurred_at=datetime.now(UTC),
+    )
+    outreach = OutreachMessage(
+        lead_id=lead.id,
+        subject="Hi",
+        message="Hello",
+        status=OutreachStatus.SENT.value,
+    )
+    service = GmailSyncService(session, settings, client=MagicMock())
+    session.get.return_value = lead
+
+    class _Result:
+        def __init__(self, rows: list[object]) -> None:
+            self._rows = rows
+
+        def __iter__(self):
+            return iter(self._rows)
+
+        def first(self):
+            return self._rows[0] if self._rows else None
+
+    def scalars_for(statement=None, *args, **kwargs):  # noqa: ANN001
+        sql = str(statement)
+        if "OutreachMessage" in sql or "outreach_messages" in sql:
+            return _Result([outreach])
+        return _Result([])
+
+    session.scalars.side_effect = scalars_for
+    repaired = service._repair_stored_self_reply(account, existing)
+    assert repaired is True
+    assert existing.direction == EmailDirection.INBOUND.value
+    assert existing.classification == EmailClassification.HUMAN_REPLY.value
+    assert existing.is_unread is True
+    assert outreach.status == OutreachStatus.REPLIED.value
+    assert lead.lead_status == LeadStatus.REPLIED.value
 
 
 def test_authorization_url_uses_minimum_scopes() -> None:

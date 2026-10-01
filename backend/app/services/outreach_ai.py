@@ -18,7 +18,8 @@ DEFAULT_OFFER = (
 )
 NEW_SITE_OFFER = (
     "I can create a professional website for the business, with a clear homepage "
-    "and a simple way for customers to get in touch."
+    "and a simple way for customers to get in touch. "
+    "The settled price for that first site is $1,400."
 )
 _SCORE_LABELS = {
     "performance": "Performance",
@@ -274,8 +275,13 @@ def suggest_offer(
             http.close()
 
     offer = _parse_offer(raw)
-    if not offer:
-        return fallback, "audit" if findings or scores else "default"
+    price, _package = _settled_quote(
+        has_website=has_website,
+        findings=findings,
+        scores=scores,
+    )
+    if not offer or not _keeps_price(offer, price):
+        return fallback, "audit" if findings or scores or not has_website else "default"
     return offer, "ai"
 
 
@@ -287,39 +293,81 @@ def offer_from_findings(
     scores: dict[str, int],
 ) -> str:
     label = (industry or "business").strip().lower() or "business"
+    price, package = _settled_quote(has_website=has_website, findings=findings, scores=scores)
+    money = f"${price:,}"
     if not has_website:
         return NEW_SITE_OFFER
 
     weak = [
         (name, score)
         for name, score in scores.items()
-        if isinstance(score, int) and score < 60
+        if isinstance(score, int) and score < 70
     ]
     weak.sort(key=lambda item: item[1])
-    titles = [title for title, _detail in findings[:3] if title.strip()]
-
-    if weak and titles:
-        score_name = _SCORE_LABELS.get(weak[0][0], weak[0][0]).lower()
-        focus = titles[0].rstrip(".")
+    titles = [title.strip().rstrip(".") for title, _detail in findings if title.strip()]
+    issue = _issue_sentence(weak, titles)
+    scope = {
+        "redesign": "This is a redesign of those weak parts",
+        "repair": "This is a focused repair of those issues",
+        "refresh": "This is a homepage refresh",
+    }[package]
+    if issue:
         return (
-            f"I help local {label}s improve {score_name} and fix issues like "
-            f"{focus}, starting with a clearer homepage that makes the next step obvious."
+            f"I can improve this {label} website. {issue} "
+            f"{scope}, and the homepage should make the next step obvious. "
+            f"The settled price is {money}."
+        )
+    return (
+        f"I can tighten this {label} website so the homepage is clearer and easier to use. "
+        f"The settled price for that refresh is {money}."
+    )
+
+
+def _settled_quote(
+    *,
+    has_website: bool,
+    findings: list[tuple[str, str]],
+    scores: dict[str, int],
+) -> tuple[int, str]:
+    if not has_website:
+        return 1400, "refresh"
+    weak = [score for score in scores.values() if isinstance(score, int) and score < 70]
+    severe = [score for score in weak if score < 45]
+    issue_count = len([title for title, _detail in findings if title.strip()])
+    if severe or len(weak) >= 3 or issue_count >= 4:
+        return 1450, "redesign"
+    if len(weak) >= 2 or issue_count >= 2:
+        return 950, "repair"
+    return 650, "refresh"
+
+
+def _issue_sentence(
+    weak: list[tuple[str, int]],
+    titles: list[str],
+) -> str:
+    score_name = _SCORE_LABELS.get(weak[0][0], weak[0][0]).lower() if weak else ""
+    if score_name and titles:
+        return (
+            f"The weakest area is {score_name}. "
+            f"I would start with {_join_titles(titles[:3])}."
         )
     if titles:
-        focus = titles[0].rstrip(".")
-        extra = f" and {titles[1].rstrip('.')}" if len(titles) > 1 else ""
-        return (
-            f"I redesign websites for local {label}s, focusing on {focus}{extra}, "
-            f"with a homepage that makes the next step obvious."
-        )
-    if weak:
-        parts = [_SCORE_LABELS.get(name, name).lower() for name, _score in weak[:2]]
-        joined = " and ".join(parts)
-        return (
-            f"I improve {joined} for local {label} websites, starting with a homepage "
-            f"that loads cleanly and makes the next step obvious."
-        )
-    return DEFAULT_OFFER
+        return f"I would start with {_join_titles(titles[:3])}."
+    if score_name:
+        second = ""
+        if len(weak) > 1:
+            second_name = _SCORE_LABELS.get(weak[1][0], weak[1][0]).lower()
+            second = f" and {second_name}"
+        return f"The weakest area is {score_name}{second}."
+    return ""
+
+
+def _join_titles(titles: list[str]) -> str:
+    if len(titles) == 1:
+        return titles[0]
+    if len(titles) == 2:
+        return f"{titles[0]} and {titles[1]}"
+    return f"{', '.join(titles[:-1])}, and {titles[-1]}"
 
 
 def parse_draft(raw: str) -> tuple[str, str]:
@@ -352,6 +400,8 @@ def _instructions(facts: str, purpose: str) -> str:
             "Explain that a professional website would make the business easier to find "
             "and give customers a clear way to get in touch.\n"
             "Do not claim you looked at an existing website.\n"
+            "The last paragraph must use the Offer line, including its price exactly. "
+            "Do not change the amount or turn it into a range.\n"
         )
     else:
         task = (
@@ -361,8 +411,14 @@ def _instructions(facts: str, purpose: str) -> str:
             "Then mention findings about how the page looks or how a customer gets in touch, "
             "when those are not already covered by the scores.\n"
             "Do not mention a score that is not listed. Do not write a checklist.\n"
-            "Say why this matters for customers, then connect the offer in the last paragraph.\n"
+            "Say why this matters for customers.\n"
+            "The last paragraph must use the Offer line, including its price exactly. "
+            "Do not change the amount or turn it into a range.\n"
         )
+    shared = shared.replace(
+        "The body is 80 to 130 words, unless the tone says to keep it shorter.\n",
+        "The body is 90 to 160 words, unless the tone says to keep it shorter.\n",
+    )
     return f"{task}{shared}{facts}"
 
 
@@ -501,7 +557,10 @@ def _groq_offer(client: httpx.Client, settings: Settings, prompt: str) -> str:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You write one short outreach offer sentence and return JSON only.",
+                    "content": (
+                "You write a short professional outreach offer and return JSON only. "
+                "Keep the stated price exactly."
+            ),
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -527,23 +586,34 @@ def _offer_instructions(
     findings: list[tuple[str, str]],
     scores: dict[str, int],
 ) -> str:
+    price, package = _settled_quote(
+        has_website=has_website,
+        findings=findings,
+        scores=scores,
+    )
     lines = [
-        "Write one short first-person offer for an outreach email.",
-        "One or two sentences. Max 220 characters. No quotes. No bullet list.",
-        "Do not mention AI, audits, scores as numbers, or that this was generated.",
-        "Speak as a web designer/developer helping a local business.",
+        "Write a professional first-person offer for an outreach email.",
+        "Two or three sentences. No quotes. No bullet list.",
+        "Do not mention AI, audits, or that this was generated.",
+        "Speak as a web designer helping a local business.",
+        f"Use this exact settled price: ${price:,}. Do not change it or give a range.",
         f"Business: {business.strip()}",
     ]
     if industry and industry.strip():
         lines.append(f"Industry: {industry.strip()}")
     if not has_website:
-        lines.append("They have no website. Offer to create a clear professional site.")
+        lines.append(
+            "They have no website. Offer a first professional site: homepage, contact, and mobile."
+        )
     else:
-        lines.append("They have a website. Offer a redesign or improvement tied to the issues.")
+        lines.append(
+            "They have a website. Describe the work from the issues, then state the price."
+        )
+        lines.append(f"Package: {package}.")
         weak = [
             f"{_SCORE_LABELS.get(name, name)} {score}/100"
             for name, score in scores.items()
-            if isinstance(score, int) and score < 80
+            if isinstance(score, int) and score < 70
         ]
         if weak:
             lines.append("Weak areas: " + ", ".join(weak[:4]))
@@ -563,9 +633,14 @@ def _parse_offer(raw: str) -> str | None:
     if not isinstance(value, str):
         return None
     cleaned = " ".join(value.split()).strip(" \"'")
-    if not 20 <= len(cleaned) <= 400:
+    if not 20 <= len(cleaned) <= 700:
         return None
-    return cleaned[:400]
+    return cleaned[:700]
+
+
+def _keeps_price(offer: str, price: int) -> bool:
+    compact = offer.replace(",", "").replace("$", "")
+    return str(price) in compact
 
 
 def _post(client: httpx.Client, url: str, **kwargs: object) -> httpx.Response:

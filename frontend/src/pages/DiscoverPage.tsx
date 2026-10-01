@@ -348,6 +348,7 @@ function SearchForm({
   const { notify } = useToast();
   const [category, setCategory] = useState(categories[0]?.value ?? "dentist");
   const [customCategory, setCustomCategory] = useState("");
+  const [limitPlace, setLimitPlace] = useState(false);
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [sources, setSources] = useState<Record<SourceKey, boolean>>({
@@ -366,8 +367,14 @@ function SearchForm({
 
   function save(searchNow: boolean) {
     const chosen = category === "other" ? customCategory.trim() : category;
-    if (chosen.length < 2 || city.trim().length < 2 || country.trim().length < 2) {
-      setError("Enter a category, city, and country.");
+    const place = limitPlace ? city.trim() : "";
+    const region = limitPlace ? country.trim() : "";
+    if (chosen.length < 2) {
+      setError("Choose a category.");
+      return;
+    }
+    if (limitPlace && (place.length < 2 || region.length < 2)) {
+      setError("Enter both a city and a country, or turn off the city limit.");
       return;
     }
     if (!Object.values(sources).some(Boolean)) {
@@ -378,13 +385,12 @@ function SearchForm({
     create.mutate(
       {
         category: chosen,
-        city: city.trim(),
-        country: country.trim(),
+        city: place,
+        country: region,
         ...sources,
       },
       {
         onSuccess: (search) => {
-          setCity("");
           setCustomCategory("");
           notify("Search saved.", "success");
           if (!searchNow) {
@@ -405,7 +411,7 @@ function SearchForm({
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-gray-100 bg-linear-to-br from-primary-50 via-white to-white px-6 py-5">
+      <div className="border-b border-gray-100 px-6 py-5">
         <div className="flex items-start gap-3">
           <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-panel bg-primary text-white shadow-md">
             <Plus className="size-5" aria-hidden="true" />
@@ -413,7 +419,8 @@ function SearchForm({
           <div>
             <h2 className="text-h3 font-semibold text-ink">New search</h2>
             <p className="mt-1 max-w-2xl text-body text-gray-600">
-              Choose a business type and city. Listings without a website rank higher for outreach.
+              Choose a business type. Leads come from the cities these directories already cover,
+              and each one keeps its own city. Listings without a website rank higher.
             </p>
           </div>
         </div>
@@ -453,25 +460,44 @@ function SearchForm({
         </section>
 
         <section className="space-y-3">
-          <SectionLabel>Where to look</SectionLabel>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="City"
-              value={city}
-              onChange={(event) => {
-                setCity(event.target.value);
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionLabel>Where to look</SectionLabel>
+            <button
+              type="button"
+              className={cn("text-small font-semibold text-primary-700", focusRing)}
+              onClick={() => {
+                setLimitPlace((current) => !current);
+                setError(null);
               }}
-              placeholder="Lahore"
-            />
-            <Input
-              label="Country"
-              value={country}
-              onChange={(event) => {
-                setCountry(event.target.value);
-              }}
-              placeholder="Pakistan"
-            />
+            >
+              {limitPlace ? "Search every covered city" : "Limit to one city"}
+            </button>
           </div>
+          {limitPlace ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="City"
+                value={city}
+                onChange={(event) => {
+                  setCity(event.target.value);
+                }}
+                placeholder="Lahore"
+              />
+              <Input
+                label="Country"
+                value={country}
+                onChange={(event) => {
+                  setCountry(event.target.value);
+                }}
+                placeholder="Pakistan"
+              />
+            </div>
+          ) : (
+            <p className="text-body text-gray-600">
+              Anywhere the selected directories publish listings, including Lahore, Karachi,
+              Islamabad, London, Manchester, Birmingham, and Portland.
+            </p>
+          )}
         </section>
 
         <section className="space-y-3">
@@ -510,14 +536,15 @@ function SearchForm({
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-caption text-gray-500">
-            Save for the daily schedule, or run immediately to fill your pipeline now.
+        <div className="flex flex-col gap-3 border-t border-gray-100 pt-5 lg:flex-row lg:items-center lg:justify-between">
+          <p className="text-small text-gray-600">
+            Save for the daily schedule, or run now. A city is only needed if you limit the search.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="secondary"
+              className="w-full sm:w-auto"
               disabled={create.isPending || running}
               onClick={() => {
                 save(false);
@@ -525,7 +552,11 @@ function SearchForm({
             >
               Save for daily run
             </Button>
-            <Button type="submit" isLoading={create.isPending || run.isPending || running}>
+            <Button
+              type="submit"
+              className="w-full sm:w-auto"
+              isLoading={create.isPending || run.isPending || running}
+            >
               <Search className="size-4" aria-hidden="true" />
               Save and search now
             </Button>
@@ -598,7 +629,7 @@ function SearchList({ searches, running }: { searches: DiscoverySearch[]; runnin
     return (
       <EmptyState
         title="No saved searches yet"
-        description="Add a category and city above. Active searches run once a day while the API is online, and you can run any search immediately."
+        description="Add a category above. Active searches run once a day while the API is online, and you can run any search immediately."
       />
     );
   }
@@ -609,7 +640,7 @@ function SearchList({ searches, running }: { searches: DiscoverySearch[]; runnin
         <div>
           <h2 className="text-h3 font-semibold text-ink">Saved searches</h2>
           <p className="mt-1 text-body text-gray-600">
-            Pause, resume, or run a city anytime. Latest results stay on each search.
+            Pause, resume, or run a search anytime. Latest results stay on each search.
           </p>
         </div>
         <p className="text-caption font-medium text-gray-500">
@@ -645,7 +676,7 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-h4 font-semibold capitalize text-ink">
-              {label} in {search.city}
+              {search.city.toLowerCase() === "anywhere" ? label : `${label} in ${search.city}`}
             </h3>
             <Badge tone={search.is_active ? "green" : "gray"}>
               {search.is_active ? "Daily" : "Paused"}
@@ -658,7 +689,7 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-body text-gray-600">
             <span className="inline-flex items-center gap-1.5">
               <MapPin className="size-3.5 shrink-0 text-gray-400" aria-hidden="true" />
-              {search.country}
+              {search.city.toLowerCase() === "anywhere" ? "Multiple cities" : search.country}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock3 className="size-3.5 shrink-0 text-gray-400" aria-hidden="true" />
@@ -1067,8 +1098,8 @@ function SourceStatus({
 function HowItWorksCard() {
   const steps = [
     {
-      title: "Search a city",
-      body: "Pick a category and location, then choose which directories to scan.",
+      title: "Pick a category",
+      body: "Directories are checked across the cities they cover. Limit a search only when you want one place.",
     },
     {
       title: "Review matches",

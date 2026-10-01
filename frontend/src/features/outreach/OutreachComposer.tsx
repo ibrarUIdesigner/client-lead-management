@@ -53,10 +53,7 @@ export function OutreachComposer({
   const [tone, setTone] = useState<OutreachTone>(() => readTone());
   const [senderName, setSenderName] = useState(() => readStored(SENDER_KEY, ""));
   const [pending, setPending] = useState<"ai" | "template" | null>(null);
-  const [offerTouched, setOfferTouched] = useState(() => {
-    const stored = readStored(OFFER_KEY, "");
-    return Boolean(stored) && stored !== DEFAULT_OFFER;
-  });
+  const [offerTouched, setOfferTouched] = useState(false);
   const appliedSuggestion = useRef<string | null>(null);
   const activeTemplates = (templates.data ?? []).filter((item) => item.is_active);
   const missingAudit = audit.isError && apiErrorCode(audit.error) === "AUDIT_NOT_FOUND";
@@ -159,6 +156,7 @@ export function OutreachComposer({
             <Textarea
               label="Your offer"
               hint={offerHint(suggestion.data?.source, suggestion.isFetching, offerTouched)}
+              rows={6}
               value={offer}
               onChange={(event) => {
                 const next = event.target.value;
@@ -205,8 +203,8 @@ export function OutreachComposer({
         </div>
         <p className="mt-3 text-small text-gray-600">
           {hasWebsite
-            ? "With a website, the draft uses the audit findings, including design, SEO, and performance. "
-            : "With no website, the draft uses the business details and offers to create one. "}
+            ? "With a website, the draft uses the audit findings and the offer above, including its price. "
+            : "With no website, the draft uses the business details and the offer above, including its price. "}
           Notes, phone numbers, and past emails stay here.
           {provider === "gemini"
             ? " Google's free API tier can use that content to improve its products."
@@ -264,13 +262,10 @@ function offerHint(
   if (touched) {
     return "Edited by you. Click Suggest from audit to replace it.";
   }
-  if (source === "ai") {
-    return "Suggested from the audit findings with AI. Edit freely.";
+  if (source === "ai" || source === "audit") {
+    return "Written from the audit findings, with a settled price for the work. The email keeps this offer. Edit freely.";
   }
-  if (source === "audit") {
-    return "Suggested from the audit findings. Edit freely.";
-  }
-  return "What you want this email to propose.";
+  return "What you want this email to propose. The generated email includes this text.";
 }
 
 function ExternalLink({ href, children }: { href: string; children: string }) {

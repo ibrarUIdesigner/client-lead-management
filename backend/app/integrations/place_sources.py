@@ -1,4 +1,5 @@
 import logging
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -11,6 +12,7 @@ from app.integrations.directory_sources import (
     fetch_yelp,
 )
 from app.integrations.source_errors import PlaceSourceError
+from app.services.discovery_markets import ANYWHERE_CAP, markets_for
 from app.services.place_listings import (
     BBox,
     FoundBusiness,
@@ -166,6 +168,71 @@ def collect_places(
     if not found and errors:
         raise PlaceSourceError(" ".join([*errors, *notes]))
     return found, [*notes, *errors]
+
+
+def collect_places_anywhere(
+    *,
+    category: str,
+    use_openstreetmap: bool,
+    use_google: bool,
+    use_yelp: bool,
+    use_yell: bool,
+    use_businesslist: bool,
+    use_epages: bool,
+    settings: Settings,
+    client: httpx.Client,
+) -> tuple[list[FoundBusiness], list[str]]:
+    markets = markets_for(
+        use_openstreetmap=use_openstreetmap,
+        use_google=use_google,
+        use_yelp=use_yelp,
+        use_yell=use_yell,
+        use_businesslist=use_businesslist,
+        use_epages=use_epages,
+    )
+    if not markets:
+        raise PlaceSourceError("Choose at least one source.")
+    found: list[FoundBusiness] = []
+    notes = ["Checked the cities these directories already cover."]
+    seen: set[str] = set()
+    for index, market in enumerate(markets):
+        if len(found) >= ANYWHERE_CAP:
+            notes.append("Stopped after enough listings for one run.")
+            break
+        if index and use_openstreetmap and "openstreetmap" in market.sources:
+            time.sleep(1.1)
+        elif index:
+            time.sleep(0.4)
+        try:
+            batch, _batch_notes = collect_places(
+                category=category,
+                city=market.city,
+                country=market.country,
+                use_openstreetmap=use_openstreetmap and "openstreetmap" in market.sources,
+                use_google=use_google and "google" in market.sources,
+                use_yelp=use_yelp and "yelp" in market.sources,
+                use_yell=use_yell and "yell" in market.sources,
+                use_businesslist=use_businesslist and "businesslist" in market.sources,
+                use_epages=use_epages and "epages" in market.sources,
+                settings=settings,
+                client=client,
+            )
+        except PlaceSourceError as exc:
+            notes.append(f"{market.city}: {exc.message}")
+            continue
+        added = 0
+        for business in batch:
+            if business.source_key in seen:
+                continue
+            seen.add(business.source_key)
+            found.append(business)
+            added += 1
+            if len(found) >= ANYWHERE_CAP:
+                break
+        notes.append(f"{market.city} returned {added}.")
+    if not found:
+        raise PlaceSourceError(" ".join(notes))
+    return found, notes
 
 
 def _read_source(

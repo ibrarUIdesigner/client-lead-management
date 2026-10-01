@@ -112,7 +112,11 @@ class GmailSyncService:
                 )
             )
             if existing is not None:
-                result.skipped += 1
+                if self._repair_stored_self_reply(account, existing):
+                    result.processed += 1
+                    result.matched += 1
+                else:
+                    result.skipped += 1
                 continue
             try:
                 parsed = self.client.get_message(access, message_id)
@@ -143,6 +147,10 @@ class GmailSyncService:
                 result.ambiguous += 1
             else:
                 result.skipped += 1
+
+        repaired = self._repair_known_self_replies(account)
+        result.processed += repaired
+        result.matched += repaired
 
         account.history_id = latest_history_id
         account.last_synced_at = datetime.now(UTC)
@@ -219,8 +227,9 @@ class GmailSyncService:
         sender = (parsed.sender_email or "").lower()
         is_ours = sender == our_email or "SENT" in parsed.label_ids
 
-        # Persist our own outbound messages that were sent outside the app.
-        if is_ours:
+        # A reply sent from the connected account to itself is the lead writing back
+        # when that lead's address is the connected mailbox. Keep other sent mail outbound.
+        if is_ours and not self._is_self_reply(account, parsed):
             return self._store_external_outbound(account, parsed)
 
         matches = self._match_leads(account.id, parsed)
@@ -291,6 +300,75 @@ class GmailSyncService:
                         lead_ids.add(lead_id)
 
         return list(lead_ids)
+
+    def _is_self_reply(self, account: GmailAccount, parsed: ParsedGmailMessage) -> bool:
+        """True when this mailbox replied on a thread sent to its own address."""
+        if not parsed.in_reply_to:
+            return False
+        sender = (parsed.sender_email or "").lower()
+        if sender != account.email.lower():
+            return False
+        matches = self._match_leads(account.id, parsed)
+        if len(matches) != 1:
+            return False
+        lead = self.session.get(Lead, matches[0])
+        if lead is None or not lead.email:
+            return False
+        return lead.email.lower() == account.email.lower()
+
+    def _repair_known_self_replies(self, account: GmailAccount) -> int:
+        rows = list(
+            self.session.scalars(
+                select(LeadEmail).where(
+                    LeadEmail.gmail_account_id == account.id,
+                    LeadEmail.direction == EmailDirection.OUTBOUND.value,
+                    LeadEmail.classification == EmailClassification.OUTGOING.value,
+                    LeadEmail.in_reply_to.is_not(None),
+                    LeadEmail.lead_id.is_not(None),
+                )
+            )
+        )
+        return sum(1 for row in rows if self._repair_stored_self_reply(account, row))
+
+    def _repair_stored_self_reply(self, account: GmailAccount, existing: LeadEmail) -> bool:
+        """Reclassify a self-reply that an earlier sync stored as mail we sent."""
+        if existing.direction != EmailDirection.OUTBOUND.value:
+            return False
+        if existing.classification != EmailClassification.OUTGOING.value:
+            return False
+        if not existing.in_reply_to or existing.lead_id is None:
+            return False
+        sender = (existing.sender_email or "").lower()
+        if sender != account.email.lower():
+            return False
+        lead = self.session.get(Lead, existing.lead_id)
+        if lead is None or not lead.email or lead.email.lower() != account.email.lower():
+            return False
+        classification = classify_inbound_message(
+            subject=existing.subject,
+            body_text=existing.body_text,
+            sender_email=existing.sender_email,
+        ).classification
+        existing.direction = EmailDirection.INBOUND.value
+        existing.classification = classification.value
+        existing.is_unread = classification == EmailClassification.HUMAN_REPLY
+        parsed = ParsedGmailMessage(
+            gmail_message_id=existing.gmail_message_id,
+            gmail_thread_id=existing.gmail_thread_id,
+            rfc_message_id=existing.rfc_message_id,
+            in_reply_to=existing.in_reply_to,
+            references=existing.references_header,
+            subject=existing.subject,
+            sender_email=existing.sender_email,
+            recipient_email=existing.recipient_email,
+            body_text=existing.body_text,
+            body_html=None,
+            label_ids=(),
+            internal_date=existing.occurred_at,
+            snippet=None,
+        )
+        self._apply_lead_effects(existing.lead_id, classification, parsed)
+        return True
 
     def _store_external_outbound(
         self,

@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
 from app.core.errors import AppError
-from app.integrations.place_sources import PlaceSourceError, collect_places
+from app.integrations.place_sources import (
+    PlaceSourceError,
+    collect_places,
+    collect_places_anywhere,
+)
 from app.models.discovery import DiscoveryRun, DiscoverySearch
 from app.models.enums import DiscoveryRunStatus, DiscoveryTrigger, LeadStatus
 from app.models.lead import Lead
@@ -24,6 +28,7 @@ from app.schemas.discovery import (
     DiscoveryStatus,
 )
 from app.schemas.values import slugify
+from app.services.discovery_markets import is_anywhere
 from app.services.persistence import flush_or_reject
 from app.services.place_listings import CATEGORIES, FoundBusiness
 
@@ -322,19 +327,30 @@ def _execute_one(
         use_businesslist = search.use_businesslist
         use_epages = search.use_epages
     try:
-        found, notes = collect_places(
-            category=category,
-            city=city,
-            country=country,
-            use_openstreetmap=use_openstreetmap,
-            use_google=use_google,
-            use_yelp=use_yelp,
-            use_yell=use_yell,
-            use_businesslist=use_businesslist,
-            use_epages=use_epages,
-            settings=settings,
-            client=client,
-        )
+        source_flags = {
+            "use_openstreetmap": use_openstreetmap,
+            "use_google": use_google,
+            "use_yelp": use_yelp,
+            "use_yell": use_yell,
+            "use_businesslist": use_businesslist,
+            "use_epages": use_epages,
+        }
+        if is_anywhere(city, country):
+            found, notes = collect_places_anywhere(
+                category=category,
+                settings=settings,
+                client=client,
+                **source_flags,
+            )
+        else:
+            found, notes = collect_places(
+                category=category,
+                city=city,
+                country=country,
+                settings=settings,
+                client=client,
+                **source_flags,
+            )
         created, updated, skipped = _save_businesses(session_factory, found, city)
         message = (
             f"Saved {created} new, updated {updated}, skipped {skipped} already on file. "

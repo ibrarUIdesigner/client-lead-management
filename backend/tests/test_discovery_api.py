@@ -17,12 +17,21 @@ def _client(session: Mock) -> TestClient:
     return TestClient(app)
 
 
-def test_a_search_needs_a_city_and_category() -> None:
+def test_a_search_needs_a_category() -> None:
     with _client(Mock()) as client:
-        response = client.post("/api/v1/discovery/searches", json={"category": "dentist"})
+        response = client.post("/api/v1/discovery/searches", json={"city": "Lahore"})
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_blank_location_is_saved_as_anywhere() -> None:
+    from app.schemas.discovery import DiscoverySearchCreate
+
+    search = DiscoverySearchCreate(category="dentist")
+
+    assert search.city == "Anywhere"
+    assert search.country == "Worldwide"
 
 
 def test_a_search_must_use_at_least_one_source() -> None:
