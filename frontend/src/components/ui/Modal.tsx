@@ -2,16 +2,25 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "./Button";
+import { cn } from "../../lib/cn";
 
 type ModalProps = {
   open: boolean;
   title: string;
   description?: string;
+  size?: "md" | "lg" | "xl";
   onClose: () => void;
   children: ReactNode;
 };
 
-export function Modal({ open, title, description, onClose, children }: ModalProps) {
+export function Modal({
+  open,
+  title,
+  description,
+  size = "md",
+  onClose,
+  children,
+}: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -29,7 +38,16 @@ export function Modal({ open, title, description, onClose, children }: ModalProp
   }, [open]);
 
   return (
-    <dialog ref={dialogRef} aria-labelledby={titleId} className="text-ink" onClose={onClose}>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className={cn(
+        "text-ink",
+        size === "lg" && "dialog-lg",
+        size === "xl" && "dialog-xl",
+      )}
+      onClose={onClose}
+    >
       <div className="flex items-start justify-between gap-4 p-6 pb-0">
         <div>
           <h2 id={titleId} className="text-h3 font-semibold">

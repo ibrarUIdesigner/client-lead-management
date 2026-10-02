@@ -40,6 +40,14 @@ class WorkspaceService:
                 Mockup.version,
                 Mockup.notes,
                 Mockup.prompt,
+                Mockup.provider,
+                Mockup.model_name,
+                Mockup.goal,
+                Mockup.screenshot_status,
+                Mockup.error_code,
+                Mockup.html_content,
+                Mockup.desktop_image_url,
+                Mockup.mobile_image_url,
                 BrandProfile.primary_color,
                 Mockup.design_guide_id,
                 Mockup.design_guide_name,
@@ -52,10 +60,35 @@ class WorkspaceService:
         )
         if lead_id is not None:
             statement = statement.where(Mockup.lead_id == lead_id)
-        return [
-            MockupRead.model_validate(row, from_attributes=True)
-            for row in self.session.execute(statement)
-        ]
+        items: list[MockupRead] = []
+        for row in self.session.execute(statement):
+            items.append(
+                MockupRead(
+                    id=row.id,
+                    lead_id=row.lead_id,
+                    business_name=row.business_name,
+                    city=row.city,
+                    title=row.title,
+                    status=row.status,
+                    version=row.version,
+                    notes=row.notes,
+                    prompt=row.prompt,
+                    provider=row.provider,
+                    model_name=row.model_name,
+                    goal=row.goal,
+                    screenshot_status=row.screenshot_status,
+                    error_code=row.error_code,
+                    has_html=bool(row.html_content),
+                    has_desktop_screenshot=bool(row.desktop_image_url),
+                    has_mobile_screenshot=bool(row.mobile_image_url),
+                    primary_color=row.primary_color,
+                    design_guide_id=row.design_guide_id,
+                    design_guide_name=row.design_guide_name,
+                    completed_at=row.completed_at,
+                    created_at=row.created_at,
+                )
+            )
+        return items
 
     def list_messages(self, lead_id: UUID | None = None) -> list[OutreachMessageRead]:
         statement = self._messages().order_by(OutreachMessage.created_at.desc())

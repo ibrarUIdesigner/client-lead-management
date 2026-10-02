@@ -29,4 +29,6 @@ export type MockupCreateWrite = {
   source_mockup_id?: string | null;
   design_guide_id?: string | null;
   guide_mode: "keep" | "selected" | "none";
+  provider: "gemini" | "groq";
+  goal: "calls" | "whatsapp" | "bookings" | "quotes";
 };

@@ -94,3 +94,43 @@ def screenshot_key(lead_id: str, audit_id: str, variant: str) -> str:
             status_code=404,
         )
     return f"leads/{lead_id}/audits/{audit_id}/{variant}.png"
+
+
+def mockup_screenshot_key(lead_id: str, mockup_id: str, variant: str) -> str:
+    if variant not in {"desktop", "mobile", "thumb"}:
+        raise AppError(
+            code="NOT_FOUND",
+            message="That screenshot could not be found.",
+            status_code=404,
+        )
+    return f"leads/{lead_id}/mockups/{mockup_id}/{variant}.png"
+
+
+def mockup_asset_key(lead_id: str, mockup_id: str, filename: str) -> str:
+    safe = Path(filename).name.replace("..", "")
+    if not safe:
+        raise AppError(
+            code="VALIDATION_ERROR",
+            message="Upload a named image file.",
+            status_code=422,
+        )
+    return f"leads/{lead_id}/mockups/{mockup_id}/assets/{safe}"
+
+
+def save_bytes(storage_dir: Path, relative: str, data: bytes) -> str:
+    target = resolve_storage_path(storage_dir, relative)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return relative
+
+
+def read_storage_file(storage_dir: Path, relative: str | None) -> bytes | None:
+    if not relative:
+        return None
+    try:
+        path = resolve_storage_path(storage_dir, relative)
+    except AppError:
+        return None
+    if not path.is_file():
+        return None
+    return path.read_bytes()

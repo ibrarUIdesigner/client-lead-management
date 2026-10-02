@@ -8,6 +8,14 @@ export type MockupItem = {
   version: number;
   notes: string | null;
   prompt: string | null;
+  provider?: string | null;
+  model_name?: string | null;
+  goal?: string | null;
+  screenshot_status?: string | null;
+  error_code?: string | null;
+  has_html?: boolean;
+  has_desktop_screenshot?: boolean;
+  has_mobile_screenshot?: boolean;
   primary_color: string | null;
   design_guide_id: string | null;
   design_guide_name: string | null;

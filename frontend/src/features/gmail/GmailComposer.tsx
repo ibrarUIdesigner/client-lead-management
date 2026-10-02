@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useToast } from "../../components/feedback/useToast";
 import { Button } from "../../components/ui/Button";
@@ -10,6 +10,7 @@ import { useLatestAudit } from "../../hooks/useAudit";
 import { useGmailStatus, useSendLeadEmail } from "../../hooks/useGmail";
 import { useMockups } from "../../hooks/useWorkspace";
 import { apiErrorMessage } from "../../lib/apiError";
+import { mockupScreenshotUrl } from "../../services/mockups";
 
 type GmailComposerProps = {
   leadId: string;
@@ -39,12 +40,27 @@ export function GmailComposer({
   const [attachAudit, setAttachAudit] = useState(false);
   const [mockupIds, setMockupIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [autoPicked, setAutoPicked] = useState(false);
 
   const connected = Boolean(gmail.data?.connected && !gmail.data.needs_reauth);
   const ready = to.trim().length > 0 && subject.trim().length > 0 && body.trim().length > 0;
   const completedAudit =
     audit.data?.status === "COMPLETED" ? audit.data : null;
-  const readyMockups = (mockups.data ?? []).filter((item) => item.status === "READY");
+  const attachableMockups = useMemo(
+    () =>
+      (mockups.data ?? []).filter(
+        (item) => item.status === "READY" && item.has_desktop_screenshot,
+      ),
+    [mockups.data],
+  );
+
+  useEffect(() => {
+    if (autoPicked || attachableMockups.length === 0) {
+      return;
+    }
+    setMockupIds([attachableMockups[0].id]);
+    setAutoPicked(true);
+  }, [attachableMockups, autoPicked]);
 
   if (!connected) {
     return (
@@ -126,27 +142,54 @@ export function GmailComposer({
             label="Attach latest audit screenshot"
           />
         ) : null}
-        {readyMockups.length > 0 ? (
-          <div className="space-y-2">
-            <p className="text-caption font-semibold text-gray-500">Attach mockups</p>
-            {readyMockups.map((item) => {
+        {attachableMockups.length > 0 ? (
+          <div className="space-y-3">
+            <div>
+              <p className="text-caption font-semibold text-gray-500">Attach mockup screenshots</p>
+              <p className="mt-1 text-small text-gray-600">
+                Selected mockups attach as desktop and mobile PNGs. Review before sending.
+              </p>
+            </div>
+            {attachableMockups.map((item) => {
               const checked = mockupIds.includes(item.id);
               return (
-                <Checkbox
+                <label
                   key={item.id}
-                  checked={checked}
-                  onChange={(event) => {
-                    setMockupIds((current) =>
-                      event.target.checked
-                        ? [...current, item.id]
-                        : current.filter((id) => id !== item.id),
-                    );
-                  }}
-                  label={item.title || `Mockup v${item.version}`}
-                />
+                  className="flex cursor-pointer items-start gap-3 rounded-control border border-gray-200 p-3"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 accent-primary"
+                    checked={checked}
+                    onChange={(event) => {
+                      setMockupIds((current) =>
+                        event.target.checked
+                          ? [...current, item.id]
+                          : current.filter((id) => id !== item.id),
+                      );
+                    }}
+                  />
+                  <img
+                    src={mockupScreenshotUrl(item.id, "desktop")}
+                    alt=""
+                    className="h-16 w-24 rounded-control border border-gray-100 object-cover object-top"
+                  />
+                  <span className="text-body text-ink">
+                    {item.title || `Mockup v${item.version}`}
+                    <span className="mt-1 block text-small text-gray-600">
+                      Version {item.version}
+                      {item.has_mobile_screenshot ? " · desktop + mobile" : " · desktop"}
+                    </span>
+                  </span>
+                </label>
               );
             })}
           </div>
+        ) : (mockups.data ?? []).some((item) => item.status === "READY") ? (
+          <p className="text-small text-gray-600">
+            A mockup is ready, but screenshots are missing. Open the mockup and retry capture before
+            attaching.
+          </p>
         ) : null}
         <Button
           disabled={!ready || sending || send.isPending}

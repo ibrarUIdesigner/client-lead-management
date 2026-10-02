@@ -20,6 +20,7 @@ from app.models.enums import (
     EmailClassification,
     EmailDirection,
     LeadStatus,
+    MockupStatus,
     OutreachStatus,
 )
 from app.models.gmail import LeadEmail
@@ -419,15 +420,40 @@ class GmailMailService:
                     message="That mockup could not be found.",
                     status_code=404,
                 )
-            relative = mockup.desktop_image_url or mockup.image_url or mockup.thumbnail_url
-            if relative:
+            if mockup.status != MockupStatus.READY.value:
+                raise AppError(
+                    code="MOCKUP_NOT_READY",
+                    message="Only ready mockups can be attached to email.",
+                    status_code=409,
+                )
+            lead = self.session.get(Lead, lead_id)
+            slug = _safe_filename(lead.business_name if lead else "mockup")
+            attached = False
+            for variant, relative in (
+                ("desktop", mockup.desktop_image_url or mockup.image_url or mockup.thumbnail_url),
+                ("mobile", mockup.mobile_image_url),
+            ):
+                if not relative:
+                    continue
                 path = resolve_storage_path(self.settings.storage_dir, relative)
+                if not path.is_file():
+                    continue
                 attachments.append(
                     GmailAttachment(
-                        filename=path.name or f"mockup-{mockup.id}.png",
+                        filename=f"{slug}-mockup-v{mockup.version}-{variant}.png",
                         content_type="image/png",
                         content=self._limit_attachment(self._read_attachment_bytes(path)),
                     )
+                )
+                attached = True
+            if not attached:
+                raise AppError(
+                    code="MOCKUP_SCREENSHOT_MISSING",
+                    message=(
+                        "That mockup has no screenshot to attach yet. "
+                        "Open the mockup and retry screenshot capture first."
+                    ),
+                    status_code=409,
                 )
         return attachments
 
@@ -474,3 +500,11 @@ class GmailMailService:
             needs_review=row.needs_review,
             created_at=row.created_at,
         )
+
+
+def _safe_filename(value: str | None) -> str:
+    cleaned = "".join(
+        char if char.isalnum() or char in {"-", "_"} else "-" for char in (value or "mockup")
+    )
+    cleaned = "-".join(part for part in cleaned.split("-") if part)
+    return (cleaned[:48] or "mockup").lower()

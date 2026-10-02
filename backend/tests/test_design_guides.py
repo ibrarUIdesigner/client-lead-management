@@ -12,7 +12,6 @@ from app.models.website_audit import WebsiteAudit
 from app.schemas.design_guides import DesignGuideWrite, MockupCreate
 from app.services.design_guides import DesignGuideService
 from app.services.design_markdown import (
-    build_brief,
     fence_guidance,
     parse_markdown,
     read_markdown_upload,
@@ -62,21 +61,31 @@ def test_upload_rules() -> None:
 
 
 def test_missing_guide_keeps_the_old_brief_shape() -> None:
-    brief = build_brief(
+    from app.services.mockup_ai import build_generation_brief
+
+    brief = build_generation_brief(
         business_name="Kindred Salon",
         city="Austin",
+        country="United States",
         industry="Salon",
         website_url="https://example.com",
         description="A neighborhood salon.",
+        email="hello@example.com",
+        phone="555-0100",
         findings=["Weak call to action: The next step is easy to miss."],
         requirements="Show prices.",
         guidance=None,
+        goal="calls",
+        asset_labels=[],
+        scenario="redesign",
+        design_score=42,
     )
 
     assert "Kindred Salon" in brief
     assert "Weak call to action" in brief
     assert "Show prices." in brief
     assert "No design guide was selected." in brief
+    assert "42/100" in brief
 
 
 def test_only_completed_audit_findings_are_used() -> None:
@@ -123,19 +132,22 @@ def test_snapshot_survives_edits_and_deletion() -> None:
                 content="# Navy",
             )
         )
-        mockups = MockupService(session)
+        mockups = MockupService(session, settings)
         first = mockups.create(
             MockupCreate(
                 lead_id=lead.id,
                 requirements="One booking button.",
                 design_guide_id=created.id,
                 guide_mode="selected",
+                provider="gemini",
+                goal="bookings",
             )
         )
         assert first.design_guide_name == "Calm"
         stored = first.prompt
         assert "Navy" in stored
         assert "One booking button." in stored
+        assert first.status == "GENERATING"
         guides.update_guide(
             created.id,
             DesignGuideWrite(
@@ -149,22 +161,26 @@ def test_snapshot_survives_edits_and_deletion() -> None:
                 lead_id=lead.id,
                 source_mockup_id=first.id,
                 guide_mode="keep",
+                provider="gemini",
+                goal="bookings",
             )
         )
         kept_row = mockups.guide_snapshot(kept.id)
         assert kept_row.design_guide_snapshot == "# Navy"
-        assert "Crimson" not in (kept.prompt)
-        assert "API key" not in kept.prompt
+        assert "Crimson" not in (kept.prompt or "")
+        assert "API key" not in (kept.prompt or "")
         refreshed = mockups.create(
             MockupCreate(
                 lead_id=lead.id,
                 source_mockup_id=first.id,
                 design_guide_id=created.id,
                 guide_mode="selected",
+                provider="gemini",
+                goal="bookings",
             )
         )
         assert mockups.guide_snapshot(refreshed.id).design_guide_snapshot.startswith("# Crimson")
-        assert "[omitted: not design guidance]" in refreshed.prompt
+        assert "[omitted: not design guidance]" in (refreshed.prompt or "")
         guides.delete_guide(created.id)
         session.flush()
         after_delete = mockups.guide_snapshot(first.id)

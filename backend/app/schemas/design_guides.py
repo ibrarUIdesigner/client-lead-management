@@ -78,6 +78,8 @@ class MockupCreate(BaseModel):
     source_mockup_id: UUID | None = None
     design_guide_id: UUID | None = None
     guide_mode: Literal["keep", "selected", "none"] = "none"
+    provider: Literal["gemini", "groq"] = "gemini"
+    goal: Literal["calls", "whatsapp", "bookings", "quotes"] = "calls"
 
     @field_validator("requirements")
     @classmethod
@@ -85,6 +87,35 @@ class MockupCreate(BaseModel):
         if value is None:
             return None
         return _plain(value)
+
+
+class MockupRefine(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    instructions: str = Field(min_length=1, max_length=4000)
+    provider: Literal["gemini", "groq"] | None = None
+
+    @field_validator("instructions")
+    @classmethod
+    def plain_instructions(cls, value: str) -> str:
+        return _plain(value)
+
+
+class MockupRetry(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    provider: Literal["gemini", "groq"]
+
+
+class MockupEligibilityRead(BaseModel):
+    lead_id: UUID
+    allowed: bool
+    reason: str
+    message: str
+    design_score: int | None = None
+    has_website: bool = False
+    limit: int = 50
+    scenario: str | None = None
 
 
 class MockupGuideRead(BaseModel):
@@ -100,10 +131,80 @@ class MockupCreated(BaseModel):
     lead_id: UUID
     version: int
     status: str
+    provider: str | None = None
+    goal: str | None = None
     design_guide_id: UUID | None
     design_guide_name: str | None
-    prompt: str
+    prompt: str | None = None
 
     @classmethod
     def from_mockup(cls, mockup: object) -> Self:
         return cls.model_validate(mockup, from_attributes=True)
+
+
+class MockupDetail(BaseModel):
+    id: UUID
+    lead_id: UUID
+    business_name: str | None = None
+    title: str | None
+    status: str
+    version: int
+    notes: str | None
+    prompt: str | None
+    provider: str | None
+    model_name: str | None = None
+    goal: str | None = None
+    html_content: str | None = None
+    preview_html: str | None = None
+    asset_refs: list[dict[str, object]] | None = None
+    source_mockup_id: UUID | None = None
+    screenshot_status: str | None = None
+    error_code: str | None = None
+    has_html: bool = False
+    has_desktop_screenshot: bool = False
+    has_mobile_screenshot: bool = False
+    design_guide_id: UUID | None
+    design_guide_name: str | None
+    completed_at: datetime | None
+    created_at: datetime
+
+    @classmethod
+    def from_mockup(
+        cls,
+        mockup: object,
+        *,
+        business_name: str | None = None,
+        include_html: bool = False,
+    ) -> Self:
+        html = getattr(mockup, "html_content", None) if include_html else None
+        preview = None
+        if include_html and isinstance(html, str) and html.strip():
+            from app.services.mockup_html import wrap_for_srcdoc
+
+            preview = wrap_for_srcdoc(html)
+        return cls(
+            id=getattr(mockup, "id"),
+            lead_id=getattr(mockup, "lead_id"),
+            business_name=business_name,
+            title=getattr(mockup, "title", None),
+            status=getattr(mockup, "status"),
+            version=getattr(mockup, "version"),
+            notes=getattr(mockup, "notes", None),
+            prompt=getattr(mockup, "prompt", None),
+            provider=getattr(mockup, "provider", None),
+            model_name=getattr(mockup, "model_name", None),
+            goal=getattr(mockup, "goal", None),
+            html_content=html if include_html else None,
+            preview_html=preview,
+            asset_refs=getattr(mockup, "asset_refs", None),
+            source_mockup_id=getattr(mockup, "source_mockup_id", None),
+            screenshot_status=getattr(mockup, "screenshot_status", None),
+            error_code=getattr(mockup, "error_code", None),
+            has_html=bool(getattr(mockup, "html_content", None)),
+            has_desktop_screenshot=bool(getattr(mockup, "desktop_image_url", None)),
+            has_mobile_screenshot=bool(getattr(mockup, "mobile_image_url", None)),
+            design_guide_id=getattr(mockup, "design_guide_id", None),
+            design_guide_name=getattr(mockup, "design_guide_name", None),
+            completed_at=getattr(mockup, "completed_at", None),
+            created_at=getattr(mockup, "created_at"),
+        )

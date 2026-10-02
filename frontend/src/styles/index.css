@@ -106,6 +106,14 @@ dialog {
   color: inherit;
 }
 
+dialog.dialog-lg {
+  width: min(920px, calc(100% - 32px));
+}
+
+dialog.dialog-xl {
+  width: min(1280px, calc(100% - 32px));
+}
+
 dialog:modal {
   margin: auto;
 }

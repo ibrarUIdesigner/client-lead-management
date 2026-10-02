@@ -14,6 +14,14 @@ class MockupRead(BaseModel):
     version: int
     notes: str | None
     prompt: str | None
+    provider: str | None = None
+    model_name: str | None = None
+    goal: str | None = None
+    screenshot_status: str | None = None
+    error_code: str | None = None
+    has_html: bool = False
+    has_desktop_screenshot: bool = False
+    has_mobile_screenshot: bool = False
     primary_color: str | None
     design_guide_id: UUID | None
     design_guide_name: str | None

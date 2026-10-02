@@ -12,6 +12,20 @@ export function useMockups(leadId?: string) {
   return useQuery({
     queryKey: ["mockups", leadId ?? "all"],
     queryFn: () => listMockups(leadId),
+    refetchInterval: (query) => {
+      const items = query.state.data ?? [];
+      if (
+        items.some(
+          (item) =>
+            item.status === "GENERATING" ||
+            item.status === "PENDING" ||
+            item.screenshot_status === "PENDING",
+        )
+      ) {
+        return 2500;
+      }
+      return false;
+    },
   });
 }
 

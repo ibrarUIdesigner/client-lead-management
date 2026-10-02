@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -46,6 +47,16 @@ class Mockup(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     )
     prompt: Mapped[str | None] = mapped_column(Text)
     provider: Mapped[str | None] = mapped_column(String(64))
+    model_name: Mapped[str | None] = mapped_column(String(64))
+    goal: Mapped[str | None] = mapped_column(String(32))
+    html_content: Mapped[str | None] = mapped_column(Text)
+    asset_refs: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    source_mockup_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("mockups.id", ondelete="SET NULL"),
+    )
+    screenshot_status: Mapped[str | None] = mapped_column(String(32))
+    error_code: Mapped[str | None] = mapped_column(String(64))
     image_url: Mapped[str | None] = mapped_column(Text)
     thumbnail_url: Mapped[str | None] = mapped_column(Text)
     desktop_image_url: Mapped[str | None] = mapped_column(Text)

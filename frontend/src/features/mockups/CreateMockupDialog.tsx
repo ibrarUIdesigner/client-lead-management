@@ -1,44 +1,92 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "../../components/ui/Button";
 import { Modal } from "../../components/ui/Modal";
+import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { MarkdownView } from "../design-md/markdown";
 import { useDesignGuide, useDesignGuides } from "../../hooks/useDesignGuides";
+import { useProviders } from "../../hooks/useHealth";
 import { apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
-import { createMockupBrief } from "../../services/designGuides";
-import type { MockupCreateWrite } from "../../types/designGuide";
-
-type GuideMode = MockupCreateWrite["guide_mode"];
+import { createMockup } from "../../services/mockups";
+import type { GuideMode, MockupGoal, MockupProvider } from "../../types/mockup";
 
 type CreateMockupDialogProps = {
   open: boolean;
   leadId: string;
   sourceMockupId?: string | null;
   savedGuideName?: string | null;
+  defaultProvider?: MockupProvider;
+  scenario?: "new_site" | "redesign" | null;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (mockupId: string) => void;
 };
+
+const GOAL_OPTIONS = [
+  { value: "calls", label: "Phone calls" },
+  { value: "whatsapp", label: "WhatsApp enquiries" },
+  { value: "bookings", label: "Bookings" },
+  { value: "quotes", label: "Quote requests" },
+];
 
 export function CreateMockupDialog({
   open,
   leadId,
   sourceMockupId,
   savedGuideName,
+  defaultProvider,
+  scenario,
   onClose,
   onCreated,
 }: CreateMockupDialogProps) {
   const queryClient = useQueryClient();
+  const providers = useProviders();
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<GuideMode>(savedGuideName ? "keep" : "none");
   const [guideId, setGuideId] = useState<string | null>(null);
   const [requirements, setRequirements] = useState("");
+  const [provider, setProvider] = useState<MockupProvider>(defaultProvider ?? "gemini");
+  const [goal, setGoal] = useState<MockupGoal>("calls");
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const guides = useDesignGuides(mode === "selected" ? search : "", "");
   const selected = useDesignGuide(mode === "selected" ? (guideId ?? undefined) : undefined);
+
+  const providerOptions = useMemo(() => {
+    const snapshots = providers.data?.providers ?? [];
+    return [
+      {
+        value: "gemini",
+        label: providerLabel(snapshots.find((item) => item.id === "gemini"), "Gemini"),
+      },
+      {
+        value: "groq",
+        label: providerLabel(snapshots.find((item) => item.id === "groq"), "Groq"),
+      },
+    ];
+  }, [providers.data]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setMode(savedGuideName ? "keep" : "none");
+    setGuideId(null);
+    setRequirements("");
+    setGoal("calls");
+    setFiles([]);
+    setError(null);
+    setSaving(false);
+    const ready = providers.data?.providers.find((item) => item.configured);
+    if (defaultProvider) {
+      setProvider(defaultProvider);
+    } else if (ready?.id === "groq" || ready?.id === "gemini") {
+      setProvider(ready.id);
+    }
+  }, [open, savedGuideName, defaultProvider, providers.data]);
 
   async function onSubmit() {
     if (saving) {
@@ -51,17 +99,22 @@ export function CreateMockupDialog({
     }
     setSaving(true);
     try {
-      await createMockupBrief({
-        lead_id: leadId,
-        requirements: requirements.trim() || null,
-        source_mockup_id: sourceMockupId ?? null,
-        design_guide_id: mode === "selected" ? guideId : null,
-        guide_mode: mode,
-      });
+      const created = await createMockup(
+        {
+          lead_id: leadId,
+          requirements: requirements.trim() || null,
+          source_mockup_id: sourceMockupId ?? null,
+          design_guide_id: mode === "selected" ? guideId : null,
+          guide_mode: mode,
+          provider,
+          goal,
+        },
+        files,
+      );
       await queryClient.invalidateQueries({ queryKey: ["mockups"] });
-      onCreated();
+      onCreated(created.id);
     } catch (caught) {
-      setError(apiErrorMessage(caught, "The mockup could not be saved."));
+      setError(apiErrorMessage(caught, "The mockup could not be started."));
       setSaving(false);
     }
   }
@@ -70,10 +123,38 @@ export function CreateMockupDialog({
     <Modal
       open={open}
       title={sourceMockupId ? "Regenerate mockup" : "Create mockup"}
-      description="The brief uses the lead, checked audit findings, and your notes. A design guide only describes the look."
-      onClose={onClose}
+      description={
+        scenario === "redesign"
+          ? "Design score is below 50. Uses verified lead details, audit findings, and an optional Design MD guide."
+          : scenario === "new_site"
+            ? "No website on file. Uses the full verified business profile and an optional Design MD guide."
+            : "Uses the lead, verified audit findings, optional Design MD guide, and your instructions. Generation stays on the server until you review it."
+      }
+      onClose={() => {
+        if (!saving) {
+          onClose();
+        }
+      }}
     >
       <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select
+            label="Provider"
+            value={provider}
+            options={providerOptions}
+            onChange={(event) => {
+              setProvider(event.target.value as MockupProvider);
+            }}
+          />
+          <Select
+            label="Main goal"
+            value={goal}
+            options={GOAL_OPTIONS}
+            onChange={(event) => {
+              setGoal(event.target.value as MockupGoal);
+            }}
+          />
+        </div>
         <fieldset className="space-y-2">
           <legend className="text-small font-medium text-gray-700">Design guide</legend>
           {savedGuideName ? (
@@ -149,8 +230,27 @@ export function CreateMockupDialog({
             ) : null}
           </div>
         ) : null}
+        <label className="flex flex-col gap-2 text-small font-medium text-gray-700">
+          Logo or images
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            onChange={(event) => {
+              setFiles(Array.from(event.target.files ?? []).slice(0, 4));
+            }}
+          />
+          <span className="font-normal text-gray-600">
+            Optional. Up to 4 images, 1.5 MB each. Remote images are blocked in the preview.
+          </span>
+          {files.length > 0 ? (
+            <span className="font-normal text-gray-700">
+              {files.map((file) => file.name).join(", ")}
+            </span>
+          ) : null}
+        </label>
         <Textarea
-          label="Mockup requirements"
+          label="Additional instructions"
           hint="Optional notes for this homepage. Business facts stay on the lead."
           value={requirements}
           onChange={(event) => setRequirements(event.target.value)}
@@ -161,14 +261,28 @@ export function CreateMockupDialog({
           </p>
         ) : null}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" disabled={saving} onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={() => void onSubmit()} isLoading={saving}>
-            Save brief
+            Generate mockup
           </Button>
         </div>
       </div>
     </Modal>
   );
+}
+
+function providerLabel(
+  snapshot: { configured: boolean; model: string; display_name: string | null } | undefined,
+  name: string,
+): string {
+  if (!snapshot) {
+    return name;
+  }
+  const model = snapshot.display_name || snapshot.model;
+  if (!snapshot.configured) {
+    return `${name} (not configured)`;
+  }
+  return model ? `${name} · ${model}` : name;
 }
