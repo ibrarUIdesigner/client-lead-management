@@ -332,10 +332,13 @@ class MockupService:
             # Persist HTML before screenshots so a serverless timeout cannot lose the page.
             self.session.commit()
 
-            # Chromium pack download can exhaust Vercel maxDuration; capture on a follow-up /process.
+            # Vercel has no durable local disk; /tmp files vanish between instances.
+            # Skip Chromium capture and surface the HTML preview instead.
             if os.environ.get("VERCEL") == "1":
+                mockup.screenshot_status = "FAILED"
                 mockup.notes = (
-                    "Homepage HTML is ready. Screenshots will finish on the next process pass."
+                    "Homepage HTML is ready. PNG screenshots are skipped on this host "
+                    "(no durable storage); use the live HTML preview or download HTML."
                 )
                 self.session.flush()
                 return

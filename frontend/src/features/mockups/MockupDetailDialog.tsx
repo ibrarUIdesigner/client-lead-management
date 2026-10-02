@@ -65,9 +65,7 @@ export function MockupDetailDialog({
       return;
     }
     const needsWork =
-      detail.data.status === "GENERATING" ||
-      detail.data.status === "PENDING" ||
-      (detail.data.status === "READY" && detail.data.screenshot_status === "PENDING");
+      detail.data.status === "GENERATING" || detail.data.status === "PENDING";
     if (!needsWork) {
       return;
     }

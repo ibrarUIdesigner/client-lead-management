@@ -161,12 +161,21 @@ async def process_mockup(mockup_id: UUID, request: Request, session: SessionDep)
         and mockup.html_content
         and mockup.screenshot_status == "PENDING"
     ):
-        session.commit()
-        await run_mockup_screenshots(
-            mockup_id,
-            request.app.state.session_factory,
-            request.app.state.settings,
-        )
+        # On Vercel, local PNG storage is ephemeral — mark skipped instead of hanging on Chromium.
+        if _on_vercel():
+            mockup.screenshot_status = "FAILED"
+            mockup.notes = (
+                "Homepage HTML is ready. PNG screenshots are skipped on this host "
+                "(no durable storage); use the live HTML preview or download HTML."
+            )
+            session.commit()
+        else:
+            session.commit()
+            await run_mockup_screenshots(
+                mockup_id,
+                request.app.state.session_factory,
+                request.app.state.settings,
+            )
     session.expire_all()
     detail = service.detail(mockup_id, include_html=True)
     if detail.asset_refs:

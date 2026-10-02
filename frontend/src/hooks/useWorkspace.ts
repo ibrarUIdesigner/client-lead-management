@@ -35,11 +35,11 @@ export function useMockups(leadId?: string) {
   useEffect(() => {
     const items = query.data ?? [];
     for (const item of items) {
-      const needsWork =
-        item.status === "GENERATING" ||
-        item.status === "PENDING" ||
-        (item.status === "READY" && item.screenshot_status === "PENDING");
-      if (!needsWork || kicked.current.has(item.id)) {
+      // Only auto-kick HTML generation. Screenshot capture is host-specific / manual.
+      if (item.status !== "GENERATING" && item.status !== "PENDING") {
+        continue;
+      }
+      if (kicked.current.has(item.id)) {
         continue;
       }
       kicked.current.add(item.id);
