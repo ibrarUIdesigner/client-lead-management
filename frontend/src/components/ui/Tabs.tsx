@@ -12,15 +12,21 @@ export type TabItem = {
 type TabsProps = {
   label: string;
   tabs: TabItem[];
+  value?: string;
+  onValueChange?: (id: string) => void;
 };
 
-export function Tabs({ label, tabs }: TabsProps) {
+export function Tabs({ label, tabs, value, onValueChange }: TabsProps) {
   const baseId = useId();
-  const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
+  const [uncontrolledId, setUncontrolledId] = useState(tabs[0]?.id ?? "");
+  const activeId = value ?? uncontrolledId;
   const activeTab = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
 
   const selectTab = (tabId: string) => {
-    setActiveId(tabId);
+    if (value === undefined) {
+      setUncontrolledId(tabId);
+    }
+    onValueChange?.(tabId);
     document.getElementById(`${baseId}-${tabId}`)?.focus();
   };
 
@@ -29,7 +35,7 @@ export function Tabs({ label, tabs }: TabsProps) {
       <div
         role="tablist"
         aria-label={label}
-        className="flex flex-wrap gap-1 rounded-card bg-gray-100 p-1"
+        className="flex gap-1 overflow-x-auto rounded-card bg-gray-100 p-1 [scrollbar-width:thin]"
       >
         {tabs.map((tab) => {
           const selected = tab.id === activeTab?.id;
@@ -44,7 +50,7 @@ export function Tabs({ label, tabs }: TabsProps) {
               aria-controls={`${baseId}-panel-${tab.id}`}
               tabIndex={selected ? 0 : -1}
               className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-control px-3 text-body font-medium",
+                "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-control px-3 text-body font-medium whitespace-nowrap",
                 focusRing,
                 selected ? "bg-white text-ink shadow-sm" : "text-gray-600 hover:text-ink",
               )}

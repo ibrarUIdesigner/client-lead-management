@@ -5,6 +5,7 @@ import { useToast } from "../../components/feedback/useToast";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import {
   useConnectGmail,
   useDisconnectGmail,
@@ -128,50 +129,44 @@ export function GmailSettingsCard() {
             >
               Sync now
             </Button>
-            {!confirming ? (
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setConfirming(true);
-                }}
-              >
-                Disconnect
-              </Button>
-            ) : (
-              <>
-                <Button
-                  isLoading={disconnect.isPending}
-                  onClick={() => {
-                    disconnect.mutate(undefined, {
-                      onSuccess: () => {
-                        notify("Gmail disconnected.", "success");
-                        setConfirming(false);
-                      },
-                      onError: (error) => {
-                        notify(apiErrorMessage(error, "Could not disconnect Gmail."), "danger");
-                      },
-                    });
-                  }}
-                >
-                  Confirm disconnect
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setConfirming(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </>
-            )}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setConfirming(true);
+              }}
+            >
+              Disconnect
+            </Button>
           </>
         ) : null}
       </div>
-      <p className="mt-3 text-small text-gray-600">
-        Setup notes are in docs/GMAIL.md. Redirect URI must match
-        GOOGLE_OAUTH_REDIRECT_URI on the API.
+      <p className="mt-3 text-small leading-relaxed text-gray-600">
+        Setup notes are in docs/GMAIL.md. Redirect URI must match GOOGLE_OAUTH_REDIRECT_URI on the
+        API.
       </p>
+      <ConfirmDialog
+        open={confirming}
+        title="Disconnect Gmail?"
+        description="Sending and reply sync stop until you connect this account again."
+        confirmLabel="Disconnect"
+        isLoading={disconnect.isPending}
+        onConfirm={() => {
+          disconnect.mutate(undefined, {
+            onSuccess: () => {
+              notify("Gmail disconnected.", "success");
+              setConfirming(false);
+            },
+            onError: (error) => {
+              notify(apiErrorMessage(error, "Could not disconnect Gmail."), "danger");
+            },
+          });
+        }}
+        onClose={() => {
+          if (!disconnect.isPending) {
+            setConfirming(false);
+          }
+        }}
+      />
     </Card>
   );
 }

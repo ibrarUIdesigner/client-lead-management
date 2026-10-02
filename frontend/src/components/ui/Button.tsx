@@ -4,7 +4,7 @@ import { cn, focusRing } from "../../lib/cn";
 import { Spinner } from "./Spinner";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "default" | "icon";
   isLoading?: boolean;
   children: ReactNode;
@@ -14,6 +14,7 @@ const variants = {
   primary: "bg-primary text-white hover:bg-primary-hover",
   secondary: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
   ghost: "text-gray-600 hover:bg-gray-100",
+  danger: "bg-danger text-white hover:bg-red-600",
 };
 
 export function Button({

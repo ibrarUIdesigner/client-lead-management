@@ -13,13 +13,14 @@ import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { EmptyState } from "../components/feedback/EmptyState";
+import { LoadingState } from "../components/feedback/LoadingState";
+import { OfflineState } from "../components/feedback/OfflineState";
 import { useToast } from "../components/feedback/useToast";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Badge, StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Modal } from "../components/ui/Modal";
-import { Skeleton } from "../components/ui/Skeleton";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Tabs } from "../components/ui/Tabs";
 import { MockupGallery } from "../features/mockups/MockupGallery";
 import { ConversationPanel } from "../features/gmail/ConversationPanel";
@@ -27,8 +28,9 @@ import { GmailComposer } from "../features/gmail/GmailComposer";
 import { MessageList } from "../features/outreach/MessageList";
 import { OutreachComposer } from "../features/outreach/OutreachComposer";
 import { AuditPanel } from "../features/audits/AuditPanel";
+import { useOnline } from "../hooks/useOnline";
 import { useDeleteLead, useLead } from "../hooks/useLeads";
-import { apiErrorCode, apiErrorMessage } from "../lib/apiError";
+import { apiErrorCode, apiErrorMessage, isOfflineError } from "../lib/apiError";
 import { cn, focusRing } from "../lib/cn";
 import { formatWhen } from "../lib/format";
 import type { Activity, LeadDetail } from "../types/lead";
@@ -53,16 +55,27 @@ function BackToLeads() {
 export function LeadDetailPage() {
   const { leadId = "" } = useParams();
   const navigate = useNavigate();
+  const online = useOnline();
   const lead = useLead(leadId);
+
+  if (!online && (lead.isPending || lead.isError)) {
+    return (
+      <>
+        <BackToLeads />
+        <OfflineState
+          onRetry={() => {
+            void lead.refetch();
+          }}
+        />
+      </>
+    );
+  }
 
   if (lead.isPending) {
     return (
-      <div aria-busy="true">
+      <div>
         <BackToLeads />
-        <div className="space-y-3">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-40 w-full" />
-        </div>
+        <LoadingState label="Loading lead" />
       </div>
     );
   }
@@ -82,6 +95,19 @@ export function LeadDetailPage() {
           </Button>
         }
       />
+    );
+  }
+
+  if (lead.isError && isOfflineError(lead.error)) {
+    return (
+      <>
+        <BackToLeads />
+        <OfflineState
+          onRetry={() => {
+            void lead.refetch();
+          }}
+        />
+      </>
     );
   }
 
@@ -138,27 +164,31 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           [lead.industry, lead.city, lead.country].filter(Boolean).join(" · ") || undefined
         }
         actions={
-          <>
-            {lead.email_unread ? <Badge tone="orange">Unread reply</Badge> : null}
-            {lead.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
-            <StatusBadge status={lead.lead_status} />
-            <Button
-              variant="secondary"
-              onClick={() => {
-                navigate(`/leads/${lead.id}/edit`);
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setConfirming(true);
-              }}
-            >
-              Delete
-            </Button>
-          </>
+          <div className="flex w-full flex-col gap-3 sm:w-auto">
+            <div className="flex flex-wrap gap-2">
+              {lead.email_unread ? <Badge tone="orange">Unread reply</Badge> : null}
+              {lead.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
+              <StatusBadge status={lead.lead_status} />
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  navigate(`/leads/${lead.id}/edit`);
+                }}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setConfirming(true);
+                }}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
         }
       />
       <Tabs
@@ -187,8 +217,8 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
                   onCreated={setOutreachFocus}
                 />
                 <Card className="overflow-hidden p-0 shadow-sm">
-                  <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
-                    <section className="p-5">
+                  <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
+                    <section className="min-w-0 p-4 sm:p-5">
                       <h2 className="text-h4 font-semibold text-ink">Messages</h2>
                       <p className="mt-1 text-small text-gray-600">
                         Drafts from the form above land here.
@@ -197,7 +227,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
                         <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
                       </div>
                     </section>
-                    <section className="border-t border-gray-100 p-5 lg:border-t-0">
+                    <section className="min-w-0 border-t border-gray-100 p-4 sm:p-5 lg:border-t-0">
                       <ConversationPanel leadId={lead.id} />
                     </section>
                   </div>
@@ -214,28 +244,19 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           },
         ]}
       />
-      <Modal
+      <ConfirmDialog
         open={confirming}
         title="Delete this lead?"
         description="Notes and activity for this lead will be removed."
+        confirmLabel="Delete lead"
+        isLoading={removeLead.isPending}
+        onConfirm={remove}
         onClose={() => {
-          setConfirming(false);
+          if (!removeLead.isPending) {
+            setConfirming(false);
+          }
         }}
-      >
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setConfirming(false);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button onClick={remove} isLoading={removeLead.isPending}>
-            Delete lead
-          </Button>
-        </div>
-      </Modal>
+      />
     </>
   );
 }
@@ -261,7 +282,7 @@ function Overview({ lead }: { lead: LeadDetail }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         <Card className="shadow-sm">
           <p className="text-caption font-semibold text-gray-500">Lead score</p>
           <p className="mt-2 text-h2 font-bold text-ink tabular-nums">{lead.lead_score ?? "—"}</p>
@@ -304,7 +325,7 @@ function Overview({ lead }: { lead: LeadDetail }) {
           <dl className="mt-2">
             <Fact icon={<Mail className="size-4" aria-hidden="true" />} label="Email">
               {lead.email ? (
-                <a href={`mailto:${lead.email}`} className={cn("text-primary-700", focusRing)}>
+                <a href={`mailto:${lead.email}`} className={cn("break-all text-primary-700", focusRing)}>
                   {lead.email}
                 </a>
               ) : (
@@ -409,8 +430,8 @@ function ActivityList({ lead }: { lead: LeadDetail }) {
           <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600">
             <ActivityIcon type={activity.type} />
           </span>
-          <article className="min-w-0 flex-1 rounded-card border border-gray-200 bg-white px-4 py-3 shadow-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <article className="min-w-0 flex-1 rounded-card border border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-3">
               <h3 className="font-medium text-ink">{activity.title}</h3>
               <time className="text-caption text-gray-500" dateTime={activity.created_at}>
                 {formatWhen(activity.created_at)}
@@ -462,7 +483,7 @@ function SummaryCard({
   return (
     <Card className={cn("shadow-sm", emphasis && "border-amber-200 bg-amber-50")}>
       <p className="text-caption font-semibold text-gray-500">{label}</p>
-      <p className="mt-2 text-h4 font-semibold text-ink">{value}</p>
+      <p className="mt-2 text-h4 font-semibold break-words text-ink">{value}</p>
       {detail ? <p className="mt-1 text-caption text-gray-500">{detail}</p> : null}
     </Card>
   );

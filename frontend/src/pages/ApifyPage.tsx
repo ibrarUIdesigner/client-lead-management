@@ -9,7 +9,9 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Spinner } from "../components/ui/Spinner";
+import { Tabs } from "../components/ui/Tabs";
 import { AddConnectorDialog } from "../features/apify/AddConnectorDialog";
 import { ResultsPanel } from "../features/apify/ResultsPanel";
 import { RunActorDialog } from "../features/apify/RunActorDialog";
@@ -21,6 +23,7 @@ import { ACTIVE_RUN_STATUSES, type ApifyConnector, type ApifyRun } from "../type
 export function ApifyPage() {
   const apify = useApify();
   const [addOpen, setAddOpen] = useState(false);
+  const [tab, setTab] = useState("connectors");
   const [runTarget, setRunTarget] = useState<ApifyConnector | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const { notify } = useToast();
@@ -31,6 +34,7 @@ export function ApifyPage() {
   if (activeRun && activeRun.id !== trackedActiveId && selectedRunId == null) {
     setTrackedActiveId(activeRun.id);
     setSelectedRunId(activeRun.id);
+    setTab("history");
   }
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
 
@@ -59,87 +63,108 @@ export function ApifyPage() {
         }}
       >
         {apify.data ? (
-          <div className="space-y-8">
-            {!apify.data.token_configured ? (
-              <p
-                className="rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-950"
-                role="status"
-              >
-                Set APIFY_TOKEN on the server before connecting actors. The token stays on the
-                server and is not stored in the browser.
-              </p>
-            ) : null}
-            {apify.data.token_error ? (
-              <p className="text-body text-danger" role="alert">
-                {apify.data.token_error}
-              </p>
-            ) : null}
-            {apify.data.connectors.length === 0 ? (
-              <EmptyState
-                title="No actors yet"
-                description="Actors you have created or used in Apify show up here. You can also add one by its ID or owner/name."
-                action={
-                  <Button
-                    onClick={() => {
-                      setAddOpen(true);
-                    }}
-                  >
-                    Add connector
-                  </Button>
-                }
-              />
-            ) : (
-              <div className="grid gap-4">
-                {apify.data.connectors.map((connector) => (
-                  <ConnectorCard
-                    key={connector.id}
-                    connector={connector}
-                    tokenConfigured={apify.data?.token_configured ?? false}
-                    onRun={() => {
-                      setRunTarget(connector);
-                    }}
-                    onRemoved={() => {
-                      if (selectedRun?.connector_id === connector.id) {
-                        setSelectedRunId(null);
-                      }
-                      notify("Connector removed.");
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            {selectedRun ? (
-              <section id="run-progress" className="space-y-4" aria-labelledby="run-progress-title">
-                <RunProgress
-                  run={selectedRun}
-                  onAbortError={(message) => {
-                    notify(message, "danger");
-                  }}
-                />
-                <ResultsPanel
-                  key={selectedRun.id}
-                  run={selectedRun}
-                  onImported={(message) => {
-                    notify(message, "success");
-                  }}
-                />
-              </section>
-            ) : null}
-
-            <section className="space-y-4" aria-labelledby="run-history-title">
-              <h2 id="run-history-title" className="text-h3 font-semibold text-ink">
-                Run history
-              </h2>
-              <DataTable
-                columns={historyColumns(selectedRunId, setSelectedRunId)}
-                rows={runs}
-                getRowId={(run) => run.id}
-                emptyTitle="No runs yet"
-                emptyDescription="Runs will show up here after you start an actor."
-              />
-            </section>
-          </div>
+          <Tabs
+            label="Apify"
+            value={tab}
+            onValueChange={setTab}
+            tabs={[
+              {
+                id: "connectors",
+                label: "Connectors",
+                count: apify.data.connectors.length,
+                content: (
+                  <div className="space-y-4">
+                    {!apify.data.token_configured ? (
+                      <p
+                        className="rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-950"
+                        role="status"
+                      >
+                        Set APIFY_TOKEN on the server before connecting actors. The token stays on
+                        the server and is not stored in the browser.
+                      </p>
+                    ) : null}
+                    {apify.data.token_error ? (
+                      <p className="text-body text-danger" role="alert">
+                        {apify.data.token_error}
+                      </p>
+                    ) : null}
+                    {apify.data.connectors.length === 0 ? (
+                      <EmptyState
+                        title="No actors yet"
+                        description="Actors you have created or used in Apify show up here. You can also add one by its ID or owner/name."
+                        action={
+                          <Button
+                            onClick={() => {
+                              setAddOpen(true);
+                            }}
+                          >
+                            Add connector
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <div className="grid gap-4">
+                        {apify.data.connectors.map((connector) => (
+                          <ConnectorCard
+                            key={connector.id}
+                            connector={connector}
+                            tokenConfigured={apify.data?.token_configured ?? false}
+                            onRun={() => {
+                              setRunTarget(connector);
+                            }}
+                            onRemoved={() => {
+                              if (selectedRun?.connector_id === connector.id) {
+                                setSelectedRunId(null);
+                              }
+                              notify("Connector removed.");
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                id: "history",
+                label: "Run history",
+                count: runs.length,
+                content: (
+                  <div className="space-y-6">
+                    {selectedRun ? (
+                      <section id="run-progress" className="space-y-4" aria-labelledby="run-progress-title">
+                        <RunProgress
+                          run={selectedRun}
+                          onAbortError={(message) => {
+                            notify(message, "danger");
+                          }}
+                        />
+                        <ResultsPanel
+                          key={selectedRun.id}
+                          run={selectedRun}
+                          onImported={(message) => {
+                            notify(message, "success");
+                          }}
+                        />
+                      </section>
+                    ) : null}
+                    <DataTable
+                      columns={historyColumns(selectedRunId, (runId) => {
+                        setSelectedRunId(runId);
+                        window.setTimeout(() => {
+                          document.getElementById("run-progress")?.scrollIntoView({ behavior: "smooth" });
+                        }, 50);
+                      })}
+                      rows={runs}
+                      getRowId={(run) => run.id}
+                      emptyTitle="No runs yet"
+                      emptyDescription="Runs will show up here after you start an actor."
+                    />
+                  </div>
+                ),
+              },
+            ]}
+          />
         ) : null}
       </QueryGate>
       {addOpen ? (
@@ -159,6 +184,7 @@ export function ApifyPage() {
           }}
           onStarted={(runId) => {
             setSelectedRunId(runId);
+            setTab("history");
             notify("Actor run started.");
             window.setTimeout(() => {
               document.getElementById("run-progress")?.scrollIntoView({ behavior: "smooth" });
@@ -182,28 +208,17 @@ function ConnectorCard({
   onRemoved: () => void;
 }) {
   const remove = useDeleteApifyConnector();
-  const [removing, setRemoving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onRemove() {
-    if (removing) {
-      return;
-    }
-    if (
-      !window.confirm(
-        "Remove this connector and its run history? Leads already imported will stay.",
-      )
-    ) {
-      return;
-    }
-    setRemoving(true);
     setError(null);
     try {
       await remove.mutateAsync(connector.id);
+      setConfirming(false);
       onRemoved();
     } catch (caught) {
       setError(apiErrorMessage(caught, "That connector could not be removed."));
-      setRemoving(false);
     }
   }
 
@@ -248,15 +263,35 @@ function ConnectorCard({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button onClick={onRun} disabled={!tokenConfigured || connector.has_active_run}>
             Run Actor
           </Button>
-          <Button variant="secondary" onClick={() => void onRemove()} isLoading={removing}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setConfirming(true);
+            }}
+          >
             Remove
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        title="Remove this connector?"
+        description="Run history for this connector will be removed. Leads already imported will stay."
+        confirmLabel="Remove connector"
+        isLoading={remove.isPending}
+        onConfirm={() => {
+          void onRemove();
+        }}
+        onClose={() => {
+          if (!remove.isPending) {
+            setConfirming(false);
+          }
+        }}
+      />
     </Card>
   );
 }
@@ -269,23 +304,15 @@ function RunProgress({
   onAbortError: (message: string) => void;
 }) {
   const abort = useAbortApifyRun();
-  const [aborting, setAborting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const active = ACTIVE_RUN_STATUSES.has(run.status);
 
   async function onAbort() {
-    if (aborting) {
-      return;
-    }
-    if (!window.confirm("Abort this run?")) {
-      return;
-    }
-    setAborting(true);
     try {
       await abort.mutateAsync(run.id);
+      setConfirming(false);
     } catch (caught) {
       onAbortError(apiErrorMessage(caught, "The run could not be aborted."));
-    } finally {
-      setAborting(false);
     }
   }
 
@@ -311,11 +338,31 @@ function RunProgress({
           </p>
         </div>
         {run.status === "READY" || run.status === "RUNNING" ? (
-          <Button variant="secondary" onClick={() => void onAbort()} isLoading={aborting}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setConfirming(true);
+            }}
+          >
             Abort run
           </Button>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={confirming}
+        title="Abort this run?"
+        description="The actor stops and any records already collected stay in the run."
+        confirmLabel="Abort run"
+        isLoading={abort.isPending}
+        onConfirm={() => {
+          void onAbort();
+        }}
+        onClose={() => {
+          if (!abort.isPending) {
+            setConfirming(false);
+          }
+        }}
+      />
     </Card>
   );
 }

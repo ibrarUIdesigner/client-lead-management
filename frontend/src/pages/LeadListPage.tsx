@@ -339,7 +339,7 @@ export function LeadListPage() {
               }}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 sm:max-w-md">
             <Select
               label="Status"
               placeholder="Any status"
@@ -460,6 +460,7 @@ export function LeadListPage() {
             }}
           />
           <Button
+            className="w-full md:w-auto"
             onClick={applyBulk}
             isLoading={bulkUpdate.isPending}
             disabled={!bulkStatus && bulkTag.trim() === ""}
@@ -524,6 +525,92 @@ export function LeadListPage() {
           setPage(nextPage);
           setSelected(new Set());
         }}
+        renderCard={(row) => (
+          <article className="flex gap-3">
+            <label className="inline-flex size-11 shrink-0 items-start justify-center pt-0.5">
+              <input
+                type="checkbox"
+                className={cn("size-4 accent-primary", focusRing)}
+                aria-label={`Select ${row.business_name}`}
+                checked={selected.has(row.id)}
+                onChange={() => {
+                  toggle(row.id);
+                }}
+              />
+            </label>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  to={`/leads/${row.id}`}
+                  className={cn(
+                    "text-h4 font-semibold break-words text-ink hover:text-primary-700",
+                    focusRing,
+                  )}
+                >
+                  {row.business_name}
+                </Link>
+                <span className="shrink-0 text-h4 font-semibold tabular-nums text-ink">
+                  {row.lead_score === null ? "—" : row.lead_score}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <StatusBadge status={row.lead_status} />
+                {row.industry ? <span className="text-small text-gray-600">{row.industry}</span> : null}
+              </div>
+              <dl className="mt-3 space-y-1 text-small text-gray-700">
+                <div className="flex gap-2">
+                  <dt className="w-16 shrink-0 text-gray-500">Email</dt>
+                  <dd className="min-w-0 break-all">
+                    {row.email ? (
+                      <a href={`mailto:${row.email}`} className={cn("text-primary-700", focusRing)}>
+                        {row.email}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="w-16 shrink-0 text-gray-500">Website</dt>
+                  <dd className="min-w-0 truncate">
+                    {row.website_url ? (
+                      <a
+                        href={row.website_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn("text-primary-700", focusRing)}
+                      >
+                        {websiteLabel(row.website_url)}
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="w-16 shrink-0 text-gray-500">Place</dt>
+                  <dd className="min-w-0">{[row.city, row.country].filter(Boolean).join(", ") || "—"}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="w-16 shrink-0 text-gray-500">Source</dt>
+                  <dd className="min-w-0">{row.source || "—"}</dd>
+                </div>
+              </dl>
+              {row.tags.length > 0 ? (
+                <span className="mt-3 flex flex-wrap gap-1">
+                  {row.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-caption font-medium text-gray-700"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </div>
+          </article>
+        )}
       />
     </>
   );

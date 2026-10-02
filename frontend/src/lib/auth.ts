@@ -22,3 +22,7 @@ export function signIn(email: string, password: string): boolean {
 export function signOut(): void {
   sessionStorage.removeItem(SESSION_KEY);
 }
+
+export function sessionEmail(): string {
+  return STATIC_EMAIL;
+}

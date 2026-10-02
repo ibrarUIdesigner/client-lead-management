@@ -26,6 +26,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import {
@@ -177,8 +178,8 @@ function DiscoverWorkspace({
 
       {status.running ? <RunningBanner message={status.latest_message} /> : null}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
+        <div className="min-w-0 space-y-6">
           <SearchForm
             categories={status.categories}
             googleConfigured={status.google_configured}
@@ -411,7 +412,7 @@ function SearchForm({
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-gray-100 px-6 py-5">
+      <div className="border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex items-start gap-3">
           <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-panel bg-primary text-white shadow-md">
             <Plus className="size-5" aria-hidden="true" />
@@ -427,7 +428,7 @@ function SearchForm({
       </div>
 
       <form
-        className="space-y-6 px-6 py-5"
+        className="space-y-6 px-4 py-4 sm:px-6 sm:py-5"
         onSubmit={(event) => {
           event.preventDefault();
           save(true);
@@ -507,7 +508,7 @@ function SearchForm({
               {Object.values(sources).filter(Boolean).length} selected
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {SOURCE_OPTIONS.map((option) => {
               const enabled = sources[option.key];
               const keyMissing =
@@ -661,6 +662,7 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
   const remove = useDeleteDiscoverySearch();
   const run = useRunDiscovery();
   const { notify } = useToast();
+  const [confirming, setConfirming] = useState(false);
   const label = search.category.replaceAll("_", " ");
   const sourceChips = enabledSources(search);
   const failed = Boolean(
@@ -671,11 +673,11 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
   );
 
   return (
-    <Card className="p-0">
-      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="min-w-0 overflow-hidden p-0">
+      <div className="flex min-w-0 flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-h4 font-semibold capitalize text-ink">
+            <h3 className="text-h4 font-semibold break-words text-ink capitalize">
               {search.city.toLowerCase() === "anywhere" ? label : `${label} in ${search.city}`}
             </h3>
             <Badge tone={search.is_active ? "green" : "gray"}>
@@ -715,7 +717,7 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
           ) : null}
         </div>
 
-        <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:w-auto sm:min-w-55">
+        <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:w-auto sm:min-w-56">
           <Metric label="Found" value={search.last_found_count} />
           <Metric label="New" value={search.last_created_count} />
           <Metric label="Updated" value={search.last_updated_count} />
@@ -723,9 +725,10 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-gray-100 bg-gray-50/80 px-5 py-3">
+      <div className="flex flex-col gap-2 border-t border-gray-100 bg-gray-50/80 px-4 py-3 sm:flex-row sm:flex-wrap sm:px-5">
         <Button
           variant="secondary"
+          className="w-full sm:w-auto"
           isLoading={run.isPending}
           disabled={running}
           onClick={() => {
@@ -741,6 +744,7 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
         </Button>
         <Button
           variant="ghost"
+          className="w-full sm:w-auto"
           disabled={update.isPending || running}
           onClick={() => {
             update.mutate(
@@ -767,23 +771,38 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
         </Button>
         <Button
           variant="ghost"
-          className="text-danger hover:bg-red-50"
-          disabled={remove.isPending || running}
+          className="w-full text-danger hover:bg-red-50 sm:w-auto"
+          disabled={running}
           onClick={() => {
-            if (!window.confirm("Remove this search? Leads already saved will stay.")) {
-              return;
-            }
-            remove.mutate(search.id, {
-              onError: (error) => {
-                notify(apiErrorMessage(error, "The search could not be removed."), "danger");
-              },
-            });
+            setConfirming(true);
           }}
         >
           <Trash2 className="size-4" aria-hidden="true" />
           Remove
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirming}
+        title="Remove this search?"
+        description="Leads already saved will stay."
+        confirmLabel="Remove search"
+        isLoading={remove.isPending}
+        onConfirm={() => {
+          remove.mutate(search.id, {
+            onSuccess: () => {
+              setConfirming(false);
+            },
+            onError: (error) => {
+              notify(apiErrorMessage(error, "The search could not be removed."), "danger");
+            },
+          });
+        }}
+        onClose={() => {
+          if (!remove.isPending) {
+            setConfirming(false);
+          }
+        }}
+      />
     </Card>
   );
 }
@@ -876,7 +895,7 @@ function FoundLeads({
         </Link>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
         {leads.map((lead) => (
           <FoundLead key={lead.id} lead={lead} />
         ))}
@@ -894,7 +913,7 @@ function FoundLead({ lead }: { lead: Lead }) {
   const location = [lead.industry, lead.city, lead.country].filter(Boolean).join(" · ");
 
   return (
-    <Card className="flex h-full flex-col p-0 transition-shadow duration-150 hover:shadow-md">
+    <Card className="flex h-full min-w-0 w-full flex-col overflow-hidden p-0 transition-shadow duration-150 hover:shadow-md">
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -915,7 +934,7 @@ function FoundLead({ lead }: { lead: Lead }) {
         </div>
 
         {lead.description ? (
-          <p className="line-clamp-3 text-small text-gray-600">{lead.description}</p>
+          <p className="line-clamp-3 min-w-0 text-small break-words text-gray-600">{lead.description}</p>
         ) : null}
 
         <div className="mt-auto space-y-1.5 border-t border-gray-100 pt-3 text-small text-gray-600">
@@ -1080,7 +1099,7 @@ function SourceStatus({
   detail: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5 rounded-control bg-gray-50 px-3 py-2.5">
+    <div className="flex flex-wrap items-start gap-2.5 rounded-control bg-gray-50 px-3 py-2.5">
       {ready ? (
         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden="true" />
       ) : (
@@ -1090,7 +1109,9 @@ function SourceStatus({
         <p className="text-small font-semibold text-ink">{name}</p>
         <p className="text-caption text-gray-500">{detail}</p>
       </div>
-      <Badge tone={ready ? "green" : "orange"}>{ready ? "Ready" : "Needs key"}</Badge>
+      <span className="sm:ml-auto">
+        <Badge tone={ready ? "green" : "orange"}>{ready ? "Ready" : "Needs key"}</Badge>
+      </span>
     </div>
   );
 }

@@ -1,33 +1,45 @@
 import type { ReactNode } from "react";
 
-import { apiErrorMessage } from "../../lib/apiError";
+import { useOnline } from "../../hooks/useOnline";
+import { apiErrorMessage, isOfflineError } from "../../lib/apiError";
 import { Button } from "../ui/Button";
-import { Skeleton } from "../ui/Skeleton";
+import { LoadingState } from "./LoadingState";
+import { OfflineState } from "./OfflineState";
 
 type QueryGateProps = {
   pending: boolean;
   error: unknown;
   onRetry: () => void;
   fallback: string;
+  loadingLabel?: string;
   children: ReactNode;
 };
 
-export function QueryGate({ pending, error, onRetry, fallback, children }: QueryGateProps) {
+export function QueryGate({
+  pending,
+  error,
+  onRetry,
+  fallback,
+  loadingLabel = "Loading",
+  children,
+}: QueryGateProps) {
+  const online = useOnline();
+
+  if (!online || (error && isOfflineError(error))) {
+    return <OfflineState onRetry={onRetry} />;
+  }
+
   if (pending) {
-    return (
-      <div className="space-y-3" aria-busy="true">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-40 w-full" />
-      </div>
-    );
+    return <LoadingState label={loadingLabel} />;
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-start gap-3" role="alert">
-        <p className="text-body text-danger">{apiErrorMessage(error, fallback)}</p>
+      <div className="flex flex-col items-start gap-3 rounded-card border border-red-200 bg-red-50 px-4 py-6 sm:px-6" role="alert">
+        <h2 className="text-h4 font-semibold text-ink">Could not load this</h2>
+        <p className="max-w-lg text-body text-red-800">{apiErrorMessage(error, fallback)}</p>
         <Button variant="secondary" onClick={onRetry}>
-          Retry
+          Try again
         </Button>
       </div>
     );

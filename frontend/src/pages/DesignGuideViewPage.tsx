@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { QueryGate } from "../components/feedback/QueryGate";
@@ -6,6 +7,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { MarkdownView } from "../features/design-md/markdown";
 import { useDeleteDesignGuide, useDesignGuide } from "../hooks/useDesignGuides";
 import { apiErrorMessage } from "../lib/apiError";
@@ -18,15 +20,9 @@ export function DesignGuideViewPage() {
   const remove = useDeleteDesignGuide();
   const navigate = useNavigate();
   const { notify } = useToast();
+  const [confirming, setConfirming] = useState(false);
 
   async function onDelete() {
-    if (
-      !window.confirm(
-        "Delete this design guide? Mockups that already used it will keep their saved copy.",
-      )
-    ) {
-      return;
-    }
     try {
       await remove.mutateAsync(guideId);
       notify("Design guide deleted.");
@@ -73,7 +69,12 @@ export function DesignGuideViewPage() {
                 >
                   Download
                 </Button>
-                <Button variant="secondary" onClick={() => void onDelete()} isLoading={remove.isPending}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setConfirming(true);
+                  }}
+                >
                   Delete
                 </Button>
               </>
@@ -97,6 +98,21 @@ export function DesignGuideViewPage() {
               </Link>
             </p>
           </Card>
+          <ConfirmDialog
+            open={confirming}
+            title="Delete this design guide?"
+            description="Mockups that already used it will keep their saved copy."
+            confirmLabel="Delete guide"
+            isLoading={remove.isPending}
+            onConfirm={() => {
+              void onDelete();
+            }}
+            onClose={() => {
+              if (!remove.isPending) {
+                setConfirming(false);
+              }
+            }}
+          />
         </>
       ) : null}
     </QueryGate>

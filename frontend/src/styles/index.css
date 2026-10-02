@@ -32,28 +32,36 @@
   --shadow-lg: 0 12px 32px rgb(16 24 40 / 0.08);
 
   --spacing-sidebar: 248px;
+  --spacing-sidebar-rail: 72px;
   --spacing-topbar: 64px;
 
-  --text-display-xl: 48px;
-  --text-display-xl--line-height: 56px;
-  --text-display-lg: 40px;
-  --text-display-lg--line-height: 48px;
-  --text-h1: 32px;
-  --text-h1--line-height: 40px;
-  --text-h2: 24px;
-  --text-h2--line-height: 32px;
-  --text-h3: 20px;
-  --text-h3--line-height: 28px;
-  --text-h4: 16px;
-  --text-h4--line-height: 24px;
-  --text-body-lg: 16px;
-  --text-body-lg--line-height: 24px;
-  --text-body: 14px;
-  --text-body--line-height: 21px;
-  --text-small: 13px;
-  --text-small--line-height: 18px;
-  --text-caption: 12px;
-  --text-caption--line-height: 16px;
+  --text-display-xl: clamp(1.75rem, 1.2rem + 1.8vw, 3rem);
+  --text-display-xl--line-height: 1.12;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-lg: clamp(1.5rem, 1.15rem + 1.2vw, 2.5rem);
+  --text-display-lg--line-height: 1.16;
+  --text-display-lg--letter-spacing: -0.026em;
+  --text-h1: clamp(1.375rem, 1.12rem + 0.9vw, 2rem);
+  --text-h1--line-height: 1.2;
+  --text-h1--letter-spacing: -0.022em;
+  --text-h2: clamp(1.1875rem, 1.05rem + 0.5vw, 1.5rem);
+  --text-h2--line-height: 1.28;
+  --text-h2--letter-spacing: -0.018em;
+  --text-h3: clamp(1.0625rem, 1rem + 0.25vw, 1.25rem);
+  --text-h3--line-height: 1.35;
+  --text-h3--letter-spacing: -0.012em;
+  --text-h4: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  --text-h4--line-height: 1.4;
+  --text-h4--letter-spacing: -0.008em;
+  --text-body-lg: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  --text-body-lg--line-height: 1.55;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.5;
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.45;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.35;
+  --text-caption--letter-spacing: 0.01em;
 }
 
 html {
@@ -65,8 +73,25 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  font-size: 14px;
-  line-height: 21px;
+  font-size: var(--text-body);
+  font-weight: 400;
+  line-height: var(--text-body--line-height);
+  text-rendering: optimizeLegibility;
+}
+
+@media (max-width: 639px) {
+  :root {
+    --text-display-xl: 1.75rem;
+    --text-display-lg: 1.5rem;
+    --text-h1: 1.375rem;
+    --text-h2: 1.1875rem;
+    --text-h3: 1.0625rem;
+    --text-h4: 0.9375rem;
+    --text-body-lg: 0.875rem;
+    --text-body: 0.8125rem;
+    --text-small: 0.75rem;
+    --text-caption: 0.75rem;
+  }
 }
 
 dialog {

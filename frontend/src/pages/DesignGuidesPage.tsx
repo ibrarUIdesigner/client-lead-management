@@ -9,6 +9,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { useDeleteDesignGuide, useDesignGuides } from "../hooks/useDesignGuides";
 import { apiErrorMessage } from "../lib/apiError";
 import { cn, focusRing } from "../lib/cn";
@@ -21,20 +22,18 @@ export function DesignGuidesPage() {
   const { notify } = useToast();
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<DesignGuideSummary | null>(null);
   const guides = useDesignGuides(query, tag);
   const remove = useDeleteDesignGuide();
 
-  async function onDelete(guide: DesignGuideSummary) {
-    if (
-      !window.confirm(
-        "Delete this design guide? Mockups that already used it will keep their saved copy.",
-      )
-    ) {
+  async function onDelete() {
+    if (!pendingDelete) {
       return;
     }
     try {
-      await remove.mutateAsync(guide.id);
+      await remove.mutateAsync(pendingDelete.id);
       notify("Design guide deleted.");
+      setPendingDelete(null);
     } catch (caught) {
       notify(apiErrorMessage(caught, "That design guide could not be deleted."), "danger");
     }
@@ -174,9 +173,8 @@ export function DesignGuidesPage() {
                     <Button
                       variant="secondary"
                       onClick={() => {
-                        void onDelete(guide);
+                        setPendingDelete(guide);
                       }}
-                      isLoading={remove.isPending}
                     >
                       Delete
                     </Button>
@@ -187,6 +185,21 @@ export function DesignGuidesPage() {
           </div>
         ) : null}
       </QueryGate>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete this design guide?"
+        description="Mockups that already used it will keep their saved copy."
+        confirmLabel="Delete guide"
+        isLoading={remove.isPending}
+        onConfirm={() => {
+          void onDelete();
+        }}
+        onClose={() => {
+          if (!remove.isPending) {
+            setPendingDelete(null);
+          }
+        }}
+      />
     </>
   );
 }
