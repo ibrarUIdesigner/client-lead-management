@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -324,9 +325,22 @@ class MockupService:
             mockup.html_content = html
             mockup.model_name = model_name
             mockup.error_code = None
-            await self._capture_only(mockup, capture=capture)
             mockup.status = MockupStatus.READY.value
+            mockup.screenshot_status = "PENDING"
             mockup.completed_at = datetime.now(UTC)
+            mockup.notes = "Homepage HTML ready. Capturing screenshots…"
+            # Persist HTML before screenshots so a serverless timeout cannot lose the page.
+            self.session.commit()
+
+            # Chromium pack download can exhaust Vercel maxDuration; capture on a follow-up /process.
+            if os.environ.get("VERCEL") == "1":
+                mockup.notes = (
+                    "Homepage HTML is ready. Screenshots will finish on the next process pass."
+                )
+                self.session.flush()
+                return
+
+            await self._capture_only(mockup, capture=capture)
             if mockup.screenshot_status == "READY":
                 mockup.notes = "Homepage ready for review. Nothing was emailed or published."
             else:

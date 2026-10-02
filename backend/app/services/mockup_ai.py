@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import time
 from typing import Literal
@@ -81,7 +82,9 @@ def generate_homepage_html(
     model = model_for_provider(settings, provider)
     prompt = _instructions(brief)
     owns_client = client is None
-    http = client or httpx.Client(timeout=90.0)
+    # Keep headroom under Vercel maxDuration (AI + response overhead).
+    timeout = 60.0 if os.environ.get("VERCEL") == "1" else 90.0
+    http = client or httpx.Client(timeout=timeout)
     try:
         try:
             if provider == "gemini":
@@ -275,7 +278,9 @@ def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> tuple[str,
     preferred = settings.gemini_model.strip()
     if preferred and _MODEL.match(preferred):
         models.append(preferred)
-    for model in _GEMINI_FALLBACK_MODELS:
+    # On Vercel, avoid chaining many 90s model attempts past maxDuration.
+    fallbacks = _GEMINI_FALLBACK_MODELS[:1] if os.environ.get("VERCEL") == "1" else _GEMINI_FALLBACK_MODELS
+    for model in fallbacks:
         if model not in models:
             models.append(model)
     last: httpx.Response | None = None
