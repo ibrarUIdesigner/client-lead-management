@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import Callable
 from typing import Literal
 from uuid import UUID
@@ -9,6 +10,8 @@ from starlette.responses import Response
 
 from app.api.deps import SessionDep
 from app.core.errors import AppError
+from app.models.enums import MockupStatus
+from app.models.mockup import Mockup
 from app.schemas.design_guides import (
     MockupCreate,
     MockupCreated,
@@ -25,12 +28,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["mockups"])
 
 
+def _on_vercel() -> bool:
+    return os.environ.get("VERCEL") == "1"
+
+
 async def run_mockup(
     mockup_id: UUID,
     session_factory: Callable[[], Session],
-    settings_factory: Callable[[], object],
+    settings: object,
 ) -> None:
-    settings = settings_factory()  # type: ignore[misc]
     session = session_factory()
     try:
         service = MockupService(session, settings, settings.storage_dir)  # type: ignore[attr-defined]
@@ -38,7 +44,7 @@ async def run_mockup(
         session.commit()
     except Exception:
         session.rollback()
-        logger.warning("mockup_job_failed mockup_id=%s", mockup_id)
+        logger.exception("mockup_job_failed mockup_id=%s", mockup_id)
     finally:
         session.close()
 
@@ -46,9 +52,8 @@ async def run_mockup(
 async def run_mockup_screenshots(
     mockup_id: UUID,
     session_factory: Callable[[], Session],
-    settings_factory: Callable[[], object],
+    settings: object,
 ) -> None:
-    settings = settings_factory()  # type: ignore[misc]
     session = session_factory()
     try:
         service = MockupService(session, settings, settings.storage_dir)  # type: ignore[attr-defined]
@@ -56,9 +61,37 @@ async def run_mockup_screenshots(
         session.commit()
     except Exception:
         session.rollback()
-        logger.warning("mockup_screenshot_job_failed mockup_id=%s", mockup_id)
+        logger.exception("mockup_screenshot_job_failed mockup_id=%s", mockup_id)
     finally:
         session.close()
+
+
+async def _schedule_mockup(
+    *,
+    mockup_id: UUID,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    screenshots_only: bool = False,
+) -> None:
+    """Schedule mockup work.
+
+    On Vercel, background tasks freeze after the HTTP response, so create/refine
+    only persist the GENERATING row. The client must call POST /process to run
+    the job in-request.
+    """
+    settings = request.app.state.settings
+    session_factory = request.app.state.session_factory
+    if _on_vercel():
+        logger.info(
+            "mockup_deferred_to_process mockup_id=%s screenshots_only=%s",
+            mockup_id,
+            screenshots_only,
+        )
+        return
+    if screenshots_only:
+        background_tasks.add_task(run_mockup_screenshots, mockup_id, session_factory, settings)
+    else:
+        background_tasks.add_task(run_mockup, mockup_id, session_factory, settings)
 
 
 @router.post("/mockups", response_model=MockupCreated, status_code=201)
@@ -101,13 +134,49 @@ async def create_mockup(
     service = MockupService(session, request.app.state.settings)
     created = service.create(data, assets=assets or None)
     session.commit()
-    background_tasks.add_task(
-        run_mockup,
-        created.id,
-        request.app.state.session_factory,
-        lambda: request.app.state.settings,
+    await _schedule_mockup(
+        mockup_id=created.id,
+        request=request,
+        background_tasks=background_tasks,
     )
     return created
+
+
+@router.post("/mockups/{mockup_id}/process", response_model=MockupDetail)
+async def process_mockup(mockup_id: UUID, request: Request, session: SessionDep) -> MockupDetail:
+    """Resume a stuck GENERATING/PENDING mockup (needed when background jobs did not run)."""
+    service = MockupService(session, request.app.state.settings)
+    mockup = session.get(Mockup, mockup_id)
+    if mockup is None:
+        raise AppError(
+            code="MOCKUP_NOT_FOUND",
+            message="That mockup could not be found.",
+            status_code=404,
+        )
+    if mockup.status in {MockupStatus.GENERATING.value, MockupStatus.PENDING.value}:
+        session.commit()
+        await run_mockup(mockup_id, request.app.state.session_factory, request.app.state.settings)
+    elif (
+        mockup.status == MockupStatus.READY.value
+        and mockup.html_content
+        and mockup.screenshot_status == "PENDING"
+    ):
+        session.commit()
+        await run_mockup_screenshots(
+            mockup_id,
+            request.app.state.session_factory,
+            request.app.state.settings,
+        )
+    session.expire_all()
+    detail = service.detail(mockup_id, include_html=True)
+    if detail.asset_refs:
+        detail.asset_refs = [
+            {key: value for key, value in item.items() if key != "data_uri"}
+            if isinstance(item, dict)
+            else item
+            for item in detail.asset_refs
+        ]
+    return detail
 
 
 @router.get("/leads/{lead_id}/mockup-eligibility", response_model=MockupEligibilityRead)
@@ -119,7 +188,6 @@ def mockup_eligibility(lead_id: UUID, request: Request, session: SessionDep) -> 
 @router.get("/mockups/{mockup_id}", response_model=MockupDetail)
 def get_mockup(mockup_id: UUID, request: Request, session: SessionDep) -> MockupDetail:
     detail = MockupService(session, request.app.state.settings).detail(mockup_id, include_html=True)
-    # Do not send stored data URIs to the browser list payload inside asset_refs.
     if detail.asset_refs:
         detail.asset_refs = [
             {key: value for key, value in item.items() if key != "data_uri"}
@@ -140,11 +208,10 @@ async def refine_mockup(
 ) -> MockupCreated:
     created = MockupService(session, request.app.state.settings).refine(mockup_id, data)
     session.commit()
-    background_tasks.add_task(
-        run_mockup,
-        created.id,
-        request.app.state.session_factory,
-        lambda: request.app.state.settings,
+    await _schedule_mockup(
+        mockup_id=created.id,
+        request=request,
+        background_tasks=background_tasks,
     )
     return created
 
@@ -159,11 +226,10 @@ async def retry_mockup(
 ) -> MockupCreated:
     created = MockupService(session, request.app.state.settings).retry(mockup_id, data)
     session.commit()
-    background_tasks.add_task(
-        run_mockup,
-        created.id,
-        request.app.state.session_factory,
-        lambda: request.app.state.settings,
+    await _schedule_mockup(
+        mockup_id=created.id,
+        request=request,
+        background_tasks=background_tasks,
     )
     return created
 
@@ -177,13 +243,13 @@ async def retry_mockup_screenshots(
 ) -> MockupDetail:
     detail = MockupService(session, request.app.state.settings).retry_screenshots(mockup_id)
     session.commit()
-    background_tasks.add_task(
-        run_mockup_screenshots,
-        mockup_id,
-        request.app.state.session_factory,
-        lambda: request.app.state.settings,
+    await _schedule_mockup(
+        mockup_id=mockup_id,
+        request=request,
+        background_tasks=background_tasks,
+        screenshots_only=True,
     )
-    return detail
+    return MockupService(session, request.app.state.settings).detail(mockup_id, include_html=True)
 
 
 @router.get("/mockups/{mockup_id}/guide", response_model=MockupGuideRead)

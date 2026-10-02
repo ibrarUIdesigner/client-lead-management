@@ -15,6 +15,7 @@ export async function getMockupEligibility(leadId: string): Promise<MockupEligib
 }
 
 export async function createMockup(body: MockupCreateWrite, files: File[] = []): Promise<MockupCreated> {
+  const timeout = 180_000;
   if (files.length > 0) {
     const form = new FormData();
     form.append("lead_id", body.lead_id);
@@ -33,10 +34,10 @@ export async function createMockup(body: MockupCreateWrite, files: File[] = []):
     for (const file of files) {
       form.append("assets", file);
     }
-    const { data } = await api.post<MockupCreated>("/mockups", form);
+    const { data } = await api.post<MockupCreated>("/mockups", form, { timeout });
     return data;
   }
-  const { data } = await api.post<MockupCreated>("/mockups", body);
+  const { data } = await api.post<MockupCreated>("/mockups", body, { timeout });
   return data;
 }
 
@@ -45,16 +46,27 @@ export async function getMockup(mockupId: string): Promise<MockupDetail> {
   return data;
 }
 
+export async function processMockup(mockupId: string): Promise<MockupDetail> {
+  const { data } = await api.post<MockupDetail>(`/mockups/${mockupId}/process`, null, {
+    timeout: 180_000,
+  });
+  return data;
+}
+
 export async function refineMockup(
   mockupId: string,
   body: MockupRefineWrite,
 ): Promise<MockupCreated> {
-  const { data } = await api.post<MockupCreated>(`/mockups/${mockupId}/refine`, body);
+  const { data } = await api.post<MockupCreated>(`/mockups/${mockupId}/refine`, body, {
+    timeout: 180_000,
+  });
   return data;
 }
 
 export async function retryMockup(mockupId: string, body: MockupRetryWrite): Promise<MockupCreated> {
-  const { data } = await api.post<MockupCreated>(`/mockups/${mockupId}/retry`, body);
+  const { data } = await api.post<MockupCreated>(`/mockups/${mockupId}/retry`, body, {
+    timeout: 180_000,
+  });
   return data;
 }
 

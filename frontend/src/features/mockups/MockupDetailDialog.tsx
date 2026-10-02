@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "../../components/ui/Button";
@@ -13,6 +13,7 @@ import {
   downloadMockupScreenshot,
   getMockup,
   mockupScreenshotUrl,
+  processMockup,
   refineMockup,
   retryMockup,
   retryMockupScreenshots,
@@ -39,6 +40,7 @@ export function MockupDetailDialog({
   const [provider, setProvider] = useState<MockupProvider>("gemini");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const processKicked = useRef(false);
 
   const detail = useQuery({
     queryKey: ["mockup", mockupId],
@@ -53,6 +55,32 @@ export function MockupDetailDialog({
       return false;
     },
   });
+
+  useEffect(() => {
+    processKicked.current = false;
+  }, [mockupId, open]);
+
+  useEffect(() => {
+    if (!open || !mockupId || !detail.data || processKicked.current) {
+      return;
+    }
+    const needsWork =
+      detail.data.status === "GENERATING" ||
+      detail.data.status === "PENDING" ||
+      (detail.data.status === "READY" && detail.data.screenshot_status === "PENDING");
+    if (!needsWork) {
+      return;
+    }
+    processKicked.current = true;
+    void processMockup(mockupId)
+      .then((result) => {
+        queryClient.setQueryData(["mockup", mockupId], result);
+        void queryClient.invalidateQueries({ queryKey: ["mockups"] });
+      })
+      .catch(() => {
+        processKicked.current = false;
+      });
+  }, [open, mockupId, detail.data, queryClient]);
 
   useEffect(() => {
     if (detail.data?.provider === "groq" || detail.data?.provider === "gemini") {
@@ -83,6 +111,10 @@ export function MockupDetailDialog({
       });
       setInstructions("");
       notify("Refinement started. A new version will appear when ready.", "success");
+      void processMockup(created.id).then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["mockups"] });
+        void queryClient.invalidateQueries({ queryKey: ["mockup", created.id] });
+      });
       await queryClient.invalidateQueries({ queryKey: ["mockups"] });
       await queryClient.invalidateQueries({ queryKey: ["mockup", created.id] });
       onClose();
@@ -100,13 +132,17 @@ export function MockupDetailDialog({
     setBusy(true);
     setError(null);
     try {
-      await retryMockup(mockupId, { provider: nextProvider });
+      const created = await retryMockup(mockupId, { provider: nextProvider });
       notify(
         nextProvider === item?.provider
           ? "Retry started."
           : `Retry started with ${nextProvider === "gemini" ? "Gemini" : "Groq"}.`,
         "success",
       );
+      void processMockup(created.id).then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["mockups"] });
+        void queryClient.invalidateQueries({ queryKey: ["mockup", created.id] });
+      });
       await detail.refetch();
       await queryClient.invalidateQueries({ queryKey: ["mockups"] });
     } catch (caught) {

@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getAnalytics,
@@ -7,13 +8,16 @@ import {
   listOutreachMessages,
   listOutreachTemplates,
 } from "../services/workspace";
+import { processMockup } from "../services/mockups";
 
 export function useMockups(leadId?: string) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const kicked = useRef(new Set<string>());
+  const query = useQuery({
     queryKey: ["mockups", leadId ?? "all"],
     queryFn: () => listMockups(leadId),
-    refetchInterval: (query) => {
-      const items = query.state.data ?? [];
+    refetchInterval: (current) => {
+      const items = current.state.data ?? [];
       if (
         items.some(
           (item) =>
@@ -27,6 +31,31 @@ export function useMockups(leadId?: string) {
       return false;
     },
   });
+
+  useEffect(() => {
+    const items = query.data ?? [];
+    for (const item of items) {
+      const needsWork =
+        item.status === "GENERATING" ||
+        item.status === "PENDING" ||
+        (item.status === "READY" && item.screenshot_status === "PENDING");
+      if (!needsWork || kicked.current.has(item.id)) {
+        continue;
+      }
+      kicked.current.add(item.id);
+      void processMockup(item.id)
+        .then(() => {
+          void queryClient.invalidateQueries({ queryKey: ["mockups"] });
+          void queryClient.invalidateQueries({ queryKey: ["mockup", item.id] });
+        })
+        .catch(() => {
+          // Allow another kick later if the first attempt failed immediately.
+          kicked.current.delete(item.id);
+        });
+    }
+  }, [query.data, queryClient]);
+
+  return query;
 }
 
 export function useOutreachMessages(leadId?: string) {

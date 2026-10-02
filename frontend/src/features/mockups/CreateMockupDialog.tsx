@@ -10,7 +10,7 @@ import { useDesignGuide, useDesignGuides } from "../../hooks/useDesignGuides";
 import { useProviders } from "../../hooks/useHealth";
 import { apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
-import { createMockup } from "../../services/mockups";
+import { createMockup, processMockup } from "../../services/mockups";
 import type { GuideMode, MockupGoal, MockupProvider } from "../../types/mockup";
 
 type CreateMockupDialogProps = {
@@ -111,6 +111,11 @@ export function CreateMockupDialog({
         },
         files,
       );
+      // On Vercel, generation only runs via /process (background tasks freeze).
+      void processMockup(created.id).then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["mockups"] });
+        void queryClient.invalidateQueries({ queryKey: ["mockup", created.id] });
+      });
       await queryClient.invalidateQueries({ queryKey: ["mockups"] });
       onCreated(created.id);
     } catch (caught) {
