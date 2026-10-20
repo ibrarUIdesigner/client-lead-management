@@ -38,10 +38,15 @@ _TONES = {
 }
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,40}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$")
 _GEMINI_FALLBACK_MODELS = (
-    "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
+    "gemini-3-flash-preview",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
+)
+_GROQ_FALLBACK_MODELS = (
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "llama-3.3-70b-versatile",
 )
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -193,7 +198,7 @@ def draft_email(
         )
     prompt = _instructions(render_brief(brief), brief.purpose)
     owns_client = client is None
-    http = client or httpx.Client(timeout=45.0)
+    http = client or httpx.Client(timeout=25.0)
     try:
         try:
             if provider == "gemini":
@@ -207,6 +212,13 @@ def draft_email(
             raw = _groq(http, settings, prompt)
     except httpx.TimeoutException as exc:
         logger.warning("email_draft_timeout provider=%s", provider)
+        if _should_try_groq(settings, provider, AppError("AI_DRAFT_FAILED", "", 504)):
+            logger.warning("email_draft_fallback provider=groq after timeout")
+            try:
+                raw = _groq(http, settings, prompt)
+                return parse_draft(raw)
+            except Exception:
+                pass
         raise AppError(
             code="AI_DRAFT_FAILED",
             message="The email draft took too long. Try again in a moment.",
@@ -428,6 +440,7 @@ def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> str:
         "generationConfig": {
             "temperature": 0.5,
             "maxOutputTokens": 4096,
+            "thinkingConfig": {"thinkingBudget": 0},
             "responseMimeType": "application/json",
             "responseSchema": {
                 "type": "OBJECT",
@@ -449,6 +462,7 @@ def _gemini_offer(client: httpx.Client, settings: Settings, prompt: str) -> str:
         "generationConfig": {
             "temperature": 0.4,
             "maxOutputTokens": 512,
+            "thinkingConfig": {"thinkingBudget": 0},
             "responseMimeType": "application/json",
             "responseSchema": {
                 "type": "OBJECT",
@@ -471,25 +485,30 @@ def _gemini_generate(client: httpx.Client, settings: Settings, payload: dict[str
             models.append(model)
     last: httpx.Response | None = None
     for model in models:
-        response = _post(
-            client,
-            _GEMINI_URL.format(model=model),
-            headers={"x-goog-api-key": settings.gemini_api_key.strip()},
-            json=payload,
-        )
+        try:
+            response = _post(
+                client,
+                _GEMINI_URL.format(model=model),
+                headers={"x-goog-api-key": settings.gemini_api_key.strip()},
+                json=payload,
+            )
+        except (httpx.TimeoutException, httpx.HTTPError) as exc:
+            logger.warning("email_draft_model_error model=%s error=%s", model, exc)
+            continue
         if response.status_code < 400:
             if model != preferred:
                 logger.info("email_draft_model_fallback model=%s", model)
             return response
         last = response
-        if response.status_code not in {404, 429}:
+        if response.status_code not in {404, 408, 429, 502, 503, 504}:
             break
         logger.warning(
             "email_draft_model_retry model=%s status=%s",
             model,
             response.status_code,
         )
-    assert last is not None
+    if last is None:
+        raise httpx.TimeoutException("All Gemini models timed out or failed to connect.")
     _raise_for_status(last, "gemini")
     return last
 
@@ -514,25 +533,49 @@ def _gemini_text(response: httpx.Response) -> str:
 
 
 def _groq(client: httpx.Client, settings: Settings, prompt: str) -> str:
-    response = _post(
-        client,
-        _GROQ_URL,
-        headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
-        json={
-            "model": settings.groq_model.strip(),
-            "temperature": 0.5,
-            "max_tokens": 1024,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You write plain outreach emails and return JSON only.",
+    models: list[str] = []
+    preferred = settings.groq_model.strip()
+    if preferred:
+        models.append(preferred)
+    for model in _GROQ_FALLBACK_MODELS:
+        if model not in models:
+            models.append(model)
+    last: httpx.Response | None = None
+    for model in models:
+        try:
+            response = _post(
+                client,
+                _GROQ_URL,
+                headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
+                json={
+                    "model": model,
+                    "temperature": 0.5,
+                    "max_tokens": 1024,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You write plain outreach emails and return JSON only.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
                 },
-                {"role": "user", "content": prompt},
-            ],
-        },
-    )
-    _raise_for_status(response, "groq")
+            )
+        except (httpx.TimeoutException, httpx.HTTPError) as exc:
+            logger.warning("groq_draft_error model=%s error=%s", model, exc)
+            continue
+        if response.status_code < 400:
+            return _groq_text(response)
+        last = response
+        if response.status_code not in {404, 429}:
+            break
+    if last is None:
+        raise httpx.TimeoutException("All Groq models timed out or failed to connect.")
+    _raise_for_status(last, "groq")
+    return _groq_text(last)
+
+
+def _groq_text(response: httpx.Response) -> str:
     payload = _response_json(response)
     choices = payload.get("choices") if isinstance(payload, dict) else None
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
@@ -545,37 +588,49 @@ def _groq(client: httpx.Client, settings: Settings, prompt: str) -> str:
 
 
 def _groq_offer(client: httpx.Client, settings: Settings, prompt: str) -> str:
-    response = _post(
-        client,
-        _GROQ_URL,
-        headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
-        json={
-            "model": settings.groq_model.strip(),
-            "temperature": 0.4,
-            "max_tokens": 256,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                "You write a short professional outreach offer and return JSON only. "
-                "Keep the stated price exactly."
-            ),
+    models: list[str] = []
+    preferred = settings.groq_model.strip()
+    if preferred:
+        models.append(preferred)
+    for model in _GROQ_FALLBACK_MODELS:
+        if model not in models:
+            models.append(model)
+    last: httpx.Response | None = None
+    for model in models:
+        try:
+            response = _post(
+                client,
+                _GROQ_URL,
+                headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
+                json={
+                    "model": model,
+                    "temperature": 0.4,
+                    "max_tokens": 256,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You write a short professional outreach offer and return JSON only. "
+                                "Keep the stated price exactly."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
                 },
-                {"role": "user", "content": prompt},
-            ],
-        },
-    )
-    _raise_for_status(response, "groq")
-    payload = _response_json(response)
-    choices = payload.get("choices") if isinstance(payload, dict) else None
-    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
-        _invalid_draft()
-    message = choices[0].get("message")
-    content = message.get("content") if isinstance(message, dict) else None
-    if not isinstance(content, str) or not content.strip():
-        _invalid_draft()
-    return content
+            )
+        except (httpx.TimeoutException, httpx.HTTPError) as exc:
+            logger.warning("groq_offer_error model=%s error=%s", model, exc)
+            continue
+        if response.status_code < 400:
+            return _groq_text(response)
+        last = response
+        if response.status_code not in {404, 429}:
+            break
+    if last is None:
+        raise httpx.TimeoutException("All Groq models timed out or failed to connect.")
+    _raise_for_status(last, "groq")
+    return _groq_text(last)
 
 
 def _offer_instructions(

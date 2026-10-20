@@ -58,7 +58,7 @@ def _cache_key(settings: Settings) -> str:
 
 
 def _gemini(settings: Settings, client: httpx.Client, active: bool) -> ProviderRead:
-    model = settings.gemini_model.strip() or "gemini-3.5-flash"
+    model = settings.gemini_model.strip() or "gemini-3-flash-preview"
     if not settings.gemini_api_key.strip():
         return ProviderRead(
             id="gemini",

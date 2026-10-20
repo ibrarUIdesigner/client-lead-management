@@ -26,10 +26,15 @@ MockupGoal = Literal["calls", "whatsapp", "bookings", "quotes"]
 
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,40}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$")
 _GEMINI_FALLBACK_MODELS = (
-    "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
-    "gemini-3.8-flash",
+    "gemini-3-flash-preview",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
+)
+_GROQ_FALLBACK_MODELS = (
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "llama-3.3-70b-versatile",
 )
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -266,6 +271,7 @@ def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> tuple[str,
         "generationConfig": {
             "temperature": 0.4,
             "maxOutputTokens": 8192,
+            "thinkingConfig": {"thinkingBudget": 0},
             "responseMimeType": "application/json",
             "responseSchema": {
                 "type": "OBJECT",
@@ -286,22 +292,27 @@ def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> tuple[str,
     last: httpx.Response | None = None
     used = preferred or models[0]
     for model in models:
-        response = _post(
-            client,
-            _GEMINI_URL.format(model=model),
-            headers={"x-goog-api-key": settings.gemini_api_key.strip()},
-            json=payload,
-        )
+        try:
+            response = _post(
+                client,
+                _GEMINI_URL.format(model=model),
+                headers={"x-goog-api-key": settings.gemini_api_key.strip()},
+                json=payload,
+            )
+        except (httpx.TimeoutException, httpx.HTTPError) as exc:
+            logger.warning("mockup_model_error model=%s error=%s", model, exc)
+            continue
         if response.status_code < 400:
             if model != preferred:
                 logger.info("mockup_model_fallback model=%s", model)
             return _gemini_text(response), model
         last = response
         used = model
-        if response.status_code not in {404, 429}:
+        if response.status_code not in {404, 408, 429, 502, 503, 504}:
             break
         logger.warning("mockup_model_retry model=%s status=%s", model, response.status_code)
-    assert last is not None
+    if last is None:
+        raise httpx.TimeoutException("All Gemini models timed out or failed to connect.")
     _raise_for_status(last, "gemini")
     return _gemini_text(last), used
 
@@ -333,31 +344,56 @@ def _gemini_text(response: httpx.Response) -> str:
 
 
 def _groq(client: httpx.Client, settings: Settings, prompt: str) -> tuple[str, str]:
-    model = settings.groq_model.strip()
-    response = _post(
-        client,
-        _GROQ_URL,
-        headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
-        json={
-            "model": model,
-            "temperature": 0.4,
-            "max_tokens": 8192,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You generate polished, self-contained HTML/CSS homepage mockups for local "
-                        "businesses and return JSON only with key html. "
-                        "Include substantial inline CSS. No JavaScript. No external resources. "
-                        "Do not invent fantasy themes or write a page for a CRM product."
-                    ),
+    models: list[str] = []
+    preferred = settings.groq_model.strip()
+    if preferred:
+        models.append(preferred)
+    for model in _GROQ_FALLBACK_MODELS:
+        if model not in models:
+            models.append(model)
+    last: httpx.Response | None = None
+    used = preferred or models[0]
+    for model in models:
+        try:
+            response = _post(
+                client,
+                _GROQ_URL,
+                headers={"Authorization": f"Bearer {settings.groq_api_key.strip()}"},
+                json={
+                    "model": model,
+                    "temperature": 0.4,
+                    "max_tokens": 8192,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You generate polished, self-contained HTML/CSS homepage mockups for local "
+                                "businesses and return JSON only with key html. "
+                                "Include substantial inline CSS. No JavaScript. No external resources. "
+                                "Do not invent fantasy themes or write a page for a CRM product."
+                            ),
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
                 },
-                {"role": "user", "content": prompt},
-            ],
-        },
-    )
-    _raise_for_status(response, "groq")
+            )
+        except (httpx.TimeoutException, httpx.HTTPError) as exc:
+            logger.warning("mockup_groq_error model=%s error=%s", model, exc)
+            continue
+        if response.status_code < 400:
+            return _groq_payload(response, model)
+        last = response
+        used = model
+        if response.status_code not in {404, 429}:
+            break
+    if last is None:
+        raise httpx.TimeoutException("All Groq models timed out or failed to connect.")
+    _raise_for_status(last, "groq")
+    return _groq_payload(last, used)
+
+
+def _groq_payload(response: httpx.Response, model: str) -> tuple[str, str]:
     payload = _response_json(response)
     choices = payload.get("choices") if isinstance(payload, dict) else None
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
