@@ -18,7 +18,14 @@ GLOBAL_SOURCES = frozenset(
 
 # Worldwide markets prioritizing major international business hubs
 ANYWHERE_MARKETS: tuple[Market, ...] = (
+    # United States
     Market("New York", "United States", GLOBAL_SOURCES),
+    Market("San Francisco", "United States", GLOBAL_SOURCES),
+    Market("Los Angeles", "United States", GLOBAL_SOURCES),
+    Market("Chicago", "United States", GLOBAL_SOURCES),
+    Market("Miami", "United States", GLOBAL_SOURCES),
+    Market("Austin", "United States", GLOBAL_SOURCES),
+    # United Kingdom
     Market(
         "London",
         "United Kingdom",
@@ -34,19 +41,33 @@ ANYWHERE_MARKETS: tuple[Market, ...] = (
             }
         ),
     ),
-    Market("San Francisco", "United States", GLOBAL_SOURCES),
-    Market("Toronto", "Canada", GLOBAL_SOURCES),
-    Market("Sydney", "Australia", GLOBAL_SOURCES),
-    Market("Chicago", "United States", GLOBAL_SOURCES),
-    Market("Los Angeles", "United States", GLOBAL_SOURCES),
-    Market("Miami", "United States", GLOBAL_SOURCES),
     Market(
         "Manchester",
         "United Kingdom",
         frozenset({"yell", "apollo", "serpapi", "scrapingbee"}),
     ),
+    Market(
+        "Birmingham",
+        "United Kingdom",
+        frozenset({"yell", "apollo", "serpapi", "scrapingbee"}),
+    ),
+    # Canada
+    Market("Toronto", "Canada", GLOBAL_SOURCES),
+    Market("Vancouver", "Canada", GLOBAL_SOURCES),
+    Market("Montreal", "Canada", GLOBAL_SOURCES),
+    # Australia
+    Market("Sydney", "Australia", GLOBAL_SOURCES),
+    Market("Melbourne", "Australia", GLOBAL_SOURCES),
+    Market("Brisbane", "Australia", GLOBAL_SOURCES),
+    # Germany / Europe
     Market("Berlin", "Germany", GLOBAL_SOURCES),
+    Market("Munich", "Germany", GLOBAL_SOURCES),
+    Market("Frankfurt", "Germany", GLOBAL_SOURCES),
     Market("Dublin", "Ireland", GLOBAL_SOURCES),
+    # United Arab Emirates
+    Market("Dubai", "United Arab Emirates", GLOBAL_SOURCES),
+    Market("Abu Dhabi", "United Arab Emirates", GLOBAL_SOURCES),
+    # Pakistan
     Market(
         "Lahore",
         "Pakistan",
@@ -69,7 +90,13 @@ ANYWHERE_MARKETS: tuple[Market, ...] = (
 
 
 def is_anywhere(city: str, country: str) -> bool:
-    return city.strip().casefold() == ANYWHERE_CITY.casefold()
+    c_city = city.strip().casefold()
+    c_country = country.strip().casefold()
+    return (
+        c_city == ANYWHERE_CITY.casefold()
+        or not c_city
+        or c_country == ANYWHERE_COUNTRY.casefold()
+    )
 
 
 def markets_for(
@@ -83,6 +110,7 @@ def markets_for(
     use_apollo: bool = False,
     use_serpapi: bool = False,
     use_scrapingbee: bool = False,
+    country: str | None = None,
 ) -> list[Market]:
     enabled = {
         name
@@ -101,4 +129,23 @@ def markets_for(
     }
     if not enabled:
         return []
-    return [market for market in ANYWHERE_MARKETS if market.sources & enabled]
+
+    markets = [market for market in ANYWHERE_MARKETS if market.sources & enabled]
+
+    if country and country.strip().casefold() not in ("worldwide", "anywhere"):
+        target_country = country.strip().casefold()
+        country_markets = [
+            m for m in markets if m.country.casefold() == target_country
+        ]
+        if country_markets:
+            return country_markets
+        # If country isn't in predefined list, dynamically create a target market for it
+        return [
+            Market(
+                city="Capital",
+                country=country.strip(),
+                sources=frozenset(enabled),
+            )
+        ]
+
+    return markets
