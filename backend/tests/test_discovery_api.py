@@ -48,6 +48,9 @@ def test_a_search_must_use_at_least_one_source() -> None:
                 "use_yell": False,
                 "use_businesslist": False,
                 "use_epages": False,
+                "use_apollo": False,
+                "use_serpapi": False,
+                "use_scrapingbee": False,
             },
         )
 

@@ -346,6 +346,8 @@ class ApifyService:
         )
         if action == "skip":
             return "skip"
+        if not prepared.email or not prepared.email.strip():
+            return "skip"
         if action == "attach" and lead is not None:
             try:
                 with self.session.begin_nested():

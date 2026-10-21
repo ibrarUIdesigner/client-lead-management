@@ -36,6 +36,7 @@ export function LeadFormFields({ register, errors }: LeadFormFieldsProps) {
       <Input
         label="Email"
         type="email"
+        required
         autoComplete="email"
         error={errors.email?.message}
         {...register("email")}

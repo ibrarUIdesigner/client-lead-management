@@ -20,6 +20,9 @@ class DiscoverySearchCreate(BaseModel):
     use_yell: bool = True
     use_businesslist: bool = True
     use_epages: bool = True
+    use_apollo: bool = True
+    use_serpapi: bool = True
+    use_scrapingbee: bool = True
 
     @field_validator("category", "city", "country")
     @classmethod
@@ -59,6 +62,9 @@ class DiscoverySearchCreate(BaseModel):
                 self.use_yell,
                 self.use_businesslist,
                 self.use_epages,
+                self.use_apollo,
+                self.use_serpapi,
+                self.use_scrapingbee,
             )
         ):
             raise ValueError("Choose at least one source.")
@@ -73,6 +79,9 @@ class DiscoverySearchUpdate(BaseModel):
     use_yell: bool | None = None
     use_businesslist: bool | None = None
     use_epages: bool | None = None
+    use_apollo: bool | None = None
+    use_serpapi: bool | None = None
+    use_scrapingbee: bool | None = None
 
     @model_validator(mode="after")
     def require_change(self) -> Self:
@@ -86,6 +95,9 @@ class DiscoverySearchUpdate(BaseModel):
                 self.use_yell,
                 self.use_businesslist,
                 self.use_epages,
+                self.use_apollo,
+                self.use_serpapi,
+                self.use_scrapingbee,
             )
         ):
             raise ValueError("Choose what to change.")
@@ -106,6 +118,9 @@ class DiscoverySearchRead(BaseModel):
     use_yell: bool
     use_businesslist: bool
     use_epages: bool
+    use_apollo: bool = True
+    use_serpapi: bool = True
+    use_scrapingbee: bool = True
     created_at: datetime
     last_status: str | None = None
     last_started_at: datetime | None = None
@@ -126,6 +141,9 @@ class DiscoveryStatus(BaseModel):
     running: bool
     google_configured: bool
     yelp_configured: bool
+    apollo_configured: bool = False
+    serpapi_configured: bool = False
+    scrapingbee_configured: bool = False
     schedule: str
     next_run_at: datetime | None
     categories: list[CategoryOption]

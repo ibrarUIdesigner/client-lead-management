@@ -46,6 +46,18 @@ export type AuditTool = {
   detail: string;
 };
 
+export type AuditSecurity = {
+  has_ssl?: boolean;
+  ssl_valid?: boolean | null;
+  ssl_expiry?: string | null;
+  ssl_days_remaining?: number | null;
+  ssl_issuer?: string | null;
+  has_hsts?: boolean;
+  has_csp?: boolean;
+  has_x_frame_options?: boolean;
+  has_x_content_type_options?: boolean;
+};
+
 export type AuditAnalysis = {
   opportunity_score?: number | null;
   opportunity_breakdown?: OpportunityItem[];
@@ -55,6 +67,7 @@ export type AuditAnalysis = {
   report?: AuditReportItem[];
   pages?: AuditPageCheck[];
   field_data?: AuditFieldData | null;
+  security?: AuditSecurity | null;
   error?: string | null;
   brand?: AuditBrand;
 };

@@ -5,12 +5,15 @@ from dataclasses import dataclass
 import httpx
 
 from app.core.config import Settings
+from app.integrations.apollo_source import fetch_apollo
 from app.integrations.directory_sources import (
     fetch_businesslist,
     fetch_epages,
     fetch_yell,
     fetch_yelp,
 )
+from app.integrations.scrapingbee_source import fetch_scrapingbee
+from app.integrations.serpapi_source import fetch_serpapi
 from app.integrations.source_errors import PlaceSourceError
 from app.services.discovery_markets import ANYWHERE_CAP, markets_for
 from app.services.place_listings import (
@@ -61,6 +64,9 @@ def collect_places(
     use_yell: bool,
     use_businesslist: bool,
     use_epages: bool,
+    use_apollo: bool = False,
+    use_serpapi: bool = False,
+    use_scrapingbee: bool = False,
     settings: Settings,
     client: httpx.Client,
 ) -> tuple[list[FoundBusiness], list[str]]:
@@ -71,6 +77,9 @@ def collect_places(
         use_yell,
         use_businesslist,
         use_epages,
+        use_apollo,
+        use_serpapi,
+        use_scrapingbee,
     )
     if not any(selected):
         raise PlaceSourceError("Choose at least one source.")
@@ -165,6 +174,45 @@ def collect_places(
                 client=client,
             ),
         )
+    if use_apollo:
+        _read_directory(
+            found,
+            notes,
+            errors,
+            lambda: fetch_apollo(
+                category=category,
+                city=city,
+                country=country,
+                settings=settings,
+                client=client,
+            ),
+        )
+    if use_serpapi:
+        _read_directory(
+            found,
+            notes,
+            errors,
+            lambda: fetch_serpapi(
+                category=category,
+                city=city,
+                country=country,
+                settings=settings,
+                client=client,
+            ),
+        )
+    if use_scrapingbee:
+        _read_directory(
+            found,
+            notes,
+            errors,
+            lambda: fetch_scrapingbee(
+                category=category,
+                city=city,
+                country=country,
+                settings=settings,
+                client=client,
+            ),
+        )
     if not found and errors:
         raise PlaceSourceError(" ".join([*errors, *notes]))
     return found, [*notes, *errors]
@@ -179,6 +227,9 @@ def collect_places_anywhere(
     use_yell: bool,
     use_businesslist: bool,
     use_epages: bool,
+    use_apollo: bool = False,
+    use_serpapi: bool = False,
+    use_scrapingbee: bool = False,
     settings: Settings,
     client: httpx.Client,
 ) -> tuple[list[FoundBusiness], list[str]]:
@@ -214,6 +265,9 @@ def collect_places_anywhere(
                 use_yell=use_yell and "yell" in market.sources,
                 use_businesslist=use_businesslist and "businesslist" in market.sources,
                 use_epages=use_epages and "epages" in market.sources,
+                use_apollo=use_apollo,
+                use_serpapi=use_serpapi,
+                use_scrapingbee=use_scrapingbee,
                 settings=settings,
                 client=client,
             )

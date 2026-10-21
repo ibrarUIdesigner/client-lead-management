@@ -15,6 +15,9 @@ export type DiscoverySearch = {
   use_yell: boolean;
   use_businesslist: boolean;
   use_epages: boolean;
+  use_apollo: boolean;
+  use_serpapi: boolean;
+  use_scrapingbee: boolean;
   created_at: string;
   last_status: string | null;
   last_started_at: string | null;
@@ -30,6 +33,9 @@ export type DiscoveryStatus = {
   running: boolean;
   google_configured: boolean;
   yelp_configured: boolean;
+  apollo_configured: boolean;
+  serpapi_configured: boolean;
+  scrapingbee_configured: boolean;
   schedule: string;
   next_run_at: string | null;
   categories: CategoryOption[];
@@ -47,4 +53,7 @@ export type DiscoverySearchWrite = {
   use_yell: boolean;
   use_businesslist: boolean;
   use_epages: boolean;
+  use_apollo: boolean;
+  use_serpapi: boolean;
+  use_scrapingbee: boolean;
 };

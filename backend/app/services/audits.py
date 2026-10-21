@@ -20,8 +20,10 @@ from app.services.audit_analysis import (
     analyze_page,
     apply_crawl,
     apply_pagespeed,
+    apply_security,
     build_report,
 )
+from app.services.audit_security import fetch_security
 from app.services.audit_browser import AuditRunError, capture_website
 from app.services.audit_crawl import crawl_site
 from app.services.audit_crux import fetch_crux
@@ -120,12 +122,14 @@ class AuditService:
         audit.mobile_screenshot_url = None
         self.session.commit()
         try:
-            captured, pagespeed, field_data = await asyncio.gather(
+            captured, pagespeed, field_data, security = await asyncio.gather(
                 capture_website(audit.url),
                 fetch_pagespeed(audit.url, self.pagespeed_api_key),
                 fetch_crux(audit.url, self.pagespeed_api_key),
+                fetch_security(audit.url),
             )
             analysis = analyze_page(captured)
+            apply_security(analysis, security)
             try:
                 crawled = await crawl_site(captured.final_url, captured.links, self.user_agent)
                 apply_crawl(analysis, crawled)
@@ -227,6 +231,7 @@ class AuditService:
             "report": analysis.report,
             "pages": analysis.pages,
             "field_data": analysis.field_data,
+            "security": analysis.security,
             "error": None,
             "brand": {
                 "primary_color": analysis.brand.get("primary_color"),

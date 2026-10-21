@@ -21,6 +21,7 @@ class LeadQuery:
     limit: int = 25
     q: str | None = None
     lead_status: str | None = None
+    has_email: bool | None = None
     industry: str | None = None
     city: str | None = None
     country: str | None = None
@@ -79,6 +80,10 @@ class LeadRepository:
             )
         if query.lead_status:
             statement = statement.where(Lead.lead_status == query.lead_status)
+        if query.has_email is True:
+            statement = statement.where(Lead.email.is_not(None), func.trim(Lead.email) != '')
+        elif query.has_email is False:
+            statement = statement.where(or_(Lead.email.is_(None), func.trim(Lead.email) == ''))
         if query.industry:
             statement = statement.where(
                 Lead.industry.ilike(like_pattern(query.industry), escape="\\")

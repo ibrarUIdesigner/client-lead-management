@@ -362,6 +362,10 @@ def _healthy_page(**overrides: object) -> CapturedPage:
         outdated_markup=bool(values["outdated_markup"]),
         load_time_ms=int(values["load_time_ms"]),  # type: ignore[arg-type]
         lcp_ms=int(values["lcp_ms"]) if "lcp_ms" in values else 0,  # type: ignore[arg-type]
+        h1_count=int(values["h1_count"]) if "h1_count" in values else 1,  # type: ignore[arg-type]
+        images_total=int(values["images_total"]) if "images_total" in values else 0,  # type: ignore[arg-type]
+        images_missing_alt=int(values["images_missing_alt"]) if "images_missing_alt" in values else 0,  # type: ignore[arg-type]
+        has_viewport_meta=bool(values["has_viewport_meta"]) if "has_viewport_meta" in values else True,
         schema_types=list(values["schema_types"]) if "schema_types" in values else [],  # type: ignore[arg-type]
         schema_checked=bool(values["schema_checked"]) if "schema_checked" in values else False,
         accessibility_violations=(
@@ -373,3 +377,92 @@ def _healthy_page(**overrides: object) -> CapturedPage:
             bool(values["accessibility_checked"]) if "accessibility_checked" in values else False
         ),
     )
+
+
+def test_seo_on_page_hierarchy_and_alt_tags() -> None:
+    page = _healthy_page(
+        h1_count=3,
+        images_total=10,
+        images_missing_alt=4,
+        has_viewport_meta=False,
+    )
+    analysis = analyze_page(page)
+
+    codes = {item["code"] for item in analysis.issues}
+    assert "multiple_h1" in codes
+    assert "images_missing_alt" in codes
+    assert "missing_viewport" in codes
+
+    points = {item["code"]: item["points"] for item in analysis.opportunity_breakdown}
+    assert points["multiple_h1"] == 5
+    assert points["images_missing_alt"] == 5
+    assert points["missing_viewport"] == 10
+
+
+def test_pagespeed_extracts_metrics_and_viewport() -> None:
+    report = parse_pagespeed(
+        {
+            "lighthouseResult": {
+                "categories": {
+                    "performance": {"score": 0.75},
+                    "seo": {"score": 0.90},
+                },
+                "audits": {
+                    "first-contentful-paint": {"score": 0.8, "displayValue": "1.2 s"},
+                    "largest-contentful-paint": {"score": 0.6, "displayValue": "2.4 s"},
+                    "server-response-time": {"score": 0.9, "displayValue": "150 ms"},
+                    "viewport": {"score": 1.0},
+                    "render-blocking-resources": {
+                        "score": 0.2,
+                        "title": "Eliminate render-blocking resources",
+                        "displayValue": "Potential savings of 450 ms",
+                    },
+                },
+            }
+        }
+    )
+    assert report is not None
+    assert report.fcp == "1.2 s"
+    assert report.lcp == "2.4 s"
+    assert report.server_response_time == "150 ms"
+    assert report.has_viewport is True
+    assert any("render_blocking_resources" in f[0] for f in report.findings)
+
+
+def test_security_check_on_insecure_url() -> None:
+    from app.services.audit_security import fetch_security
+    report = asyncio.run(fetch_security("http://example.com/"))
+    assert report.has_ssl is False
+    assert report.ssl_valid is False
+    assert "insecure" in report.tool_detail.lower()
+
+
+def test_apply_security_adds_issues_and_tool() -> None:
+    from app.services.audit_analysis import apply_security
+    from app.services.audit_security import SecurityReport
+
+    analysis = analyze_page(_healthy_page())
+    security = SecurityReport(
+        has_ssl=True,
+        ssl_valid=True,
+        ssl_expiry="2027-01-01",
+        ssl_days_remaining=100,
+        ssl_issuer="Let's Encrypt",
+        has_hsts=False,
+        has_csp=False,
+        issues=[
+            {
+                "code": "missing_csp",
+                "title": "Missing Content Security Policy (CSP)",
+                "detail": "Vulnerable to XSS",
+                "recommendation": "Add CSP header",
+                "points": 10,
+            }
+        ],
+        tool_detail="SSL valid until 2027-01-01 (100 days). Headers: HSTS missing, CSP missing (XSS risk).",
+    )
+    apply_security(analysis, security)
+
+    assert any(tool["name"] == "Security Analyzer" for tool in analysis.tools)
+    assert any(issue["code"] == "missing_csp" for issue in analysis.issues)
+    assert any(b["code"] == "missing_csp" for b in analysis.opportunity_breakdown)

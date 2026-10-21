@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from app.services.audit_crawl import CrawlResult, crawl_issues, crawl_tool
 from app.services.audit_pagespeed import PageSpeedReport
+from app.services.audit_security import SecurityReport
 
 
 @dataclass
@@ -27,6 +28,10 @@ class CapturedPage:
     outdated_markup: bool
     load_time_ms: int
     lcp_ms: int = 0
+    h1_count: int = 1
+    images_total: int = 0
+    images_missing_alt: int = 0
+    has_viewport_meta: bool = True
     schema_types: list[str] = field(default_factory=list)
     schema_checked: bool = False
     accessibility_violations: list[dict[str, object]] = field(default_factory=list)
@@ -64,6 +69,7 @@ class AuditAnalysis:
     report: list[dict[str, str]] = field(default_factory=list)
     pages: list[dict[str, str]] = field(default_factory=list)
     field_data: dict[str, str] | None = None
+    security: dict[str, object] | None = None
 
 
 CTA_WORDS = (
@@ -97,7 +103,10 @@ def analyze_page(page: CapturedPage) -> AuditAnalysis:
     thin = len(page.text.strip()) < 200
     missing_title = len(page.title.strip()) < 10
     missing_meta = len(page.meta_description.strip()) < 50
-    missing_h1 = not page.h1.strip()
+    missing_h1 = not page.h1.strip() or page.h1_count == 0
+    multiple_h1 = page.h1_count > 1
+    missing_alt = page.images_missing_alt > 0
+    missing_viewport = not page.has_viewport_meta
 
     breakdown: list[dict[str, object]] = []
     issues: list[dict[str, object]] = []
@@ -191,6 +200,30 @@ def analyze_page(page: CapturedPage) -> AuditAnalysis:
             "Add one clear heading at the top of the page.",
             0,
         )
+    elif multiple_h1:
+        add(
+            "multiple_h1",
+            "Multiple H1 headings",
+            f"Found {page.h1_count} H1 headings on the homepage. Search engines recommend exactly one H1 per page for a clear topical hierarchy.",
+            "Consolidate your main message into one single H1 tag, and use H2 or H3 tags for subsections.",
+            5,
+        )
+    if missing_alt:
+        add(
+            "images_missing_alt",
+            "Images missing alt text",
+            f"{page.images_missing_alt} of {page.images_total} images lack alt attributes, which limits image search visibility and screen reader accessibility.",
+            "Add descriptive alt attributes to all content images.",
+            5,
+        )
+    if missing_viewport:
+        add(
+            "missing_viewport",
+            "Missing viewport meta tag",
+            "The homepage does not have a responsive viewport meta tag configured for mobile devices.",
+            "Add <meta name='viewport' content='width=device-width, initial-scale=1'> to the page header.",
+            10,
+        )
     if thin:
         add(
             "thin_content",
@@ -256,7 +289,9 @@ def analyze_page(page: CapturedPage) -> AuditAnalysis:
     design = 40 if page.outdated_markup else 85
     ux_parts = [100 if cta else 30, 100 if contact_form else 30, 100 if navigation else 40]
     ux = round(sum(ux_parts) / len(ux_parts))
-    seo_parts = [not missing_title, not missing_meta, not missing_h1, https]
+    has_single_h1 = (not missing_h1) and (not multiple_h1)
+    has_image_alts = not missing_alt
+    seo_parts = [not missing_title, not missing_meta, not missing_h1, has_single_h1, has_image_alts, https]
     seo = round(100 * sum(1 for item in seo_parts if item) / len(seo_parts))
     overall = round((performance + mobile + design + ux + seo) / 5)
 
@@ -357,13 +392,58 @@ def apply_pagespeed(analysis: AuditAnalysis, report: PageSpeedReport) -> None:
     if not speed and report.performance is not None:
         speed.append(f"mobile {report.performance}")
     detail = "Lighthouse " + " and ".join(speed) if speed else "Lighthouse results from Google."
+    metrics: list[str] = []
+    if report.fcp:
+        metrics.append(f"FCP {report.fcp}")
+    if report.lcp:
+        metrics.append(f"LCP {report.lcp}")
+    if report.server_response_time:
+        metrics.append(f"TTFB {report.server_response_time}")
+    if metrics:
+        detail += f" ({', '.join(metrics)})"
     if report.seo is not None:
         detail += f", SEO {report.seo}."
     elif speed:
         detail += "."
     if report.note:
         detail += f" {report.note}"
+    if report.has_viewport is False:
+        analysis.is_mobile_responsive = False
     analysis.tools.append({"name": "PageSpeed Insights", "status": "used", "detail": detail})
+    analysis.report = build_report(analysis)
+
+
+def apply_security(analysis: AuditAnalysis, security: SecurityReport) -> None:
+    analysis.security = security.as_dict()
+    if security.ssl_valid is False:
+        analysis.has_ssl = False
+    elif security.has_ssl:
+        analysis.has_ssl = True
+
+    for issue in security.issues:
+        code = str(issue["code"])
+        title = str(issue["title"])
+        detail = str(issue["detail"])
+        url = str(issue.get("url") or analysis.final_url)
+        points = int(issue.get("points") or 0)
+        if code == "no_https" and any(i.get("code") == "no_https" for i in analysis.issues):
+            continue
+        analysis.issues.append({"code": code, "title": title, "detail": detail, "url": url})
+        analysis.recommendations.append(
+            {
+                "code": code,
+                "title": str(issue.get("recommendation", title)),
+                "detail": detail,
+                "url": url,
+            }
+        )
+        if points:
+            analysis.opportunity_breakdown.append({"code": code, "label": title, "points": points})
+
+    analysis.tools.append(security.tool())
+    analysis.opportunity_score = min(
+        100, sum(int(item["points"]) for item in analysis.opportunity_breakdown)
+    )
     analysis.report = build_report(analysis)
 
 
@@ -430,16 +510,23 @@ _REPORT_ORDER = {
     "poor_mobile": 0,
     "blocked_by_robots": 1,
     "no_https": 2,
+    "ssl_expired": 2,
+    "invalid_ssl": 2,
     "broken_page": 3,
     "broken_links": 4,
-    "accessibility": 5,
-    "outdated_design": 6,
-    "noindex": 7,
-    "weak_cta": 8,
-    "no_contact_form": 9,
-    "missing_phone": 10,
-    "poor_performance": 11,
-    "missing_schema": 12,
+    "missing_csp": 5,
+    "ssl_expiring_soon": 5,
+    "accessibility": 6,
+    "outdated_design": 7,
+    "noindex": 8,
+    "weak_cta": 9,
+    "no_contact_form": 10,
+    "missing_phone": 11,
+    "poor_performance": 12,
+    "multiple_h1": 13,
+    "images_missing_alt": 14,
+    "missing_hsts": 15,
+    "missing_schema": 16,
 }
 
 

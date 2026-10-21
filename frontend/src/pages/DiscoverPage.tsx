@@ -54,6 +54,9 @@ const websiteLabels: Record<string, { label: string; tone: "green" | "orange" | 
   };
 
 type SourceKey =
+  | "use_apollo"
+  | "use_serpapi"
+  | "use_scrapingbee"
   | "use_openstreetmap"
   | "use_google"
   | "use_yelp"
@@ -65,10 +68,28 @@ type SourceOption = {
   key: SourceKey;
   label: string;
   hint: string;
-  needsKey?: "google" | "yelp";
+  needsKey?: "google" | "yelp" | "apollo" | "serpapi" | "scrapingbee";
 };
 
 const SOURCE_OPTIONS: SourceOption[] = [
+  {
+    key: "use_apollo",
+    label: "Apollo.io",
+    hint: "B2B organizations & contacts",
+    needsKey: "apollo",
+  },
+  {
+    key: "use_serpapi",
+    label: "SerpApi (Google Maps)",
+    hint: "Live Google Maps & Search",
+    needsKey: "serpapi",
+  },
+  {
+    key: "use_scrapingbee",
+    label: "ScrapingBee",
+    hint: "Google search & Web scraping",
+    needsKey: "scrapingbee",
+  },
   {
     key: "use_openstreetmap",
     label: "OpenStreetMap",
@@ -161,7 +182,13 @@ function DiscoverWorkspace({
     0,
   );
   const sourcesReady =
-    1 + (status.google_configured ? 1 : 0) + (status.yelp_configured ? 1 : 0) + 3;
+    1 +
+    (status.google_configured ? 1 : 0) +
+    (status.yelp_configured ? 1 : 0) +
+    (status.apollo_configured ? 1 : 0) +
+    (status.serpapi_configured ? 1 : 0) +
+    (status.scrapingbee_configured ? 1 : 0) +
+    3;
 
   return (
     <div className="space-y-6">
@@ -173,7 +200,7 @@ function DiscoverWorkspace({
         nextRunAt={status.next_run_at}
         running={status.running}
         sourcesReady={sourcesReady}
-        sourcesTotal={6}
+        sourcesTotal={9}
       />
 
       {status.running ? <RunningBanner message={status.latest_message} /> : null}
@@ -184,6 +211,9 @@ function DiscoverWorkspace({
             categories={status.categories}
             googleConfigured={status.google_configured}
             yelpConfigured={status.yelp_configured}
+            apolloConfigured={status.apollo_configured}
+            serpapiConfigured={status.serpapi_configured}
+            scrapingbeeConfigured={status.scrapingbee_configured}
             running={status.running}
           />
           <SearchList searches={status.searches} running={status.running} />
@@ -197,6 +227,9 @@ function DiscoverWorkspace({
             running={status.running}
             googleConfigured={status.google_configured}
             yelpConfigured={status.yelp_configured}
+            apolloConfigured={status.apollo_configured}
+            serpapiConfigured={status.serpapi_configured}
+            scrapingbeeConfigured={status.scrapingbee_configured}
             latestMessage={status.latest_message}
           />
           <HowItWorksCard />
@@ -337,11 +370,17 @@ function SearchForm({
   categories,
   googleConfigured,
   yelpConfigured,
+  apolloConfigured,
+  serpapiConfigured,
+  scrapingbeeConfigured,
   running,
 }: {
   categories: { value: string; label: string }[];
   googleConfigured: boolean;
   yelpConfigured: boolean;
+  apolloConfigured: boolean;
+  serpapiConfigured: boolean;
+  scrapingbeeConfigured: boolean;
   running: boolean;
 }) {
   const create = useCreateDiscoverySearch();
@@ -353,6 +392,9 @@ function SearchForm({
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
   const [sources, setSources] = useState<Record<SourceKey, boolean>>({
+    use_apollo: true,
+    use_serpapi: true,
+    use_scrapingbee: true,
     use_openstreetmap: true,
     use_google: true,
     use_yelp: true,
@@ -513,7 +555,10 @@ function SearchForm({
               const enabled = sources[option.key];
               const keyMissing =
                 (option.needsKey === "google" && !googleConfigured) ||
-                (option.needsKey === "yelp" && !yelpConfigured);
+                (option.needsKey === "yelp" && !yelpConfigured) ||
+                (option.needsKey === "apollo" && !apolloConfigured) ||
+                (option.needsKey === "serpapi" && !serpapiConfigured) ||
+                (option.needsKey === "scrapingbee" && !scrapingbeeConfigured);
 
               return (
                 <SourceToggle
@@ -1018,6 +1063,9 @@ function ScheduleCard({
   running,
   googleConfigured,
   yelpConfigured,
+  apolloConfigured,
+  serpapiConfigured,
+  scrapingbeeConfigured,
   latestMessage,
 }: {
   schedule: string;
@@ -1025,6 +1073,9 @@ function ScheduleCard({
   running: boolean;
   googleConfigured: boolean;
   yelpConfigured: boolean;
+  apolloConfigured: boolean;
+  serpapiConfigured: boolean;
+  scrapingbeeConfigured: boolean;
   latestMessage: string | null;
 }) {
   const { notify } = useToast();
@@ -1067,6 +1118,21 @@ function ScheduleCard({
         <p className="text-caption font-semibold uppercase tracking-wide text-gray-500">
           API keys
         </p>
+        <SourceStatus
+          name="Apollo.io"
+          ready={apolloConfigured}
+          detail={apolloConfigured ? "Key configured" : "Set APOLLO_API_KEY"}
+        />
+        <SourceStatus
+          name="SerpApi"
+          ready={serpapiConfigured}
+          detail={serpapiConfigured ? "Key configured" : "Set SERPAPI_API_KEY"}
+        />
+        <SourceStatus
+          name="ScrapingBee"
+          ready={scrapingbeeConfigured}
+          detail={scrapingbeeConfigured ? "Key configured" : "Set SCRAPINGBEE_API_KEY"}
+        />
         <SourceStatus
           name="Google Places"
           ready={googleConfigured}

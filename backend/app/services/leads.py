@@ -51,6 +51,13 @@ class LeadService:
         )
 
     def create(self, data: LeadCreate, *, imported: bool = False) -> LeadRead:
+        if not data.email or not data.email.strip():
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="Enter an email address.",
+                status_code=422,
+                details={"field": "email"},
+            )
         lead = self._build(data)
         self.session.add(lead)
         flush_or_reject(self.session)
@@ -71,6 +78,13 @@ class LeadService:
                 code="VALIDATION_ERROR",
                 message="Enter the business name.",
                 status_code=422,
+            )
+        if "email" in changes and (changes["email"] is None or not str(changes["email"]).strip()):
+            raise AppError(
+                code="VALIDATION_ERROR",
+                message="An email address is required.",
+                status_code=422,
+                details={"field": "email"},
             )
         previous_status = lead.lead_status
         if isinstance(changes.get("lead_status"), LeadStatus):

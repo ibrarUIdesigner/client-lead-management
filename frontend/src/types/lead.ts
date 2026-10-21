@@ -58,6 +58,7 @@ export type LeadListParams = {
   limit?: number;
   q?: string;
   lead_status?: string;
+  has_email?: boolean;
   industry?: string;
   city?: string;
   country?: string;

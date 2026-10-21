@@ -496,6 +496,48 @@ function AuditResults({
         </ul>
       </Card>
 
+      {analysis?.security ? (
+        <Card>
+          <h2 className="text-h4 font-semibold text-ink">Security &amp; SSL</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-control border border-gray-200 p-3">
+              <p className="text-caption font-semibold text-gray-500">SSL Certificate</p>
+              <p className="mt-1 text-body font-medium text-ink">
+                {analysis.security.ssl_valid
+                  ? `Valid (expires ${analysis.security.ssl_expiry || "soon"})`
+                  : analysis.security.has_ssl
+                    ? "Active"
+                    : "Missing / Insecure"}
+              </p>
+              {analysis.security.ssl_days_remaining !== undefined &&
+              analysis.security.ssl_days_remaining !== null ? (
+                <p className="mt-0.5 text-caption text-gray-500">
+                  {analysis.security.ssl_days_remaining > 0
+                    ? `${analysis.security.ssl_days_remaining} days remaining`
+                    : "Expired"}
+                  {analysis.security.ssl_issuer ? ` · Issued by ${analysis.security.ssl_issuer}` : ""}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="rounded-control border border-gray-200 p-3">
+              <p className="text-caption font-semibold text-gray-500">Security Headers</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <Badge tone={analysis.security.has_hsts ? "green" : "orange"}>
+                  {analysis.security.has_hsts ? "HSTS Enabled" : "HSTS Missing"}
+                </Badge>
+                <Badge tone={analysis.security.has_csp ? "green" : "orange"}>
+                  {analysis.security.has_csp ? "CSP Active" : "CSP Missing (XSS Risk)"}
+                </Badge>
+                <Badge tone={analysis.security.has_x_frame_options ? "green" : "gray"}>
+                  {analysis.security.has_x_frame_options ? "Clickjacking Protected" : "No Frame-Options"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       {audit.has_desktop_screenshot || audit.has_mobile_screenshot ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {audit.has_desktop_screenshot ? (

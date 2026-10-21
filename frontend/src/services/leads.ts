@@ -10,8 +10,8 @@ import type {
   LeadWrite,
 } from "../types/lead";
 
-function definedParams(params: LeadListParams): Record<string, string | number> {
-  const query: Record<string, string | number> = {};
+function definedParams(params: LeadListParams): Record<string, string | number | boolean> {
+  const query: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") {
       query[key] = value;

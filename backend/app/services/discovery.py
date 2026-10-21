@@ -78,6 +78,9 @@ class DiscoveryService:
             running=discovery_is_running(),
             google_configured=bool(self.settings.google_places_api_key.strip()),
             yelp_configured=bool(self.settings.yelp_api_key.strip()),
+            apollo_configured=bool(self.settings.apollo_api_key.strip()),
+            serpapi_configured=bool(self.settings.serpapi_api_key.strip()),
+            scrapingbee_configured=bool(self.settings.scrapingbee_api_key.strip()),
             schedule=f"Once a day at {hour} {zone.key}",
             next_run_at=next_run_at,
             categories=[CategoryOption(value=item.value, label=item.label) for item in CATEGORIES],
@@ -103,6 +106,9 @@ class DiscoveryService:
             use_yell=data.use_yell,
             use_businesslist=data.use_businesslist,
             use_epages=data.use_epages,
+            use_apollo=data.use_apollo,
+            use_serpapi=data.use_serpapi,
+            use_scrapingbee=data.use_scrapingbee,
         )
         self.session.add(search)
         flush_or_reject(self.session)
@@ -120,6 +126,9 @@ class DiscoveryService:
             "use_yell",
             "use_businesslist",
             "use_epages",
+            "use_apollo",
+            "use_serpapi",
+            "use_scrapingbee",
         ):
             value = getattr(data, field)
             if value is not None:
@@ -132,6 +141,9 @@ class DiscoveryService:
                 search.use_yell,
                 search.use_businesslist,
                 search.use_epages,
+                search.use_apollo,
+                search.use_serpapi,
+                search.use_scrapingbee,
             )
         ):
             raise AppError(
@@ -330,6 +342,9 @@ def _execute_one(
         use_yell = search.use_yell
         use_businesslist = search.use_businesslist
         use_epages = search.use_epages
+        use_apollo = search.use_apollo
+        use_serpapi = search.use_serpapi
+        use_scrapingbee = search.use_scrapingbee
     try:
         source_flags = {
             "use_openstreetmap": use_openstreetmap,
@@ -338,6 +353,9 @@ def _execute_one(
             "use_yell": use_yell,
             "use_businesslist": use_businesslist,
             "use_epages": use_epages,
+            "use_apollo": use_apollo,
+            "use_serpapi": use_serpapi,
+            "use_scrapingbee": use_scrapingbee,
         }
         if is_anywhere(city, country):
             found, notes = collect_places_anywhere(
@@ -435,6 +453,8 @@ def _save_one(session: Session, business: FoundBusiness) -> str:
     if existing is None and business.website_url:
         existing = session.scalar(select(Lead).where(Lead.website_url == business.website_url))
     if existing is None:
+        if not business.email or not business.email.strip():
+            return "skipped"
         lead = Lead(
             business_name=business.name,
             slug=slugify(business.name),

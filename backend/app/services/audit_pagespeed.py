@@ -11,12 +11,22 @@ logger = logging.getLogger(__name__)
 
 PSI_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 _PSI_AUDITS = (
+    "first-contentful-paint",
     "largest-contentful-paint",
+    "server-response-time",
     "total-blocking-time",
     "cumulative-layout-shift",
     "render-blocking-resources",
+    "render-blocking-insight",
     "uses-optimized-images",
+    "image-delivery-insight",
     "modern-image-formats",
+    "unminified-javascript",
+    "minify-javascript",
+    "unminified-css",
+    "minify-css",
+    "viewport",
+    "viewport-insight",
 )
 
 
@@ -28,6 +38,10 @@ class PageSpeedReport:
     findings: list[tuple[str, str, str]] = field(default_factory=list)
     mobile_performance: int | None = None
     desktop_performance: int | None = None
+    fcp: str | None = None
+    lcp: str | None = None
+    server_response_time: str | None = None
+    has_viewport: bool | None = None
     note: str = ""
 
 
@@ -49,11 +63,27 @@ def parse_pagespeed(payload: object) -> PageSpeedReport | None:
         categories = {}
     if not isinstance(audits, dict):
         audits = {}
+
+    fcp = _display_value(audits, "first-contentful-paint")
+    lcp = _display_value(audits, "largest-contentful-paint")
+    server_time = _display_value(audits, "server-response-time")
+
+    vp_audit = audits.get("viewport") or audits.get("viewport-insight")
+    has_viewport = None
+    if isinstance(vp_audit, dict):
+        vp_score = vp_audit.get("score")
+        if isinstance(vp_score, (int, float)) and not isinstance(vp_score, bool):
+            has_viewport = vp_score >= 0.9
+
     report = PageSpeedReport(
         performance=_category_score(categories, "performance"),
         seo=_category_score(categories, "seo"),
         accessibility=_category_score(categories, "accessibility"),
         findings=_findings(audits),
+        fcp=fcp,
+        lcp=lcp,
+        server_response_time=server_time,
+        has_viewport=has_viewport,
     )
     if report.performance is None and report.seo is None:
         return None
@@ -181,6 +211,20 @@ def _combine(
     accessibility = _first_score(mobile, "accessibility")
     if accessibility is None:
         accessibility = _first_score(desktop, "accessibility")
+
+    fcp = mobile.fcp if mobile and mobile.fcp else (desktop.fcp if desktop else None)
+    lcp = mobile.lcp if mobile and mobile.lcp else (desktop.lcp if desktop else None)
+    srt = (
+        mobile.server_response_time
+        if mobile and mobile.server_response_time
+        else (desktop.server_response_time if desktop else None)
+    )
+    has_viewport = (
+        mobile.has_viewport
+        if mobile and mobile.has_viewport is not None
+        else (desktop.has_viewport if desktop else None)
+    )
+
     return PageSpeedReport(
         performance=min(scores) if scores else None,
         seo=seo,
@@ -188,6 +232,10 @@ def _combine(
         findings=list(source.findings),
         mobile_performance=None if mobile is None else mobile.performance,
         desktop_performance=None if desktop is None else desktop.performance,
+        fcp=fcp,
+        lcp=lcp,
+        server_response_time=srt,
+        has_viewport=has_viewport,
         note=note,
     )
 
@@ -215,21 +263,49 @@ def _category_score(categories: dict[str, object], name: str) -> int | None:
     return max(0, min(100, round(float(value) * 100)))
 
 
+def _display_value(audits: dict[str, object], name: str) -> str | None:
+    audit = audits.get(name)
+    if not isinstance(audit, dict):
+        return None
+    val = audit.get("displayValue")
+    if isinstance(val, str) and val.strip():
+        return val.replace("\xa0", " ").strip()
+    return None
+
+
 def _findings(audits: dict[str, object]) -> list[tuple[str, str, str]]:
     found: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
     for code in _PSI_AUDITS:
         audit = audits.get(code)
         if not isinstance(audit, dict):
             continue
         score = audit.get("score")
         title = audit.get("title")
-        if isinstance(score, bool) or not isinstance(score, int | float) or score >= 0.5:
+        threshold = (
+            0.5
+            if code
+            in {
+                "first-contentful-paint",
+                "largest-contentful-paint",
+                "server-response-time",
+                "total-blocking-time",
+                "cumulative-layout-shift",
+            }
+            else 0.9
+        )
+        if isinstance(score, bool) or not isinstance(score, int | float) or score >= threshold:
             continue
         if not isinstance(title, str) or not title.strip():
             continue
+        canonical_code = code.replace("-", "_").replace("_insight", "")
+        if canonical_code in seen:
+            continue
+        seen.add(canonical_code)
         display = audit.get("displayValue")
         detail = title.strip()
         if isinstance(display, str) and display.strip():
-            detail = f"{title.strip()} is {display.strip()}."
-        found.append((code.replace("-", "_"), title.strip()[:120], detail[:240]))
+            cleaned_display = display.replace("\xa0", " ").strip()
+            detail = f"{title.strip()} is {cleaned_display}."
+        found.append((canonical_code, title.strip()[:120], detail[:240]))
     return found

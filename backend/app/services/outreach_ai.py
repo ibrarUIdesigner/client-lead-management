@@ -38,10 +38,10 @@ _TONES = {
 }
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,40}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$")
 _GEMINI_FALLBACK_MODELS = (
+    "gemini-3.8-flash",
     "gemini-3-flash-preview",
-    "gemini-flash-latest",
-    "gemini-3.1-flash-lite",
     "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
 )
 _GROQ_FALLBACK_MODELS = (
     "openai/gpt-oss-120b",
@@ -57,6 +57,8 @@ class EmailBrief:
     business: str
     industry: str | None
     services: str | None
+    notes: str | None
+    tags: tuple[str, ...]
     location: str | None
     has_website: bool
     website: str | None
@@ -108,6 +110,8 @@ def build_brief(
     offer: str | None,
     tone: str,
     sender_name: str | None,
+    notes: str | None = None,
+    tags: list[str] | tuple[str, ...] | None = None,
 ) -> EmailBrief:
     location = ", ".join(part for part in (city, country) if part and part.strip())
     cleaned_offer = " ".join((offer or "").split())
@@ -122,6 +126,8 @@ def build_brief(
         business=business.strip(),
         industry=_clip(industry, 120),
         services=_clip(description, 400),
+        notes=_clip(notes, 600),
+        tags=tuple(t.strip() for t in (tags or []) if t.strip())[:10],
         location=location or None,
         has_website=has_website,
         website=_clip(website, 300) if has_website else None,
@@ -138,7 +144,9 @@ def build_brief(
 
 
 def render_brief(brief: EmailBrief) -> str:
+    """Render a structured context block from the lead's Overview data for the AI prompt."""
     lines = [
+        "=== LEAD OVERVIEW ===",
         f"Business name: {brief.business}",
         f"Has a public website: {'yes' if brief.has_website else 'no'}",
     ]
@@ -147,16 +155,20 @@ def render_brief(brief: EmailBrief) -> str:
     if brief.industry:
         lines.append(f"Industry: {brief.industry}")
     if brief.services:
-        lines.append(f"What the business does: {brief.services}")
+        lines.append(f"Description: {brief.services}")
     if brief.location:
         lines.append(f"Location: {brief.location}")
+    if brief.tags:
+        lines.append(f"Tags: {', '.join(brief.tags)}")
+
     if brief.greeting_name:
         lines.append(f"Greeting name: {brief.greeting_name}")
     else:
         lines.append("Greeting name: unknown. Open with Hi, and do not invent a name.")
+
     if brief.purpose == "new_site":
         lines.append(
-            "Email purpose: this business has no website. Offer to create a professional one."
+            "Email purpose: this business has no website. Offer to create a professional website."
         )
         lines.append("Do not mention scores, page problems, or a review of a website.")
     elif brief.findings or brief.scores:
@@ -172,8 +184,9 @@ def render_brief(brief: EmailBrief) -> str:
             lines.append(f"Scores: {listed}")
     else:
         lines.append("Verified findings: none. Do not claim you found specific problems.")
+
     lines.append(f"Offer: {brief.offer}")
-    lines.append(f"Tone: {brief.tone}. {_TONES[brief.tone]}")
+    lines.append(f"Tone: {brief.tone}. {_TONES.get(brief.tone, '')}")
     if brief.sender_name:
         lines.append(f"Sign the email as: {brief.sender_name}")
     else:
@@ -396,42 +409,49 @@ def parse_draft(raw: str) -> tuple[str, str]:
 
 
 def _instructions(facts: str, purpose: str) -> str:
-    shared = (
-        "Use only the facts below. Do not invent metrics, awards, or a previous conversation.\n"
-        "Do not mention AI, audits, or that the email was generated.\n"
-        "Write three short paragraphs in plain sentences. No bullet list. No jargon.\n"
-        "No 'I hope this email finds you well'.\n"
-        "The subject is specific and under 70 characters.\n"
-        "The body is 80 to 130 words, unless the tone says to keep it shorter.\n"
-        "Return JSON with keys subject and body.\n\n"
+    """
+    Build the AI prompt following the strategic directives:
+    - Peer-to-peer, observant, concise tone
+    - Strictly under 110 words body
+    - 3–5 word subject, neutral and curiosity-driven
+    - Open with a specific detail extracted from the Overview
+    - 1–2 sentence value prop focused on outcome, not features
+    - Low-friction single CTA
+    - No corporate filler, no invented metrics
+    """
+    strict_rules = (
+        "RULES (non-negotiable):\n"
+        "• Use ONLY the facts in the LEAD OVERVIEW below. Do not invent data, metrics, or prior conversations.\n"
+        "• Do NOT mention AI, audits, or that this email was generated.\n"
+        "• NEVER use: 'I hope this email finds you well', 'I came across', 'In today's fast-paced world', 'game-changer', 'revolutionary'.\n"
+        "• Subject line: 3–5 words, sentence case or all lowercase, neutral and curiosity-driven. No clickbait. No fake urgency.\n"
+        "• Body: strictly under 110 words. Every sentence must earn its place.\n"
+        "• Tone: peer-to-peer — observant, candid, and specific. No sycophancy. No marketing jargon.\n"
+        "• Structure (3 short paragraphs, no bullets):\n"
+        "    1. Opening — address ONE specific operational or contextual detail from the Overview. Make it feel observed, not generic.\n"
+        "    2. Value — 1–2 sentences showing a clear outcome or operational relief. Focus on result, not feature list.\n"
+        "    3. CTA — one low-friction ask (e.g. 'Worth a quick look?', 'Open to a brief breakdown?'). Never ask for a 30-minute demo.\n"
+        "• Closing: include the Offer line verbatim in the CTA paragraph. Do not alter the price.\n"
+        "• Return clean JSON only — keys: subject (string) and body (string).\n\n"
     )
+
     if purpose == "new_site":
         task = (
-            "Write one professional email offering to create a website for this business.\n"
-            "Use the business name, what it does, and where it is.\n"
-            "Explain that a professional website would make the business easier to find "
-            "and give customers a clear way to get in touch.\n"
-            "Do not claim you looked at an existing website.\n"
-            "The last paragraph must use the Offer line, including its price exactly. "
-            "Do not change the amount or turn it into a range.\n"
+            "TASK: Write a first-contact outreach email to a business that has no website.\n"
+            "The opening must reference something specific about what this business does or where it operates.\n"
+            "The value paragraph explains concretely how a professional website helps their customers reach them.\n"
+            "Do NOT claim you reviewed or audited any existing site.\n"
         )
     else:
         task = (
-            "Write one professional email about the current website.\n"
-            "Every listed score is a weak point. Give each score its own short sentence, "
-            "in everyday language: speed, design, or search visibility.\n"
-            "Then mention findings about how the page looks or how a customer gets in touch, "
-            "when those are not already covered by the scores.\n"
-            "Do not mention a score that is not listed. Do not write a checklist.\n"
-            "Say why this matters for customers.\n"
-            "The last paragraph must use the Offer line, including its price exactly. "
-            "Do not change the amount or turn it into a range.\n"
+            "TASK: Write a first-contact outreach email referencing the business's existing website.\n"
+            "The opening must pick ONE concrete detail from the findings or scores — not a vague claim.\n"
+            "Translate scores into plain customer-impact language (e.g. slow load = customers leave).\n"
+            "Do not list every finding. Choose the sharpest angle and build the email around it.\n"
+            "Do NOT write a checklist or bullet list inside the email body.\n"
         )
-    shared = shared.replace(
-        "The body is 80 to 130 words, unless the tone says to keep it shorter.\n",
-        "The body is 90 to 160 words, unless the tone says to keep it shorter.\n",
-    )
-    return f"{task}{shared}{facts}"
+
+    return f"{task}\n{strict_rules}{facts}"
 
 
 def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> str:

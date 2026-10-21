@@ -79,9 +79,9 @@ def test_anywhere_search_asks_each_covered_city(monkeypatch: pytest.MonkeyPatch)
             client=client,
         )
 
-    assert calls[0] == "Lahore"
+    assert "New York" in calls
+    assert "Lahore" in calls
     assert "Karachi" in calls
-    assert "London" in calls
     assert found[0].city == "Lahore"
     assert any("Lahore returned 1" in note for note in notes)
 
@@ -98,12 +98,12 @@ def test_anywhere_search_fails_when_every_city_is_empty(monkeypatch: pytest.Monk
         with pytest.raises(PlaceSourceError):
             collect_places_anywhere(
                 category="pharmacy",
-                use_openstreetmap=False,
-                use_google=False,
-                use_yelp=False,
+                use_openstreetmap=True,
+                use_google=True,
+                use_yelp=True,
                 use_yell=True,
-                use_businesslist=False,
-                use_epages=False,
+                use_businesslist=True,
+                use_epages=True,
                 settings=settings,
                 client=client,
             )

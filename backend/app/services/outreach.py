@@ -275,6 +275,8 @@ class OutreachService:
             business=lead.business_name,
             industry=lead.industry,
             description=lead.description,
+            notes=lead.notes,
+            tags=lead.tags or [],
             city=lead.city,
             country=lead.country,
             website=lead.website_url if has_website else None,

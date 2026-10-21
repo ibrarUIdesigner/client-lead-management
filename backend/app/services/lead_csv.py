@@ -118,6 +118,10 @@ def _parse_row(row_number: int, record: dict[str, str]) -> ParsedCsvRow | Invali
     if not business_name:
         return InvalidCsvRow(row_number=row_number, message="Enter a business name.")
 
+    email = (record.get("email") or "").strip()
+    if not email:
+        return InvalidCsvRow(row_number=row_number, message="Enter an email address.")
+
     website = record.get("website_url") or record.get("website") or ""
     other_website = record.get("website", "")
     explicit_website = record.get("website_url", "")

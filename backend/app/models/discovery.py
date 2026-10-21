@@ -59,6 +59,24 @@ class DiscoverySearch(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=True,
         server_default=text("true"),
     )
+    use_apollo: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
+    use_serpapi: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
+    use_scrapingbee: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )
 
     runs: Mapped[list["DiscoveryRun"]] = relationship(
         back_populates="search",

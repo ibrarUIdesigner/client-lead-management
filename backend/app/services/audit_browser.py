@@ -30,6 +30,10 @@ _PAGE_FACTS = """() => {
   const title = document.title || "";
   const meta = document.querySelector('meta[name="description"]');
   const heading = document.querySelector("h1");
+  const h1Elements = document.querySelectorAll("h1");
+  const allImages = Array.from(document.querySelectorAll("img"));
+  const imagesMissingAlt = allImages.filter((img) => !img.hasAttribute("alt") || !img.alt.trim()).length;
+  const viewportMeta = Boolean(document.querySelector('meta[name="viewport"]'));
   const theme = document.querySelector('meta[name="theme-color"]');
   const bodyStyle = getComputedStyle(document.body);
   const headingStyle = heading ? getComputedStyle(heading) : null;
@@ -47,6 +51,10 @@ _PAGE_FACTS = """() => {
     title,
     meta: meta ? meta.content || "" : "",
     h1: heading ? heading.innerText || "" : "",
+    h1Count: h1Elements.length,
+    imagesTotal: allImages.length,
+    imagesMissingAlt: imagesMissingAlt,
+    viewportMeta: viewportMeta,
     text,
     linkCount: document.querySelectorAll("a").length,
     navCount: document.querySelectorAll("nav a").length,
@@ -325,6 +333,10 @@ async def _capture(browser: Any, url: str) -> CapturedPage:
         outdated_markup=bool(facts.get("outdated")),
         load_time_ms=load_time_ms,
         lcp_ms=_count(facts.get("lcp")),
+        h1_count=_count(facts.get("h1Count")) if facts.get("h1Count") is not None else (1 if facts.get("h1") else 0),
+        images_total=_count(facts.get("imagesTotal")),
+        images_missing_alt=_count(facts.get("imagesMissingAlt")),
+        has_viewport_meta=bool(facts.get("viewportMeta", True)),
         schema_types=_labels(facts.get("schemaTypes")),
         schema_checked=True,
         accessibility_violations=violations,

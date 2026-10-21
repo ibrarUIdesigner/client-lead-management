@@ -18,6 +18,7 @@ import type { Lead, LeadListParams } from "../types/lead";
 type Filters = {
   q: string;
   lead_status: string;
+  has_email: string;
   industry: string;
   city: string;
   country: string;
@@ -31,6 +32,7 @@ type Filters = {
 const defaultFilters: Filters = {
   q: "",
   lead_status: "",
+  has_email: "true",
   industry: "",
   city: "",
   country: "",
@@ -40,6 +42,12 @@ const defaultFilters: Filters = {
   min_score: "",
   sort: "lead_score:desc",
 };
+
+const emailStatusOptions = [
+  { value: "true", label: "Has email" },
+  { value: "", label: "Any (all leads)" },
+  { value: "false", label: "No email" },
+];
 
 const sortOptions = [
   { value: "lead_score:desc", label: "Highest score" },
@@ -94,6 +102,7 @@ function toParams(filters: Filters, page: number): LeadListParams {
     limit: 25,
     q: filters.q,
     lead_status: filters.lead_status,
+    has_email: filters.has_email === "true" ? true : filters.has_email === "false" ? false : undefined,
     industry: filters.industry,
     city: filters.city,
     country: filters.country,
@@ -339,7 +348,7 @@ export function LeadListPage() {
               }}
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 sm:max-w-md">
+          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-3 sm:max-w-xl">
             <Select
               label="Status"
               placeholder="Any status"
@@ -347,6 +356,14 @@ export function LeadListPage() {
               value={draft.lead_status}
               onChange={(event) => {
                 updateDraft("lead_status", event.target.value);
+              }}
+            />
+            <Select
+              label="Email"
+              options={emailStatusOptions}
+              value={draft.has_email}
+              onChange={(event) => {
+                updateDraft("has_email", event.target.value);
               }}
             />
             <Select

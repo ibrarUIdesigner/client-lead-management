@@ -10,12 +10,11 @@ const optionalUrl = z
     message: "Start the address with http:// or https://.",
   });
 
-const optionalEmail = z
+const requiredEmail = z
   .string()
   .trim()
-  .refine((value) => value === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value), {
-    message: "Enter a valid email.",
-  });
+  .min(1, "Enter an email address.")
+  .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "Enter a valid email.");
 
 export const leadFormSchema = z.object({
   business_name: z.string().trim().min(1, "Enter the business name.").max(255),
@@ -23,7 +22,7 @@ export const leadFormSchema = z.object({
   city: z.string().trim().max(120),
   country: z.string().trim().max(120),
   website_url: optionalUrl,
-  email: optionalEmail,
+  email: requiredEmail,
   phone: z.string().trim().max(40),
   source: z.string().trim().max(120),
   tags: z.string().trim(),

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 
 import { LoadingState } from "../components/feedback/LoadingState";
 import { OfflineState } from "../components/feedback/OfflineState";
@@ -15,11 +17,13 @@ import { GmailSettingsCard } from "../features/gmail/GmailSettingsCard";
 import { useApify } from "../hooks/useApify";
 import { useDiscovery } from "../hooks/useDiscovery";
 import { useHealth, useProviders } from "../hooks/useHealth";
+import { useIntegrations } from "../hooks/useIntegrations";
 import { useOnline } from "../hooks/useOnline";
 import { useOutreachTemplates } from "../hooks/useWorkspace";
 import { sessionEmail, signOut } from "../lib/auth";
 import { cn, focusRing } from "../lib/cn";
 import type { HealthResponse, ProviderSnapshot } from "../types/health";
+import type { IntegrationItem } from "../types/integration";
 import type { OutreachTemplateItem } from "../types/workspace";
 
 const areas = [
@@ -179,10 +183,160 @@ function IntegrationsSection() {
 
   return (
     <div className="space-y-6">
+      <IntegrationsListCard />
       <GmailSettingsCard />
       <ProvidersCard />
       <ApifyConnectionCard />
       <DiscoveryConnectionCard />
+    </div>
+  );
+}
+
+function IntegrationsListCard() {
+  const integrationsQuery = useIntegrations();
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const data = integrationsQuery.data;
+  const items = data?.integrations ?? [];
+
+  const categories = [
+    "all",
+    ...Array.from(new Set(items.map((item) => item.category))),
+  ];
+
+  const filteredItems =
+    filterCategory === "all"
+      ? items
+      : items.filter((item) => item.category === filterCategory);
+
+  return (
+    <Card>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-h3 font-semibold text-ink">All Integrations</h2>
+            {data ? (
+              <Badge tone="green">
+                {data.configured_count} of {data.total_count} connected
+              </Badge>
+            ) : null}
+          </div>
+          <p className="mt-1 text-body leading-relaxed text-gray-600">
+            Overview of all active API providers, scraping engines, AI models, and directories.
+          </p>
+        </div>
+      </div>
+
+      {categories.length > 2 ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setFilterCategory(cat)}
+              className={cn(
+                "rounded-full px-3 py-1 text-caption font-medium transition-colors",
+                filterCategory === cat
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              )}
+            >
+              {cat === "all" ? "All Integrations" : cat}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {integrationsQuery.isPending ? (
+        <div className="mt-4">
+          <LoadingState label="Loading integrations" framed={false} />
+        </div>
+      ) : null}
+
+      {integrationsQuery.isError ? (
+        <p className="mt-4 text-body text-danger" role="alert">
+          Integrations could not be loaded.
+        </p>
+      ) : null}
+
+      {filteredItems.length > 0 ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredItems.map((item) => (
+            <IntegrationCardItem key={item.id} item={item} />
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function IntegrationCardItem({ item }: { item: IntegrationItem }) {
+  const statusToneMap: Record<string, "green" | "indigo" | "blue" | "orange"> = {
+    active: "green",
+    ready: "indigo",
+    public: "blue",
+    not_configured: "orange",
+  };
+
+  const statusLabelMap: Record<string, string> = {
+    active: "Active",
+    ready: "Ready",
+    public: "Public API",
+    not_configured: "Not configured",
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col justify-between rounded-card border p-4 transition-shadow hover:shadow-subtle",
+        item.status === "active"
+          ? "border-emerald-300 bg-emerald-50/40"
+          : item.is_configured
+          ? "border-gray-200 bg-white"
+          : "border-gray-200 bg-gray-50/60"
+      )}
+    >
+      <div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-h4 font-semibold text-ink truncate">{item.name}</h3>
+              {item.website ? (
+                <a
+                  href={item.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                  title={`Visit ${item.name}`}
+                >
+                  <ExternalLink className="size-3.5" aria-hidden="true" />
+                </a>
+              ) : null}
+            </div>
+            <span className="inline-block text-caption text-gray-500 font-medium">
+              {item.category}
+            </span>
+          </div>
+          <Badge tone={statusToneMap[item.status] ?? "gray"}>
+            {statusLabelMap[item.status] ?? item.status}
+          </Badge>
+        </div>
+
+        <p className="mt-2 text-small leading-relaxed text-gray-600 line-clamp-3">
+          {item.description}
+        </p>
+      </div>
+
+      <div className="mt-4 pt-3 border-t border-gray-100 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-caption text-gray-500">
+          <span>Env variable:</span>
+          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-mono text-gray-800">
+            {item.env_var}
+          </code>
+        </div>
+        <p className="text-[12px] text-gray-600 font-medium truncate" title={item.details}>
+          {item.details}
+        </p>
+      </div>
     </div>
   );
 }
@@ -355,7 +509,22 @@ function DiscoveryConnectionCard() {
             </div>
           </dl>
           <ul className="mt-4 space-y-2">
-            <SourceLine name="OpenStreetMap" ready detail="No key required" />
+            <SourceLine
+              name="Apollo.io"
+              ready={status.apollo_configured}
+              detail={status.apollo_configured ? "Key configured · B2B organizations" : "Set APOLLO_API_KEY"}
+            />
+            <SourceLine
+              name="SerpApi (Google Maps)"
+              ready={status.serpapi_configured}
+              detail={status.serpapi_configured ? "Key configured · Live Google Maps worldwide" : "Set SERPAPI_API_KEY"}
+            />
+            <SourceLine
+              name="ScrapingBee"
+              ready={status.scrapingbee_configured}
+              detail={status.scrapingbee_configured ? "Key configured · Google search & proxy" : "Set SCRAPINGBEE_API_KEY"}
+            />
+            <SourceLine name="OpenStreetMap" ready detail="No key required · Worldwide" />
             <SourceLine
               name="Google Places"
               ready={status.google_configured}
