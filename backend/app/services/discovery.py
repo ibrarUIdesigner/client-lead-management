@@ -22,19 +22,24 @@ from app.models.lead import Lead
 from app.repositories.activities import ActivityRepository
 from app.schemas.discovery import (
     CategoryOption,
+    DiscoveryBatchCreate,
     DiscoverySearchCreate,
     DiscoverySearchRead,
     DiscoverySearchUpdate,
     DiscoveryStatus,
 )
 from app.schemas.values import slugify
-from app.services.discovery_markets import is_anywhere
+from app.services.discovery_markets import (
+    ANYWHERE_CITY,
+    ANYWHERE_COUNTRY,
+    is_anywhere,
+)
 from app.services.persistence import flush_or_reject
 from app.services.place_listings import CATEGORIES, FoundBusiness
 
 logger = logging.getLogger(__name__)
 
-MAX_SEARCHES = 8
+MAX_SEARCHES = 100
 _state = threading.Lock()
 _running = False
 
@@ -114,6 +119,59 @@ class DiscoveryService:
         flush_or_reject(self.session)
         self.session.refresh(search)
         return self._read(search)
+
+    def create_batch_searches(self, data: DiscoveryBatchCreate) -> list[DiscoverySearchRead]:
+        results: list[DiscoverySearchRead] = []
+        target_countries = data.countries if data.countries else ([data.country] if data.country.strip() else [ANYWHERE_COUNTRY])
+        target_city = data.city.strip() if data.city.strip() else ANYWHERE_CITY
+
+        for category in data.categories:
+            clean_category = category.strip()
+            if not clean_category or len(clean_category) < 2:
+                continue
+            for country in target_countries:
+                clean_country = country.strip() if country.strip() else ANYWHERE_COUNTRY
+                existing = self.session.scalar(
+                    select(DiscoverySearch).where(
+                        DiscoverySearch.category == clean_category,
+                        DiscoverySearch.city == target_city,
+                        DiscoverySearch.country == clean_country,
+                    )
+                )
+                if existing:
+                    existing.is_active = True
+                    existing.use_openstreetmap = data.use_openstreetmap
+                    existing.use_google = data.use_google
+                    existing.use_yelp = data.use_yelp
+                    existing.use_yell = data.use_yell
+                    existing.use_businesslist = data.use_businesslist
+                    existing.use_epages = data.use_epages
+                    existing.use_apollo = data.use_apollo
+                    existing.use_serpapi = data.use_serpapi
+                    existing.use_scrapingbee = data.use_scrapingbee
+                    flush_or_reject(self.session)
+                    self.session.refresh(existing)
+                    results.append(self._read(existing))
+                else:
+                    new_search = DiscoverySearch(
+                        category=clean_category,
+                        city=target_city,
+                        country=clean_country,
+                        use_openstreetmap=data.use_openstreetmap,
+                        use_google=data.use_google,
+                        use_yelp=data.use_yelp,
+                        use_yell=data.use_yell,
+                        use_businesslist=data.use_businesslist,
+                        use_epages=data.use_epages,
+                        use_apollo=data.use_apollo,
+                        use_serpapi=data.use_serpapi,
+                        use_scrapingbee=data.use_scrapingbee,
+                    )
+                    self.session.add(new_search)
+                    flush_or_reject(self.session)
+                    self.session.refresh(new_search)
+                    results.append(self._read(new_search))
+        return results
 
     def update_search(self, search_id: UUID, data: DiscoverySearchUpdate) -> DiscoverySearchRead:
         search = self._require(search_id)
@@ -206,7 +264,8 @@ def start_discovery_run(
     session_factory: sessionmaker[Session],
     settings: Settings,
     *,
-    search_id: UUID | None,
+    search_id: UUID | None = None,
+    search_ids: list[UUID] | None = None,
     trigger: DiscoveryTrigger,
     wait: bool = False,
 ) -> str:
@@ -214,7 +273,7 @@ def start_discovery_run(
     if not _begin_run():
         return "busy"
     try:
-        run_ids = _prepare_runs(session_factory, settings, search_id=search_id, trigger=trigger)
+        run_ids = _prepare_runs(session_factory, settings, search_id=search_id, search_ids=search_ids, trigger=trigger)
     except Exception:
         _end_run()
         raise
@@ -262,7 +321,8 @@ def _prepare_runs(
     session_factory: sessionmaker[Session],
     settings: Settings,
     *,
-    search_id: UUID | None,
+    search_id: UUID | None = None,
+    search_ids: list[UUID] | None = None,
     trigger: DiscoveryTrigger,
 ) -> list[UUID]:
     with session_factory() as session:
@@ -270,7 +330,15 @@ def _prepare_runs(
         if trigger is DiscoveryTrigger.DAILY and _daily_already_ran(session, settings):
             session.commit()
             return []
-        if search_id is None:
+        if search_ids:
+            searches = list(
+                session.scalars(
+                    select(DiscoverySearch)
+                    .where(DiscoverySearch.id.in_(search_ids), DiscoverySearch.is_active.is_(True))
+                    .order_by(DiscoverySearch.created_at.asc())
+                )
+            )
+        elif search_id is None:
             searches = list(
                 session.scalars(
                     select(DiscoverySearch)

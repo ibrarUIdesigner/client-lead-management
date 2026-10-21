@@ -1,19 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  createDiscoveryBatch,
   createDiscoverySearch,
   deleteDiscoverySearch,
   getDiscovery,
   runDiscovery,
   updateDiscoverySearch,
 } from "../services/discovery";
-import type { DiscoverySearchWrite } from "../types/discovery";
+import type { DiscoveryBatchWrite, DiscoverySearchWrite } from "../types/discovery";
 
 export function useDiscovery() {
   return useQuery({
     queryKey: ["discovery"],
     queryFn: getDiscovery,
     refetchInterval: (query) => (query.state.data?.running ? 2000 : false),
+  });
+}
+
+export function useCreateDiscoveryBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DiscoveryBatchWrite) => createDiscoveryBatch(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["discovery"] });
+    },
   });
 }
 

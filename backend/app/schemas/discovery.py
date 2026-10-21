@@ -39,6 +39,10 @@ class DiscoverySearchCreate(BaseModel):
             self.city = ANYWHERE_CITY
             self.country = ANYWHERE_COUNTRY
             return self
+        if not city and country:
+            self.city = ANYWHERE_CITY
+            self.country = country
+            return self
         if len(city) < 2 or len(country) < 2:
             raise ValueError("Enter both a city and a country, or leave both empty.")
         self.city = city
@@ -71,6 +75,25 @@ class DiscoverySearchCreate(BaseModel):
         return self
 
 
+class DiscoveryBatchCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    categories: list[str] = Field(min_length=1)
+    city: str = Field(default="", max_length=120)
+    country: str = Field(default="", max_length=120)
+    countries: list[str] = Field(default_factory=list)
+    use_openstreetmap: bool = True
+    use_google: bool = True
+    use_yelp: bool = True
+    use_yell: bool = True
+    use_businesslist: bool = True
+    use_epages: bool = True
+    use_apollo: bool = True
+    use_serpapi: bool = True
+    use_scrapingbee: bool = True
+    run_now: bool = True
+
+
 class DiscoverySearchUpdate(BaseModel):
     is_active: bool | None = None
     use_openstreetmap: bool | None = None
@@ -82,26 +105,6 @@ class DiscoverySearchUpdate(BaseModel):
     use_apollo: bool | None = None
     use_serpapi: bool | None = None
     use_scrapingbee: bool | None = None
-
-    @model_validator(mode="after")
-    def require_change(self) -> Self:
-        if all(
-            value is None
-            for value in (
-                self.is_active,
-                self.use_openstreetmap,
-                self.use_google,
-                self.use_yelp,
-                self.use_yell,
-                self.use_businesslist,
-                self.use_epages,
-                self.use_apollo,
-                self.use_serpapi,
-                self.use_scrapingbee,
-            )
-        ):
-            raise ValueError("Choose what to change.")
-        return self
 
 
 class DiscoverySearchRead(BaseModel):
@@ -130,6 +133,12 @@ class DiscoverySearchRead(BaseModel):
     last_updated_count: int | None = None
     last_skipped_count: int | None = None
     last_message: str | None = None
+
+
+class DiscoveryBatchResult(BaseModel):
+    created_count: int
+    searches: list[DiscoverySearchRead]
+    started_run: bool
 
 
 class CategoryOption(BaseModel):

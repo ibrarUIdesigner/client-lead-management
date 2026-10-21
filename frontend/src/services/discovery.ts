@@ -1,5 +1,11 @@
 import { api } from "./api";
-import type { DiscoverySearch, DiscoverySearchWrite, DiscoveryStatus } from "../types/discovery";
+import type {
+  DiscoveryBatchResult,
+  DiscoveryBatchWrite,
+  DiscoverySearch,
+  DiscoverySearchWrite,
+  DiscoveryStatus,
+} from "../types/discovery";
 
 export async function getDiscovery(): Promise<DiscoveryStatus> {
   const response = await api.get<DiscoveryStatus>("/discovery");
@@ -10,6 +16,13 @@ export async function createDiscoverySearch(
   payload: DiscoverySearchWrite,
 ): Promise<DiscoverySearch> {
   const response = await api.post<DiscoverySearch>("/discovery/searches", payload);
+  return response.data;
+}
+
+export async function createDiscoveryBatch(
+  payload: DiscoveryBatchWrite,
+): Promise<DiscoveryBatchResult> {
+  const response = await api.post<DiscoveryBatchResult>("/discovery/batch", payload);
   return response.data;
 }
 

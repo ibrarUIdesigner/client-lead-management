@@ -7,6 +7,8 @@ from app.api.deps import SessionDep
 from app.core.errors import AppError
 from app.models.enums import DiscoveryTrigger
 from app.schemas.discovery import (
+    DiscoveryBatchCreate,
+    DiscoveryBatchResult,
     DiscoveryRunStarted,
     DiscoverySearchCreate,
     DiscoverySearchRead,
@@ -41,6 +43,32 @@ def create_search(
     request: Request,
 ) -> DiscoverySearchRead:
     return DiscoveryService(session, request.app.state.settings).create_search(data)
+
+
+@router.post("/batch", response_model=DiscoveryBatchResult, status_code=201)
+def create_batch(
+    data: DiscoveryBatchCreate,
+    session: SessionDep,
+    request: Request,
+) -> DiscoveryBatchResult:
+    settings = request.app.state.settings
+    service = DiscoveryService(session, settings)
+    created = service.create_batch_searches(data)
+    started = False
+    if data.run_now and created:
+        search_ids = [s.id for s in created]
+        res = start_discovery_run(
+            request.app.state.session_factory,
+            settings,
+            search_ids=search_ids,
+            trigger=DiscoveryTrigger.MANUAL,
+        )
+        started = (res == "started")
+    return DiscoveryBatchResult(
+        created_count=len(created),
+        searches=created,
+        started_run=started,
+    )
 
 
 @router.patch("/searches/{search_id}", response_model=DiscoverySearchRead)

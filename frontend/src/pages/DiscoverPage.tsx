@@ -28,9 +28,8 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Input } from "../components/ui/Input";
-import { Select } from "../components/ui/Select";
 import {
-  useCreateDiscoverySearch,
+  useCreateDiscoveryBatch,
   useDeleteDiscoverySearch,
   useDiscovery,
   useRunDiscovery,
@@ -383,11 +382,16 @@ function SearchForm({
   scrapingbeeConfigured: boolean;
   running: boolean;
 }) {
-  const create = useCreateDiscoverySearch();
+  const createBatch = useCreateDiscoveryBatch();
   const run = useRunDiscovery();
   const { notify } = useToast();
-  const [category, setCategory] = useState(categories[0]?.value ?? "dentist");
-  const [customCategory, setCustomCategory] = useState("");
+
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([
+    categories[0]?.value ?? "dentist",
+  ]);
+  const [customInput, setCustomInput] = useState("");
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState("Worldwide");
   const [limitPlace, setLimitPlace] = useState(false);
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
@@ -408,45 +412,75 @@ function SearchForm({
     setSources((current) => ({ ...current, [key]: !current[key] }));
   }
 
+  function toggleCategory(cat: string) {
+    setSelectedCategories((current) =>
+      current.includes(cat) ? current.filter((c) => c !== cat) : [...current, cat],
+    );
+    setError(null);
+  }
+
+  function selectCategoryGroup(group: string[]) {
+    setSelectedCategories((current) => {
+      const merged = new Set([...current, ...group]);
+      return Array.from(merged);
+    });
+    setError(null);
+  }
+
+  function selectAllCategories() {
+    setSelectedCategories(categories.map((c) => c.value));
+    setError(null);
+  }
+
+  function addCustomNiche() {
+    const trimmed = customInput.trim();
+    if (trimmed.length < 2) return;
+    if (!customCategories.includes(trimmed)) {
+      setCustomCategories((curr) => [...curr, trimmed]);
+    }
+    if (!selectedCategories.includes(trimmed)) {
+      setSelectedCategories((curr) => [...curr, trimmed]);
+    }
+    setCustomInput("");
+    setError(null);
+  }
+
   function save(searchNow: boolean) {
-    const chosen = category === "other" ? customCategory.trim() : category;
-    const place = limitPlace ? city.trim() : "";
-    const region = limitPlace ? country.trim() : "";
-    if (chosen.length < 2) {
-      setError("Choose a category.");
+    if (selectedCategories.length === 0) {
+      setError("Please select at least one niche / business category.");
       return;
     }
+    const place = limitPlace ? city.trim() : "";
+    const region = limitPlace ? country.trim() : selectedCountry;
     if (limitPlace && (place.length < 2 || region.length < 2)) {
-      setError("Enter both a city and a country, or turn off the city limit.");
+      setError("Enter both a city and a country, or switch to Worldwide.");
       return;
     }
     if (!Object.values(sources).some(Boolean)) {
-      setError("Choose at least one source.");
+      setError("Choose at least one listing source.");
       return;
     }
     setError(null);
-    create.mutate(
+
+    createBatch.mutate(
       {
-        category: chosen,
+        categories: selectedCategories,
         city: place,
         country: region,
         ...sources,
+        run_now: searchNow,
       },
       {
-        onSuccess: (search) => {
-          setCustomCategory("");
-          notify("Search saved.", "success");
-          if (!searchNow) {
-            return;
-          }
-          run.mutate(search.id, {
-            onError: (runError) => {
-              notify(apiErrorMessage(runError, "The search could not start."), "danger");
-            },
-          });
+        onSuccess: (result) => {
+          notify(
+            searchNow
+              ? `Saved ${result.created_count} search(es) and started discovery!`
+              : `Saved ${result.created_count} search(es) for the daily run.`,
+            "success",
+          );
         },
         onError: (saveError) => {
-          setError(apiErrorMessage(saveError, "The search could not be saved."));
+          setError(apiErrorMessage(saveError, "The searches could not be saved."));
         },
       },
     );
@@ -460,10 +494,9 @@ function SearchForm({
             <Plus className="size-5" aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-h3 font-semibold text-ink">New search</h2>
+            <h2 className="text-h3 font-semibold text-ink">New multi-niche search</h2>
             <p className="mt-1 max-w-2xl text-body text-gray-600">
-              Choose a business type. Leads come from the cities these directories already cover,
-              and each one keeps its own city. Listings without a website rank higher.
+              Select one or multiple niches and target countries. The discovery engine fetches verified businesses with email addresses across Apollo.io, SerpApi, ScrapingBee, and OpenStreetMap.
             </p>
           </div>
         </div>
@@ -477,34 +510,146 @@ function SearchForm({
         }}
       >
         <section className="space-y-3">
-          <SectionLabel>Who to find</SectionLabel>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              label="Category"
-              value={category}
-              options={[...categories, { value: "other", label: "Other" }]}
-              onChange={(event) => {
-                setCategory(event.target.value);
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <SectionLabel>Who to find (Niches / Categories)</SectionLabel>
+            <Badge tone={selectedCategories.length > 0 ? "indigo" : "gray"}>
+              {selectedCategories.length === 0
+                ? "No niche selected"
+                : `${selectedCategories.length} selected`}
+            </Badge>
+          </div>
+
+          {/* Quick industry group presets */}
+          <div className="flex flex-wrap items-center gap-1.5 text-caption">
+            <span className="text-gray-500 font-medium mr-1">Presets:</span>
+            <button
+              type="button"
+              onClick={selectAllCategories}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              ⚡ All ({categories.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => selectCategoryGroup(["dentist", "clinic", "pharmacy", "veterinary"])}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              🏥 Healthcare
+            </button>
+            <button
+              type="button"
+              onClick={() => selectCategoryGroup(["real_estate", "lawyer", "accountant"])}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              💼 Professional
+            </button>
+            <button
+              type="button"
+              onClick={() => selectCategoryGroup(["restaurant", "cafe", "bakery", "hotel"])}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              🍽️ Hospitality
+            </button>
+            <button
+              type="button"
+              onClick={() => selectCategoryGroup(["gym", "salon", "photographer"])}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              ✂️ Care & Fitness
+            </button>
+            <button
+              type="button"
+              onClick={() => selectCategoryGroup(["plumber", "electrician", "car_repair"])}
+              className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              🔧 Trade
+            </button>
+            {selectedCategories.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setSelectedCategories([])}
+                className="rounded-md border border-red-200 bg-red-50/50 px-2.5 py-1 text-red-600 hover:bg-red-50 transition-colors"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+
+          {/* Multi-niche toggleable pills */}
+          <div className="flex flex-wrap gap-2 pt-1">
+            {categories.map((cat) => {
+              const isSelected = selectedCategories.includes(cat.value);
+              return (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => toggleCategory(cat.value)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small font-medium transition-all shadow-sm",
+                    isSelected
+                      ? "bg-primary-600 text-white shadow-primary-200 ring-2 ring-primary-600 ring-offset-1"
+                      : "border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                  )}
+                >
+                  <span className="text-[13px] font-bold">
+                    {isSelected ? "✓" : "+"}
+                  </span>
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+            {customCategories.map((custom) => {
+              const isSelected = selectedCategories.includes(custom);
+              return (
+                <button
+                  key={custom}
+                  type="button"
+                  onClick={() => toggleCategory(custom)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-small font-medium transition-all shadow-sm",
+                    isSelected
+                      ? "bg-primary-700 text-white ring-2 ring-primary-700 ring-offset-1"
+                      : "border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                  )}
+                >
+                  <span className="text-[13px] font-bold">
+                    {isSelected ? "✓" : "+"}
+                  </span>
+                  <span>{custom}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Add custom niche input */}
+          <div className="flex items-center gap-2 pt-1 sm:max-w-md">
+            <Input
+              label=""
+              aria-label="Add custom niche"
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomNiche();
+                }
               }}
+              placeholder="Add other niche (e.g. SaaS, Pet Grooming, Marketing)..."
             />
-            {category === "other" ? (
-              <Input
-                label="Custom category"
-                value={customCategory}
-                onChange={(event) => {
-                  setCustomCategory(event.target.value);
-                }}
-                placeholder="Pet grooming"
-              />
-            ) : (
-              <div className="hidden sm:block" aria-hidden="true" />
-            )}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={addCustomNiche}
+              disabled={!customInput.trim()}
+            >
+              Add
+            </Button>
           </div>
         </section>
 
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionLabel>Where to look</SectionLabel>
+            <SectionLabel>Where to look (Countries & Markets)</SectionLabel>
             <button
               type="button"
               className={cn("text-small font-semibold text-primary-700", focusRing)}
@@ -513,33 +658,58 @@ function SearchForm({
                 setError(null);
               }}
             >
-              {limitPlace ? "Search every covered city" : "Limit to one city"}
+              {limitPlace ? "Search Worldwide (Global hubs)" : "Limit to specific city / country"}
             </button>
           </div>
-          {limitPlace ? (
+
+          {!limitPlace ? (
+            <div className="space-y-2">
+              <p className="text-body text-gray-600">
+                Worldwide search automatically covers major international business hubs (New York, San Francisco, London, Toronto, Sydney, Chicago, Los Angeles, Miami, Berlin, Dublin, etc.).
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5 text-caption">
+                <span className="text-gray-500 font-medium mr-1">Target Country:</span>
+                {[
+                  { label: "🌐 Worldwide (All)", value: "Worldwide" },
+                  { label: "🇺🇸 United States", value: "United States" },
+                  { label: "🇬🇧 United Kingdom", value: "United Kingdom" },
+                  { label: "🇨🇦 Canada", value: "Canada" },
+                  { label: "🇦🇺 Australia", value: "Australia" },
+                  { label: "🇩🇪 Germany", value: "Germany" },
+                  { label: "🇦🇪 UAE", value: "United Arab Emirates" },
+                  { label: "🇵🇰 Pakistan", value: "Pakistan" },
+                ].map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setSelectedCountry(c.value)}
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-caption font-medium transition-colors",
+                      selectedCountry === c.value
+                        ? "bg-primary-600 text-white shadow-sm"
+                        : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 label="City"
                 value={city}
-                onChange={(event) => {
-                  setCity(event.target.value);
-                }}
-                placeholder="Lahore"
+                onChange={(event) => setCity(event.target.value)}
+                placeholder="e.g. New York, London, Toronto"
               />
               <Input
                 label="Country"
                 value={country}
-                onChange={(event) => {
-                  setCountry(event.target.value);
-                }}
-                placeholder="Pakistan"
+                onChange={(event) => setCountry(event.target.value)}
+                placeholder="e.g. United States, United Kingdom, Canada"
               />
             </div>
-          ) : (
-            <p className="text-body text-gray-600">
-              Anywhere the selected directories publish listings, including Lahore, Karachi,
-              Islamabad, London, Manchester, Birmingham, and Portland.
-            </p>
           )}
         </section>
 
@@ -584,27 +754,30 @@ function SearchForm({
 
         <div className="flex flex-col gap-3 border-t border-gray-100 pt-5 lg:flex-row lg:items-center lg:justify-between">
           <p className="text-small text-gray-600">
-            Save for the daily schedule, or run now. A city is only needed if you limit the search.
+            Save for the daily schedule, or run immediately across all selected niches.
           </p>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="secondary"
               className="w-full sm:w-auto"
-              disabled={create.isPending || running}
+              disabled={createBatch.isPending || running || selectedCategories.length === 0}
               onClick={() => {
                 save(false);
               }}
             >
-              Save for daily run
+              Save for daily run ({selectedCategories.length})
             </Button>
             <Button
               type="submit"
               className="w-full sm:w-auto"
-              isLoading={create.isPending || run.isPending || running}
+              isLoading={createBatch.isPending || run.isPending || running}
+              disabled={selectedCategories.length === 0}
             >
               <Search className="size-4" aria-hidden="true" />
-              Save and search now
+              {selectedCategories.length > 1
+                ? `Save & search now (${selectedCategories.length} niches)`
+                : "Save and search now"}
             </Button>
           </div>
         </div>

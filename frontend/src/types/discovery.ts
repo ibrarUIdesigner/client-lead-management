@@ -57,3 +57,26 @@ export type DiscoverySearchWrite = {
   use_serpapi: boolean;
   use_scrapingbee: boolean;
 };
+
+export type DiscoveryBatchWrite = {
+  categories: string[];
+  city?: string;
+  country?: string;
+  countries?: string[];
+  use_openstreetmap: boolean;
+  use_google: boolean;
+  use_yelp: boolean;
+  use_yell: boolean;
+  use_businesslist: boolean;
+  use_epages: boolean;
+  use_apollo: boolean;
+  use_serpapi: boolean;
+  use_scrapingbee: boolean;
+  run_now?: boolean;
+};
+
+export type DiscoveryBatchResult = {
+  created_count: number;
+  searches: DiscoverySearch[];
+  started_run: boolean;
+};
