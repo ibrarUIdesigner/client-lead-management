@@ -272,45 +272,65 @@ def draft_email(
     prompt = _instructions(render_brief(brief), brief.purpose)
     owns_client = client is None
     http = client or httpx.Client(timeout=25.0)
+    raw = None
     try:
-        try:
-            if provider == "gemini":
+        if provider == "gemini":
+            try:
                 raw = _gemini(http, settings, prompt)
-            else:
-                raw = _groq(http, settings, prompt)
-        except AppError as exc:
-            if not _should_try_groq(settings, provider, exc):
-                raise
-            logger.warning("email_draft_fallback provider=groq")
+            except Exception as exc:
+                if _should_try_groq(settings, provider, exc):
+                    logger.warning("email_draft_gemini_failed (%s), falling back to Groq", exc)
+                    try:
+                        raw = _groq(http, settings, prompt)
+                    except Exception as groq_exc:
+                        logger.error("email_draft_groq_fallback_failed: %s", groq_exc)
+                        raise
+                else:
+                    if isinstance(exc, AppError):
+                        raise
+                    raise AppError(
+                        code="AI_DRAFT_FAILED",
+                        message="The email draft could not be written. Try again in a moment.",
+                        status_code=502,
+                    ) from exc
+        else:
             raw = _groq(http, settings, prompt)
     except httpx.TimeoutException as exc:
         logger.warning("email_draft_timeout provider=%s", provider)
-        if _should_try_groq(settings, provider, AppError("AI_DRAFT_FAILED", "", 504)):
+        if _should_try_groq(settings, provider, exc):
             logger.warning("email_draft_fallback provider=groq after timeout")
             try:
                 raw = _groq(http, settings, prompt)
-                s_subj, s_body = parse_draft(raw)
-                return s_subj, append_sender_signature(
-                    s_body,
-                    name=brief.sender_name or getattr(settings, "outreach_sender_name", None) or "Ibrar",
-                    portfolio=brief.sender_portfolio or getattr(settings, "outreach_sender_portfolio", None),
-                    whatsapp=brief.sender_whatsapp or getattr(settings, "outreach_sender_whatsapp", None),
-                    email=brief.sender_email or getattr(settings, "outreach_sender_email", None),
-                )
             except Exception:
-                pass
-        raise AppError(
-            code="AI_DRAFT_FAILED",
-            message="The email draft took too long. Try again in a moment.",
-            status_code=504,
-        ) from exc
+                raise AppError(
+                    code="AI_DRAFT_FAILED",
+                    message="The email draft took too long. Try again in a moment.",
+                    status_code=504,
+                ) from exc
+        else:
+            raise AppError(
+                code="AI_DRAFT_FAILED",
+                message="The email draft took too long. Try again in a moment.",
+                status_code=504,
+            ) from exc
     except httpx.HTTPError as exc:
         logger.warning("email_draft_failed provider=%s", provider)
-        raise AppError(
-            code="AI_DRAFT_FAILED",
-            message="The email draft could not be written. Try again in a moment.",
-            status_code=502,
-        ) from exc
+        if _should_try_groq(settings, provider, exc):
+            logger.warning("email_draft_fallback provider=groq after http error")
+            try:
+                raw = _groq(http, settings, prompt)
+            except Exception:
+                raise AppError(
+                    code="AI_DRAFT_FAILED",
+                    message="The email draft could not be written. Try again in a moment.",
+                    status_code=502,
+                ) from exc
+        else:
+            raise AppError(
+                code="AI_DRAFT_FAILED",
+                message="The email draft could not be written. Try again in a moment.",
+                status_code=502,
+            ) from exc
     finally:
         if owns_client:
             http.close()
@@ -364,18 +384,21 @@ def suggest_offer(
     owns_client = client is None
     http = client or httpx.Client(timeout=30.0)
     try:
-        try:
-            if provider == "gemini":
+        if provider == "gemini":
+            try:
                 raw = _gemini_offer(http, settings, prompt)
-            else:
-                raw = _groq_offer(http, settings, prompt)
-        except AppError as exc:
-            if not _should_try_groq(settings, provider, exc):
-                logger.warning("offer_suggest_failed code=%s", exc.code)
-                return fallback, "audit" if findings or scores else "default"
-            logger.warning("offer_suggest_fallback provider=groq")
+            except Exception as exc:
+                if _should_try_groq(settings, provider, exc):
+                    logger.warning("offer_suggest_gemini_failed (%s), falling back to Groq", exc)
+                    try:
+                        raw = _groq_offer(http, settings, prompt)
+                    except Exception:
+                        return fallback, "audit" if findings or scores else "default"
+                else:
+                    return fallback, "audit" if findings or scores else "default"
+        else:
             raw = _groq_offer(http, settings, prompt)
-    except (httpx.TimeoutException, httpx.HTTPError, AppError):
+    except Exception:
         logger.warning("offer_suggest_failed")
         return fallback, "audit" if findings or scores else "default"
     finally:
@@ -819,10 +842,8 @@ def _post(client: httpx.Client, url: str, **kwargs: object) -> httpx.Response:
     return client.post(url, **kwargs)
 
 
-def _should_try_groq(settings: Settings, provider: str, exc: AppError) -> bool:
-    if provider != "gemini" or exc.code != "AI_DRAFT_FAILED":
-        return False
-    if settings.ai_email_provider.strip().lower() == "gemini":
+def _should_try_groq(settings: Settings, provider: str, exc: object = None) -> bool:
+    if provider != "gemini":
         return False
     return bool(settings.groq_api_key.strip()) and _valid_model(settings.groq_model)
 
