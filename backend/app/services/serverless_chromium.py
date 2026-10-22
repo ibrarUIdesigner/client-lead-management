@@ -105,6 +105,7 @@ def ensure_serverless_chromium(
         _apply_environment(root)
         return _launcher(root, executable)
 
+    _clean_stale(root)
     archive = root / "chromium-pack.tar"
     pack_dir = root / "chromium-pack"
     try:
@@ -114,8 +115,10 @@ def ensure_serverless_chromium(
         archive.unlink(missing_ok=True)
         _inflate_pack(pack_dir, root)
     except ServerlessBrowserError:
+        _clean_stale(root)
         raise
     except Exception as exc:
+        _clean_stale(root)
         logger.exception("serverless_chromium_setup_failed")
         raise ServerlessBrowserError("The browser files could not be unpacked.") from exc
     finally:
@@ -201,17 +204,35 @@ def _inflate_pack(pack_dir: Path, root: Path) -> None:
     _extract_tar_brotli(pack_dir / "swiftshader.tar.br", root)
 
 
+def _clean_stale(root: Path) -> None:
+    try:
+        for p in root.glob("*.partial"):
+            p.unlink(missing_ok=True)
+        for p in root.glob("*.part"):
+            p.unlink(missing_ok=True)
+        for p in root.glob("chromium-pack*"):
+            if p.is_dir():
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                p.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 def _decompress_file(source: Path, target: Path, *, executable: bool) -> None:
     temporary = target.with_name(f"{target.name}.partial")
     decompressor = brotli.Decompressor()
-    with source.open("rb") as infile, temporary.open("wb") as outfile:
-        while chunk := infile.read(1024 * 1024):
-            outfile.write(decompressor.process(chunk))
-        if not decompressor.is_finished():
-            outfile.write(decompressor.process(b""))
-    if executable:
-        temporary.chmod(0o755)
-    temporary.replace(target)
+    try:
+        with source.open("rb") as infile, temporary.open("wb") as outfile:
+            while chunk := infile.read(1024 * 1024):
+                outfile.write(decompressor.process(chunk))
+            if not decompressor.is_finished():
+                outfile.write(decompressor.process(b""))
+        if executable:
+            temporary.chmod(0o755)
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _launcher(root: Path, binary: Path) -> str:

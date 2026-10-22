@@ -466,3 +466,55 @@ def test_apply_security_adds_issues_and_tool() -> None:
     assert any(tool["name"] == "Security Analyzer" for tool in analysis.tools)
     assert any(issue["code"] == "missing_csp" for issue in analysis.issues)
     assert any(b["code"] == "missing_csp" for b in analysis.opportunity_breakdown)
+
+
+def test_capture_website_http_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services.audit_browser import capture_website
+    import httpx
+
+    html_sample = (
+        "<!DOCTYPE html><html><head>"
+        "<title>Sample Cafe - Best Coffee</title>"
+        '<meta name="description" content="A great cafe in town with breakfast and coffee.">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        "</head><body>"
+        '<nav><a href="/menu">Menu</a><a href="/about">About</a><a href="/contact">Contact</a></nav>'
+        "<h1>Welcome to Sample Cafe</h1>"
+        "<p>Call us at 555-123-4567 or visit us today.</p>"
+        '<img src="/logo.png" alt="Sample Cafe Logo">'
+        '<img src="/photo.jpg">'
+        '<form action="/contact"><input type="text" name="name"><button type="submit">Send Message</button></form>'
+        "</body></html>"
+    )
+
+    def mock_launch_fail(*args: object, **kwargs: object) -> None:
+        from app.services.serverless_chromium import ServerlessBrowserError
+        raise ServerlessBrowserError("The browser files could not be unpacked.")
+
+    monkeypatch.setattr("app.services.audit_browser._capture_website", mock_launch_fail)
+
+    class MockClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+        def __enter__(self) -> "MockClient":
+            return self
+        def __exit__(self, *args: object) -> None:
+            pass
+        def get(self, url: str) -> object:
+            resp = Mock()
+            resp.url = httpx.URL("https://example.com/")
+            resp.text = html_sample
+            return resp
+
+    monkeypatch.setattr("httpx.Client", MockClient)
+
+    captured = asyncio.run(capture_website("https://example.com/"))
+    assert captured.final_url == "https://example.com/"
+    assert captured.title == "Sample Cafe - Best Coffee"
+    assert captured.h1 == "Welcome to Sample Cafe"
+    assert captured.nav_link_count == 3
+    assert captured.form_count == 1
+    assert captured.input_count == 1
+    assert captured.phone_visible is True
+    assert captured.images_total == 2
+    assert captured.images_missing_alt == 1

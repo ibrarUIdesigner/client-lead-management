@@ -1,3 +1,4 @@
+from html.parser import HTMLParser
 import asyncio
 import logging
 import threading
@@ -185,9 +186,251 @@ async def capture_website(url: str) -> CapturedPage:
         raise AuditRunError("The website could not be analyzed.") from None
 
 
+
+class _PageHtmlParser(HTMLParser):
+    def __init__(self, base_url: str) -> None:
+        super().__init__(convert_charrefs=True)
+        self.base_url = base_url
+        self.title_parts: list[str] = []
+        self.in_title = False
+        self.meta_description = ""
+        self.canonical = ""
+        self.robots = ""
+        self.theme_color = ""
+        self.has_viewport = False
+        self.h1_texts: list[str] = []
+        self.in_h1 = False
+        self.current_h1_parts: list[str] = []
+        self.body_text_parts: list[str] = []
+        self.in_body = False
+        self.ignore_depth = 0
+        self.link_count = 0
+        self.in_nav = 0
+        self.nav_link_count = 0
+        self.links: list[tuple[str, str]] = []
+        self.current_a_href: str | None = None
+        self.current_a_parts: list[str] = []
+        self.form_count = 0
+        self.input_count = 0
+        self.in_button = False
+        self.current_button_parts: list[str] = []
+        self.cta_labels: list[str] = []
+        self.images_total = 0
+        self.images_missing_alt = 0
+        self.image_urls: list[str] = []
+        self.has_tel = False
+        self.outdated_markup = False
+        self.schema_types: list[str] = []
+        self.in_ldjson = False
+        self.ldjson_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_dict = {k.lower(): (v or "") for k, v in attrs if k}
+        name = tag.lower()
+        if name == "title":
+            self.in_title = True
+        elif name == "h1":
+            self.in_h1 = True
+            self.current_h1_parts = []
+        elif name == "meta":
+            m_name = attrs_dict.get("name", "").lower()
+            m_prop = attrs_dict.get("property", "").lower()
+            if m_name == "description" or m_prop == "og:description":
+                if not self.meta_description:
+                    self.meta_description = attrs_dict.get("content", "")
+            elif m_name == "viewport":
+                self.has_viewport = True
+            elif m_name == "theme-color":
+                self.theme_color = attrs_dict.get("content", "")
+            elif m_name == "robots":
+                self.robots = attrs_dict.get("content", "")
+        elif name == "link":
+            rel = attrs_dict.get("rel", "").lower()
+            if rel == "canonical":
+                self.canonical = attrs_dict.get("href", "")
+        elif name == "a":
+            self.link_count += 1
+            if self.in_nav > 0:
+                self.nav_link_count += 1
+            href = attrs_dict.get("href", "")
+            if href.lower().startswith("tel:"):
+                self.has_tel = True
+            self.current_a_href = href
+            self.current_a_parts = []
+        elif name == "nav":
+            self.in_nav += 1
+        elif name == "form":
+            self.form_count += 1
+        elif name in ("input", "textarea", "select"):
+            self.input_count += 1
+        elif name == "button":
+            self.in_button = True
+            self.current_button_parts = []
+        elif name == "img":
+            self.images_total += 1
+            alt = (attrs_dict.get("alt") or "").strip()
+            if not alt:
+                self.images_missing_alt += 1
+            src = (attrs_dict.get("src") or attrs_dict.get("data-src") or "").strip()
+            if src and len(self.image_urls) < 12:
+                from urllib.parse import urljoin
+                self.image_urls.append(urljoin(self.base_url, src))
+        elif name == "script":
+            s_type = attrs_dict.get("type", "").lower()
+            if "ld+json" in s_type:
+                self.in_ldjson = True
+                self.ldjson_parts = []
+            self.ignore_depth += 1
+        elif name in ("style", "svg", "noscript"):
+            self.ignore_depth += 1
+        elif name in ("marquee", "font", "frameset", "center"):
+            self.outdated_markup = True
+        elif name == "body":
+            self.in_body = True
+
+    def handle_data(self, data: str) -> None:
+        if self.in_title:
+            self.title_parts.append(data)
+        if self.in_h1:
+            self.current_h1_parts.append(data)
+        if self.current_a_href is not None:
+            self.current_a_parts.append(data)
+        if self.in_button:
+            self.current_button_parts.append(data)
+        if self.in_ldjson:
+            self.ldjson_parts.append(data)
+        if self.in_body and self.ignore_depth == 0:
+            self.body_text_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        name = tag.lower()
+        if name == "title":
+            self.in_title = False
+        elif name == "h1":
+            self.in_h1 = False
+            txt = " ".join("".join(self.current_h1_parts).split())
+            if txt:
+                self.h1_texts.append(txt)
+        elif name == "a":
+            if self.current_a_href is not None:
+                txt = " ".join("".join(self.current_a_parts).split())
+                if len(self.links) < 80:
+                    from urllib.parse import urljoin
+                    self.links.append((urljoin(self.base_url, self.current_a_href), txt[:80]))
+                if txt and len(txt) < 80:
+                    self.cta_labels.append(txt)
+                self.current_a_href = None
+        elif name == "nav":
+            self.in_nav = max(0, self.in_nav - 1)
+        elif name == "button":
+            self.in_button = False
+            txt = " ".join("".join(self.current_button_parts).split())
+            if txt and len(txt) < 80:
+                self.cta_labels.append(txt)
+        elif name == "script":
+            if self.in_ldjson:
+                self.in_ldjson = False
+                import json
+                try:
+                    payload = json.loads("".join(self.ldjson_parts))
+                    def extract_type(obj: Any) -> None:
+                        if isinstance(obj, dict):
+                            t = obj.get("@type")
+                            if t and isinstance(t, str):
+                                self.schema_types.append(t)
+                            for v in obj.values():
+                                extract_type(v)
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                extract_type(item)
+                    extract_type(payload)
+                except Exception:
+                    pass
+            self.ignore_depth = max(0, self.ignore_depth - 1)
+        elif name in ("style", "svg", "noscript"):
+            self.ignore_depth = max(0, self.ignore_depth - 1)
+        elif name == "body":
+            self.in_body = False
+
+
+def _capture_website_http(url: str) -> CapturedPage:
+    import re
+    import httpx
+
+    assert_public_http_url(url)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    start_time = time.monotonic()
+    try:
+        with httpx.Client(follow_redirects=True, timeout=20.0, headers=headers) as client:
+            response = client.get(url)
+            final_url = str(response.url)
+            assert_public_http_url(final_url)
+            load_time_ms = int((time.monotonic() - start_time) * 1000)
+            html = response.text
+    except Exception as exc:
+        logger.warning("audit_http_fallback_failed url=%s error=%s", url, exc)
+        raise AuditRunError("The website could not be reached. Check the website address.") from exc
+
+    parser = _PageHtmlParser(final_url)
+    try:
+        parser.feed(html)
+    except Exception as parse_err:
+        logger.warning("audit_html_parse_error: %s", parse_err)
+
+    title = " ".join("".join(parser.title_parts).split())
+    body_text = " ".join("".join(parser.body_text_parts).split())[:8000]
+    h1 = parser.h1_texts[0] if parser.h1_texts else ""
+    phone = parser.has_tel or bool(re.search(r"(?:\+?\d[\d\s().-]{7,}\d)", body_text))
+
+    return CapturedPage(
+        final_url=final_url,
+        title=title,
+        meta_description=parser.meta_description,
+        h1=h1,
+        h1_count=len(parser.h1_texts),
+        text=body_text,
+        link_count=parser.link_count,
+        nav_link_count=parser.nav_link_count,
+        form_count=parser.form_count,
+        input_count=parser.input_count,
+        cta_labels=parser.cta_labels[:40],
+        image_urls=parser.image_urls,
+        phone_visible=phone,
+        background_color="#ffffff",
+        text_color="#111827",
+        font_family="system-ui, sans-serif",
+        heading_font="system-ui, sans-serif",
+        theme_color=parser.theme_color,
+        horizontal_overflow=False,
+        outdated_markup=parser.outdated_markup,
+        load_time_ms=load_time_ms,
+        images_total=parser.images_total,
+        images_missing_alt=parser.images_missing_alt,
+        has_viewport_meta=parser.has_viewport,
+        schema_types=parser.schema_types,
+        canonical_url=parser.canonical,
+        robots_meta=parser.robots,
+        links=parser.links,
+        desktop_png=b"",
+        mobile_png=b"",
+    )
+
+
 def _capture_website_isolated(url: str) -> CapturedPage:
     with _browser_lock:
-        return asyncio.run(_capture_website(url))
+        try:
+            return asyncio.run(_capture_website(url))
+        except Exception as exc:
+            logger.warning("audit_browser_failed_fallback url=%s error=%s", url, exc)
+            return _capture_website_http(url)
 
 
 async def _capture_website(url: str) -> CapturedPage:
