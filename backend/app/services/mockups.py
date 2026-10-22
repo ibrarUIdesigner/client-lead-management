@@ -261,15 +261,29 @@ class MockupService:
             except Exception as b_err:
                 logger.info("Banani MCP check: %s", b_err)
 
-        # Fallback to high-fidelity AI engine conditioned on design DNA
-        llm_provider = "gemini" if provider_ready(self.settings, "gemini") else "groq"
-        html, model_name = generate_homepage_html(
-            brief=brief,
-            settings=self.settings,
-            provider=llm_provider,  # type: ignore[arg-type]
-            asset_data_uris=asset_data_uris,
-            client=client,
-        )
+        # High-fidelity AI engine conditioned on design DNA
+        llm_provider: MockupProvider = "gemini" if provider_ready(self.settings, "gemini") else "groq"
+        try:
+            html, model_name = generate_homepage_html(
+                brief=brief,
+                settings=self.settings,
+                provider=llm_provider,
+                asset_data_uris=asset_data_uris,
+                client=client,
+            )
+        except AppError as exc:
+            # If primary provider is rate-limited or fails, fall back to Groq
+            if llm_provider == "gemini" and provider_ready(self.settings, "groq"):
+                logger.warning("Gemini failed (%s: %s). Falling back to Groq...", exc.code, exc.message)
+                html, model_name = generate_homepage_html(
+                    brief=brief,
+                    settings=self.settings,
+                    provider="groq",
+                    asset_data_uris=asset_data_uris,
+                    client=client,
+                )
+            else:
+                raise
         model_display = f"{provider} ({model_name})"
         notes = f"Generated using {tool_label} design specifications via {model_name}."
         return html, model_display, notes
@@ -456,13 +470,35 @@ class MockupService:
                     client=client,
                 )
             else:
-                html, model_name = generate_homepage_html(
-                    brief=mockup.prompt or "",
-                    settings=self.settings,
-                    provider=provider,  # type: ignore[arg-type]
-                    asset_data_uris=asset_uris,
-                    client=client,
-                )
+                try:
+                    html, model_name = generate_homepage_html(
+                        brief=mockup.prompt or "",
+                        settings=self.settings,
+                        provider=provider,  # type: ignore[arg-type]
+                        asset_data_uris=asset_uris,
+                        client=client,
+                    )
+                except AppError as exc:
+                    if (
+                        exc.code in {"AI_RATE_LIMITED", "AI_MOCKUP_FAILED"}
+                        and provider == "gemini"
+                        and provider_ready(self.settings, "groq")
+                    ):
+                        logger.warning(
+                            "Gemini generation failed (%s: %s); falling back to Groq...",
+                            exc.code,
+                            exc.message,
+                        )
+                        html, model_name = generate_homepage_html(
+                            brief=mockup.prompt or "",
+                            settings=self.settings,
+                            provider="groq",
+                            asset_data_uris=asset_uris,
+                            client=client,
+                        )
+                        tool_notes = f"Generated via Groq ({model_name}) due to Gemini capacity limits."
+                    else:
+                        raise
 
             mockup.html_content = html
             mockup.model_name = model_name

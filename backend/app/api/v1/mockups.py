@@ -354,23 +354,40 @@ def _guide_mode(value: object) -> Literal["keep", "selected", "none"]:
     return text  # type: ignore[return-value]
 
 
-def _provider(value: object) -> Literal["gemini", "groq"]:
-    text = (_optional_str(value) or "").lower()
-    if text not in {"gemini", "groq"}:
+_ALLOWED_PROVIDERS = {"stitch", "banani", "magicpath", "gemini", "groq"}
+_ALLOWED_GOALS = {
+    "calls",
+    "whatsapp",
+    "bookings",
+    "quotes",
+    "reserve_table",
+    "book_consultation",
+    "schedule_viewing",
+    "request_demo",
+    "buy_product",
+    "get_started",
+    "visit_location",
+    "submit_inquiry",
+}
+
+
+def _provider(value: object) -> str:
+    text = (_optional_str(value) or "stitch").lower()
+    if text not in _ALLOWED_PROVIDERS:
         raise AppError(
             code="VALIDATION_ERROR",
-            message="Choose Gemini or Groq.",
+            message="Choose Stitch, Banani, MagicPath, Gemini, or Groq.",
             status_code=422,
         )
-    return text  # type: ignore[return-value]
+    return text
 
 
-def _goal(value: object) -> Literal["calls", "whatsapp", "bookings", "quotes"]:
+def _goal(value: object) -> str:
     text = (_optional_str(value) or "calls").lower()
-    if text not in {"calls", "whatsapp", "bookings", "quotes"}:
+    if text not in _ALLOWED_GOALS:
         raise AppError(
             code="VALIDATION_ERROR",
-            message="Choose calls, WhatsApp, bookings, or quotes.",
+            message="Choose a valid conversion goal.",
             status_code=422,
         )
-    return text  # type: ignore[return-value]
+    return text

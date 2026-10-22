@@ -109,7 +109,7 @@ def generate_homepage_html(
     prompt = _instructions(brief)
     owns_client = client is None
     # Keep headroom under Vercel maxDuration (AI + response overhead).
-    timeout = 60.0 if os.environ.get("VERCEL") == "1" else 90.0
+    timeout = 30.0 if os.environ.get("VERCEL") == "1" else 90.0
     http = client or httpx.Client(timeout=timeout)
     try:
         try:
