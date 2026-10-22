@@ -460,3 +460,96 @@ def test_delete_mockup_removes_record_and_screenshots(tmp_path: Path) -> None:
     session.commit.assert_called_once()
     assert not desktop_file.exists()
     assert not mobile_file.exists()
+
+
+def test_stock_image_allowed_domains() -> None:
+    from app.services.mockup_images import is_allowed_stock_image_url
+
+    assert is_allowed_stock_image_url("https://images.unsplash.com/photo-12345?w=1080") is True
+    assert is_allowed_stock_image_url("https://plus.unsplash.com/premium_photo-12345") is True
+    assert is_allowed_stock_image_url("https://pixabay.com/get/g12345_640.jpg") is True
+    assert is_allowed_stock_image_url("https://cdn.pixabay.com/photo/2020/01/01/image.jpg") is True
+    assert is_allowed_stock_image_url("https://malicious-tracker.com/pixel.png") is False
+    assert is_allowed_stock_image_url("http://insecure-cdn.com/test.jpg") is False
+
+
+def test_sanitize_html_preserves_stock_images_and_strips_untrusted() -> None:
+    html = """<!DOCTYPE html><html><head><style>
+    body { background: #fff; padding: 20px; color: #333; max-width: 1200px; display: block; }
+    .hero { background-image: url('https://images.unsplash.com/photo-hero'); }
+    .bad-bg { background-image: url('https://attacker.com/tracking.png'); }
+    </style></head><body>
+    <img src="asset:0" alt="Hero photo" />
+    <img src="https://images.unsplash.com/photo-123" alt="Unsplash" />
+    <img src="https://pixabay.com/get/sample.jpg" alt="Pixabay" />
+    <img src="https://attacker.com/leak.jpg" alt="Blocked" />
+    </body></html>"""
+
+    assets = {
+        "0": "https://images.unsplash.com/photo-asset-0",
+        "asset:0": "https://images.unsplash.com/photo-asset-0",
+    }
+    cleaned = sanitize_html(html, asset_data_uris=assets)
+    assert "https://images.unsplash.com/photo-asset-0" in cleaned
+    assert "https://images.unsplash.com/photo-123" in cleaned
+    assert "https://pixabay.com/get/sample.jpg" in cleaned
+    assert "https://images.unsplash.com/photo-hero" in cleaned
+    assert "https://attacker.com" not in cleaned
+
+
+def test_derive_search_queries() -> None:
+    from app.services.mockup_images import derive_search_queries
+
+    lead = Lead(
+        business_name="Apex Dental Care",
+        industry="Dentist",
+        description="Complete smile makeover and dental implants",
+    )
+    p, s = derive_search_queries(lead)
+    assert "dental" in p or "dentist" in p
+
+
+def test_fetch_relevant_mockup_images_unsplash_and_pixabay_fallback() -> None:
+    from app.services.mockup_images import fetch_relevant_mockup_images
+
+    lead = Lead(business_name="Bright Dental", industry="Dental Clinic")
+
+    unsplash_mock = Mock(spec=httpx.Client)
+    unsplash_res = Mock(
+        status_code=200,
+        json=lambda: {
+            "results": [
+                {"urls": {"regular": f"https://images.unsplash.com/photo-{i}"}, "alt_description": f"Photo {i}"}
+                for i in range(5)
+            ]
+        },
+    )
+    unsplash_mock.get.return_value = unsplash_res
+
+    settings = _settings(unsplash_access_key="fake-unsplash", pixabay_api_key="fake-pixabay")
+    assets = fetch_relevant_mockup_images(lead, settings=settings, client=unsplash_mock)
+    assert len(assets) == 4
+    assert assets[0]["role"] == "hero"
+    assert assets[0]["source"] == "unsplash"
+    assert "https://images.unsplash.com" in assets[0]["url"]
+
+    fallback_client = Mock(spec=httpx.Client)
+    def mock_get(url, **kwargs):
+        if "unsplash.com" in url:
+            return Mock(status_code=403, text="Rate limit exceeded")
+        return Mock(
+            status_code=200,
+            json=lambda: {
+                "hits": [
+                    {"largeImageURL": f"https://pixabay.com/get/pix-{i}.jpg", "tags": f"tag {i}"}
+                    for i in range(6)
+                ]
+            },
+        )
+    fallback_client.get.side_effect = mock_get
+
+    fb_assets = fetch_relevant_mockup_images(lead, settings=settings, client=fallback_client)
+    assert len(fb_assets) == 4
+    assert fb_assets[0]["role"] == "hero"
+    assert fb_assets[0]["source"] == "pixabay"
+    assert "https://pixabay.com" in fb_assets[0]["url"]

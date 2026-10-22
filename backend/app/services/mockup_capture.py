@@ -7,6 +7,8 @@ import logging
 import threading
 from typing import Any
 
+from app.services.mockup_images import is_allowed_stock_image_url
+
 logger = logging.getLogger(__name__)
 
 _browser_lock = threading.Lock()
@@ -91,7 +93,12 @@ async def _shot(browser: Any, html: str, viewport: dict[str, int]) -> bytes:
             await page.evaluate(_FORCE_FULL_WIDTH)
         except Exception:
             logger.info("mockup_capture_width_hook_skipped")
-        await page.wait_for_timeout(200)
+        try:
+            # Allow images to finish downloading for high fidelity screenshot
+            await page.wait_for_load_state("networkidle", timeout=3000)
+        except Exception:
+            pass
+        await page.wait_for_timeout(300)
         data = await page.screenshot(
             full_page=True,
             type="png",
@@ -112,6 +119,9 @@ async def _block_remote(route: Any) -> None:
         await route.continue_()
         return
     if request.resource_type == "document" and url in {"about:blank", "about:srcdoc"}:
+        await route.continue_()
+        return
+    if request.resource_type == "image" and is_allowed_stock_image_url(url):
         await route.continue_()
         return
     await route.abort()

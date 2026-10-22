@@ -6,11 +6,15 @@ import re
 from html.parser import HTMLParser
 
 from app.core.errors import AppError
+from app.services.mockup_images import is_allowed_stock_image_url
 
 MAX_HTML_CHARS = 400_000
 _SCRIPT = re.compile(r"<script\b[^>]*>[\s\S]*?</script\s*>", re.IGNORECASE)
 _STYLE_IMPORT = re.compile(r"@import\b[^;]*;", re.IGNORECASE)
-_URL_IN_CSS = re.compile(r"url\(\s*(['\"]?)(https?:|//)", re.IGNORECASE)
+_URL_IN_CSS = re.compile(
+    r"""url\(\s*(?P<quote>['"]?)(?P<url>[^'")]+)(?P=quote)\s*\)""",
+    re.IGNORECASE,
+)
 _EVENT_ATTR = re.compile(r"\son[a-z]+\s*=\s*(['\"]).*?\1", re.IGNORECASE | re.DOTALL)
 _EVENT_ATTR_UNQUOTED = re.compile(r"\son[a-z]+\s*=\s*[^\s>]+", re.IGNORECASE)
 _META_REFRESH = re.compile(
@@ -92,18 +96,33 @@ def sanitize_html(raw: str, *, asset_data_uris: dict[str, str] | None = None) ->
     html = _EVENT_ATTR_UNQUOTED.sub("", html)
     html = _FORM_ACTION.sub(' action="#"', html)
     html = _STYLE_IMPORT.sub("/* omitted import */", html)
-    html = _URL_IN_CSS.sub("url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)", html)
 
     assets = asset_data_uris or {}
     indexed: list[str] = []
-    for key in sorted(assets.keys()):
-        if key.isdigit() or key.startswith("asset:"):
-            continue
-        # Prefer numeric keys if present; otherwise keep path/filename map.
     for index in range(32):
         value = assets.get(str(index)) or assets.get(f"asset:{index}")
         if isinstance(value, str):
             indexed.append(value)
+
+    def replace_css_url(match: re.Match[str]) -> str:
+        quote = match.group("quote") or ""
+        url = match.group("url").strip()
+        lowered = url.lower()
+        if lowered.startswith("data:"):
+            return match.group(0)
+        asset_match = re.match(r"^asset:(?P<idx>\d+)$", lowered)
+        if asset_match:
+            idx = int(asset_match.group("idx"))
+            if 0 <= idx < len(indexed):
+                return f"url({quote}{indexed[idx]}{quote})"
+        for key, uri in assets.items():
+            if key and key in url:
+                return f"url({quote}{uri}{quote})"
+        if is_allowed_stock_image_url(url):
+            return match.group(0)
+        return "url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"
+
+    html = _URL_IN_CSS.sub(replace_css_url, html)
 
     def replace_asset(match: re.Match[str]) -> str:
         attr = match.group("attr")
@@ -111,8 +130,7 @@ def sanitize_html(raw: str, *, asset_data_uris: dict[str, str] | None = None) ->
         index = int(match.group("index"))
         if 0 <= index < len(indexed):
             return f"{attr}{quote}{indexed[index]}{quote}"
-        # Fall back to any ordered data URI values.
-        values = [uri for uri in assets.values() if isinstance(uri, str) and uri.startswith("data:")]
+        values = [uri for uri in assets.values() if isinstance(uri, str) and (uri.startswith("data:") or is_allowed_stock_image_url(uri))]
         if 0 <= index < len(values):
             return f"{attr}{quote}{values[index]}{quote}"
         return f"{attr}{quote}{quote_safe_placeholder()}{quote}"
@@ -128,6 +146,8 @@ def sanitize_html(raw: str, *, asset_data_uris: dict[str, str] | None = None) ->
             return match.group(0)
         if attr.lower().startswith("href"):
             return f"{attr}{quote}#{quote}"
+        if is_allowed_stock_image_url(url):
+            return match.group(0)
         for key, data_uri in assets.items():
             if key and key in url:
                 return f"{attr}{quote}{data_uri}{quote}"
@@ -192,7 +212,7 @@ def quote_safe_placeholder() -> str:
 def preview_csp() -> str:
     return (
         "default-src 'none'; "
-        "img-src data: blob:; "
+        "img-src data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.unsplash.com https://pixabay.com https://cdn.pixabay.com https://*.pixabay.com; "
         "style-src 'unsafe-inline'; "
         "font-src data:; "
         "base-uri 'none'; "

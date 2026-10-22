@@ -45,6 +45,7 @@ from app.services.outreach_ai import provider_ready
 from app.services.mockup_capture import MockupCaptureError, capture_mockup_html
 from app.services.mockup_eligibility import evaluate_mockup_eligibility, require_mockup_eligibility
 from app.services.mockup_html import wrap_for_srcdoc
+from app.services.mockup_images import fetch_relevant_mockup_images
 from app.services.storage import (
     mockup_asset_key,
     mockup_screenshot_key,
@@ -90,13 +91,27 @@ class MockupService:
         audit, findings = self._latest_findings(lead.id)
         eligibility = require_mockup_eligibility(lead, audit)
         version = self._next_version(lead.id)
+
+        stock_assets: list[dict[str, object]] = []
+        if not assets:
+            try:
+                stock_assets = fetch_relevant_mockup_images(
+                    lead=lead,
+                    audit=audit,
+                    research=getattr(lead, "research", None),
+                    settings=self.settings,
+                )
+            except Exception as exc:
+                logger.warning("mockup_create_stock_images_failed: %s", exc)
+
+        asset_labels = self._asset_labels(stock_assets) if stock_assets else []
         brief = self._brief_for_lead(
             lead=lead,
             findings=findings,
             requirements=data.requirements,
             guidance=snapshot,
             goal=data.goal,  # type: ignore[arg-type]
-            asset_labels=[],
+            asset_labels=asset_labels,
             scenario=eligibility.scenario,
             design_score=eligibility.design_score,
         )
@@ -115,7 +130,7 @@ class MockupService:
             design_guide_snapshot=snapshot,
             source_mockup_id=source.id if source is not None else None,
             screenshot_status="PENDING",
-            asset_refs=[],
+            asset_refs=stock_assets or [],
         )
         self.session.add(mockup)
         self.session.flush()
@@ -377,6 +392,32 @@ class MockupService:
         provider = (mockup.provider or "stitch").lower()
         try:
             resolve_mockup_provider(self.settings, provider)
+            if not mockup.asset_refs:
+                try:
+                    audit, findings = self._latest_findings(lead.id)
+                    stock_assets = fetch_relevant_mockup_images(
+                        lead=lead,
+                        audit=audit,
+                        research=getattr(lead, "research", None),
+                        settings=self.settings,
+                        client=client,
+                    )
+                    if stock_assets:
+                        mockup.asset_refs = stock_assets
+                        mockup.prompt = self._brief_for_lead(
+                            lead=lead,
+                            findings=findings,
+                            requirements=None,
+                            guidance=mockup.design_guide_snapshot,
+                            goal=mockup.goal or "calls",
+                            asset_labels=self._asset_labels(mockup.asset_refs),
+                            scenario="redesign" if audit is not None else "new_site",
+                            design_score=audit.design_score if audit is not None else None,
+                        )
+                        self.session.flush()
+                except Exception as img_err:
+                    logger.warning("mockup_execute_stock_assets_failed: %s", img_err)
+
             asset_uris = self._asset_data_uris(mockup)
             tool_notes: str | None = None
             if provider in {"stitch", "banani", "magicpath"}:
@@ -581,20 +622,28 @@ class MockupService:
             filename = item.get("filename")
             content_type = item.get("content_type") if isinstance(item.get("content_type"), str) else "image/png"
             data_uri = item.get("data_uri") if isinstance(item.get("data_uri"), str) else None
-            if data_uri is None and isinstance(path, str):
+            url = item.get("url") if isinstance(item.get("url"), str) else None
+
+            target_uri = data_uri
+            if target_uri is None and isinstance(path, str):
                 raw = read_storage_file(self.storage_dir, path)
                 if raw:
-                    data_uri = (
+                    target_uri = (
                         f"data:{content_type};base64,{base64.b64encode(raw).decode('ascii')}"
                     )
-            if not isinstance(data_uri, str):
+            if target_uri is None and url:
+                target_uri = url
+
+            if not isinstance(target_uri, str):
                 continue
-            mapping[str(index)] = data_uri
-            mapping[f"asset:{index}"] = data_uri
+            mapping[str(index)] = target_uri
+            mapping[f"asset:{index}"] = target_uri
             if isinstance(path, str):
-                mapping[path] = data_uri
+                mapping[path] = target_uri
             if isinstance(filename, str):
-                mapping[filename] = data_uri
+                mapping[filename] = target_uri
+            if url:
+                mapping[url] = target_uri
         return mapping
 
     @staticmethod
@@ -604,7 +653,11 @@ class MockupService:
             if not isinstance(item, dict):
                 continue
             name = item.get("filename") or item.get("id") or f"asset-{index + 1}"
-            labels.append(f'{name} — use src="asset:{index}" (approved local asset only)')
+            role = item.get("role")
+            alt = item.get("alt")
+            role_hint = f" [{str(role).upper()}]" if role else ""
+            desc = f" ({alt})" if alt else ""
+            labels.append(f'{name}{role_hint}{desc} — use src="asset:{index}"')
         return labels
 
     def _resolve_guide(

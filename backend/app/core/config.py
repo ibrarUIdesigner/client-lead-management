@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     banani_api_key: str = ""
     magicpath_url: str = "https://api.magicpath.ai/mcp"
 
+    # Stock Image Providers for Mockups (Unsplash & Pixabay)
+    unsplash_access_key: str = ""
+    unsplash_secret_key: str = ""
+    pixabay_api_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),
         extra="ignore",

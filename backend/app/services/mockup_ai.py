@@ -213,8 +213,14 @@ def build_generation_brief(
         requirements.strip() if requirements and requirements.strip() else "None given."
     )
     if asset_labels:
-        lines.append("Approved uploaded assets (use only these local asset placeholders):")
+        lines.append("Approved curated image assets (embed these photos prominently across the page):")
         lines.extend(f"- {label}" for label in asset_labels)
+        lines.append(
+            "Image placement instructions:\n"
+            "- Hero banner/section: embed asset:0 (or CSS background-image: url('asset:0')) with strong visual prominence.\n"
+            "- Services/offerings: embed asset:1 and asset:2 in primary service cards or showcase figures.\n"
+            "- About/team section: embed asset:3 for professional credibility, clinic/office photo, or team consultation."
+        )
     else:
         lines.append("No uploaded logo or images. Use CSS shapes or placeholders, not remote images.")
     if guidance and guidance.strip():
@@ -251,7 +257,8 @@ def _instructions(brief: str) -> str:
         "- Navigation should be a horizontal bar on desktop.\n"
         "Content rules:\n"
         "- Self-contained HTML and CSS only. No JavaScript. No <script> tags.\n"
-        "- No external stylesheets, fonts, CDNs, iframes, or remote images.\n"
+        "- No external stylesheets, fonts, CDNs, or iframes.\n"
+        "- For images: when approved image assets are provided in the brief, you MUST place them across the layout using src=\"asset:0\", src=\"asset:1\", etc., or CSS background-image: url('asset:0'). Style them with object-fit: cover, border-radius, and modern proportions. Do not use any unauthorized remote image domains.\n"
         "- Use system font stacks only (for example: system-ui, Segoe UI, sans-serif).\n"
         "- Sections required: navigation, hero, services, business information, contact, footer.\n"
         "- Follow the design guide for colors, typography, spacing, components, and responsive rules.\n"
