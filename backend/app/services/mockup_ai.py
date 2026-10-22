@@ -47,7 +47,7 @@ _GEMINI_FALLBACK_MODELS = (
 _GROQ_FALLBACK_MODELS = (
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "llama-3.3-70b-versatile",
+    "qwen/qwen3.8-27b",
 )
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"

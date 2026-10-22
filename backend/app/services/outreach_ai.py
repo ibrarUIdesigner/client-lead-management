@@ -46,7 +46,7 @@ _GEMINI_FALLBACK_MODELS = (
 _GROQ_FALLBACK_MODELS = (
     "openai/gpt-oss-120b",
     "openai/gpt-oss-20b",
-    "llama-3.3-70b-versatile",
+    "qwen/qwen3.8-27b",
 )
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -695,8 +695,9 @@ def _groq(client: httpx.Client, settings: Settings, prompt: str) -> str:
         if response.status_code < 400:
             return _groq_text(response)
         last = response
-        if response.status_code not in {404, 429}:
+        if response.status_code not in {400, 404, 422, 429, 502, 503, 504}:
             break
+        logger.warning("groq_model_retry model=%s status=%s", model, response.status_code)
     if last is None:
         raise httpx.TimeoutException("All Groq models timed out or failed to connect.")
     _raise_for_status(last, "groq")
@@ -753,8 +754,9 @@ def _groq_offer(client: httpx.Client, settings: Settings, prompt: str) -> str:
         if response.status_code < 400:
             return _groq_text(response)
         last = response
-        if response.status_code not in {404, 429}:
+        if response.status_code not in {400, 404, 422, 429, 502, 503, 504}:
             break
+        logger.warning("groq_model_retry model=%s status=%s", model, response.status_code)
     if last is None:
         raise httpx.TimeoutException("All Groq models timed out or failed to connect.")
     _raise_for_status(last, "groq")
