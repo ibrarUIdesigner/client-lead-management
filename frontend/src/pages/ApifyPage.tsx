@@ -112,6 +112,13 @@ export function ApifyPage() {
                             onRun={() => {
                               setRunTarget(connector);
                             }}
+                            onViewResults={() => {
+                              const match = runs.find((r) => r.connector_id === connector.id);
+                              if (match) {
+                                setSelectedRunId(match.id);
+                                setTab("history");
+                              }
+                            }}
                             onRemoved={() => {
                               if (selectedRun?.connector_id === connector.id) {
                                 setSelectedRunId(null);
@@ -200,11 +207,13 @@ function ConnectorCard({
   connector,
   tokenConfigured,
   onRun,
+  onViewResults,
   onRemoved,
 }: {
   connector: ApifyConnector;
   tokenConfigured: boolean;
   onRun: () => void;
+  onViewResults?: () => void;
   onRemoved: () => void;
 }) {
   const remove = useDeleteApifyConnector();
@@ -267,6 +276,11 @@ function ConnectorCard({
           <Button onClick={onRun} disabled={!tokenConfigured || connector.has_active_run}>
             Run Actor
           </Button>
+          {connector.last_run_at && onViewResults ? (
+            <Button variant="secondary" onClick={onViewResults}>
+              View Results
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             onClick={() => {

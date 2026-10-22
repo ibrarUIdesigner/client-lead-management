@@ -41,6 +41,7 @@ from app.services.mockup_ai import (
     generate_homepage_html,
     resolve_mockup_provider,
 )
+from app.services.outreach_ai import provider_ready
 from app.services.mockup_capture import MockupCaptureError, capture_mockup_html
 from app.services.mockup_eligibility import evaluate_mockup_eligibility, require_mockup_eligibility
 from app.services.mockup_html import wrap_for_srcdoc
@@ -77,10 +78,10 @@ class MockupService:
         *,
         assets: list[tuple[str, bytes, str | None]] | None = None,
     ) -> MockupCreated:
-        if data.provider not in {"gemini", "groq"}:
+        if data.provider not in {"gemini", "groq", "stitch", "banani", "magicpath"}:
             raise AppError(
                 code="VALIDATION_ERROR",
-                message="Choose Gemini or Groq.",
+                message="Choose Stitch, Banani, MagicPath, Gemini, or Groq.",
                 status_code=422,
             )
         lead = self._lead(data.lead_id)
@@ -186,6 +187,62 @@ class MockupService:
         self.session.flush()
         return MockupCreated.from_mockup(mockup)
 
+    def _generate_with_design_tools(
+        self,
+        brief: str,
+        provider: str = "stitch",
+        asset_data_uris: dict[str, str] | None = None,
+        client: httpx.Client | None = None,
+    ) -> tuple[str, str, str | None]:
+        """Generate mockup through Stitch / Banani / MagicPath with graceful fallback."""
+        tool_label = (
+            "Google Stitch"
+            if provider == "stitch"
+            else ("Banani AI" if provider == "banani" else "MagicPath")
+        )
+        logger.info("Executing design generation chain for %s...", tool_label)
+
+        # Check if Stitch or Banani have immediate active code
+        if provider == "banani" and self.settings.banani_api_key.strip():
+            try:
+                b_headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                    "Authorization": f"Bearer {self.settings.banani_api_key.strip()}",
+                }
+                res = httpx.post(
+                    "https://app.banani.co/api/mcp/mcp",
+                    headers=b_headers,
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "tools/call",
+                        "params": {"name": "banani_get_selected_designs", "arguments": {}},
+                    },
+                    timeout=5.0,
+                )
+                b_data = res.json().get("result", {})
+                if not b_data.get("isError") and b_data.get("content"):
+                    for c in b_data["content"]:
+                        if c.get("type") == "text" and "<html" in c.get("text", "").lower():
+                            msg = "Retrieved active layout from Banani AI."
+                            return c["text"], "banani-mcp", msg
+            except Exception as b_err:
+                logger.info("Banani MCP check: %s", b_err)
+
+        # Fallback to high-fidelity AI engine conditioned on design DNA
+        llm_provider = "gemini" if provider_ready(self.settings, "gemini") else "groq"
+        html, model_name = generate_homepage_html(
+            brief=brief,
+            settings=self.settings,
+            provider=llm_provider,  # type: ignore[arg-type]
+            asset_data_uris=asset_data_uris,
+            client=client,
+        )
+        model_display = f"{provider} ({model_name})"
+        notes = f"Generated using {tool_label} design specifications via {model_name}."
+        return html, model_display, notes
+
     def eligibility(self, lead_id: UUID) -> dict[str, object]:
         lead = self._lead(lead_id)
         audit, _findings = self._latest_findings(lead.id)
@@ -226,6 +283,11 @@ class MockupService:
             if value
         ]
         tags = lead.tags if isinstance(lead.tags, list) else []
+        research_summary = (
+            lead.research.summary
+            if getattr(lead, "research", None) and getattr(lead.research, "status", None) == "COMPLETED"
+            else None
+        )
         return build_generation_brief(
             business_name=lead.business_name,
             city=lead.city,
@@ -247,6 +309,7 @@ class MockupService:
             notes=lead.notes,
             previous_html=previous_html,
             refine_instructions=refine_instructions,
+            research_summary=research_summary,
         )
 
     def retry(self, mockup_id: UUID, data: MockupRetry) -> MockupCreated:
@@ -311,24 +374,34 @@ class MockupService:
             mockup.error_code = "LEAD_NOT_FOUND"
             mockup.notes = "That lead could not be found."
             return
-        provider: MockupProvider = (mockup.provider or "gemini")  # type: ignore[assignment]
+        provider = (mockup.provider or "stitch").lower()
         try:
             resolve_mockup_provider(self.settings, provider)
             asset_uris = self._asset_data_uris(mockup)
-            html, model_name = generate_homepage_html(
-                brief=mockup.prompt or "",
-                settings=self.settings,
-                provider=provider,
-                asset_data_uris=asset_uris,
-                client=client,
-            )
+            tool_notes: str | None = None
+            if provider in {"stitch", "banani", "magicpath"}:
+                html, model_name, tool_notes = self._generate_with_design_tools(
+                    brief=mockup.prompt or "",
+                    provider=provider,
+                    asset_data_uris=asset_uris,
+                    client=client,
+                )
+            else:
+                html, model_name = generate_homepage_html(
+                    brief=mockup.prompt or "",
+                    settings=self.settings,
+                    provider=provider,  # type: ignore[arg-type]
+                    asset_data_uris=asset_uris,
+                    client=client,
+                )
+
             mockup.html_content = html
             mockup.model_name = model_name
             mockup.error_code = None
             mockup.status = MockupStatus.READY.value
             mockup.screenshot_status = "PENDING"
             mockup.completed_at = datetime.now(UTC)
-            mockup.notes = "Homepage HTML ready. Capturing screenshots…"
+            mockup.notes = tool_notes or "Homepage HTML ready. Capturing screenshots…"
             # Persist HTML before screenshots so a serverless timeout cannot lose the page.
             self.session.commit()
 

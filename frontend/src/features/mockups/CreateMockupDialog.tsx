@@ -47,7 +47,7 @@ export function CreateMockupDialog({
   const [mode, setMode] = useState<GuideMode>(savedGuideName ? "keep" : "none");
   const [guideId, setGuideId] = useState<string | null>(null);
   const [requirements, setRequirements] = useState("");
-  const [provider, setProvider] = useState<MockupProvider>(defaultProvider ?? "gemini");
+  const [provider, setProvider] = useState<MockupProvider>(defaultProvider ?? "stitch");
   const [goal, setGoal] = useState<MockupGoal>("calls");
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +58,18 @@ export function CreateMockupDialog({
   const providerOptions = useMemo(() => {
     const snapshots = providers.data?.providers ?? [];
     return [
+      {
+        value: "stitch",
+        label: "Google Stitch · AI Design Engine (Primary)",
+      },
+      {
+        value: "banani",
+        label: "Banani AI · Interactive UI Copilot",
+      },
+      {
+        value: "magicpath",
+        label: "MagicPath · AI Visual Canvas",
+      },
       {
         value: "gemini",
         label: providerLabel(snapshots.find((item) => item.id === "gemini"), "Gemini"),
@@ -80,11 +92,10 @@ export function CreateMockupDialog({
     setFiles([]);
     setError(null);
     setSaving(false);
-    const ready = providers.data?.providers.find((item) => item.configured);
     if (defaultProvider) {
       setProvider(defaultProvider);
-    } else if (ready?.id === "groq" || ready?.id === "gemini") {
-      setProvider(ready.id);
+    } else {
+      setProvider("stitch");
     }
   }, [open, savedGuideName, defaultProvider, providers.data]);
 

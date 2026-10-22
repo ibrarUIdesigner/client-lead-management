@@ -37,7 +37,7 @@ export function MockupDetailDialog({
   const queryClient = useQueryClient();
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const [instructions, setInstructions] = useState("");
-  const [provider, setProvider] = useState<MockupProvider>("gemini");
+  const [provider, setProvider] = useState<MockupProvider>("stitch");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const processKicked = useRef(false);
@@ -81,8 +81,8 @@ export function MockupDetailDialog({
   }, [open, mockupId, detail.data, queryClient]);
 
   useEffect(() => {
-    if (detail.data?.provider === "groq" || detail.data?.provider === "gemini") {
-      setProvider(detail.data.provider);
+    if (detail.data?.provider) {
+      setProvider(detail.data.provider as MockupProvider);
     }
   }, [detail.data?.provider]);
 
@@ -314,6 +314,9 @@ export function MockupDetailDialog({
                       label="Provider for refinement"
                       value={provider}
                       options={[
+                        { value: "stitch", label: "Google Stitch (Primary)" },
+                        { value: "banani", label: "Banani AI" },
+                        { value: "magicpath", label: "MagicPath" },
                         { value: "gemini", label: "Gemini" },
                         { value: "groq", label: "Groq" },
                       ]}

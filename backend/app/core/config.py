@@ -30,7 +30,10 @@ class Settings(BaseSettings):
     ai_email_provider: str = ""
     gemini_model: str = "gemini-3-flash-preview"
     groq_model: str = "openai/gpt-oss-120b"
-    outreach_sender_name: str = ""
+    outreach_sender_name: str = "Ibrar"
+    outreach_sender_email: str = "ibraruidesigner@gmail.com"
+    outreach_sender_whatsapp: str = "+923028131491"
+    outreach_sender_portfolio: str = "https://ibrardevportfolio.netlify.app/"
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
     google_oauth_redirect_uri: str = "http://localhost:8000/api/v1/gmail/oauth/callback"
@@ -43,6 +46,15 @@ class Settings(BaseSettings):
     apify_api_base: str = "https://api.apify.com/v2"
     design_md_max_bytes: int = Field(default=262_144, ge=1_024, le=5_000_000)
     postgres_url: str = ""
+
+    # Lead Research Providers (Tavily & Exa)
+    tavily_api_key: str = ""
+    exa_api_key: str = ""
+
+    # AI Website Mockup Generation Tools
+    stitch_api_key: str = ""
+    banani_api_key: str = ""
+    magicpath_url: str = "https://api.magicpath.ai/mcp"
 
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),
@@ -70,6 +82,10 @@ class Settings(BaseSettings):
     @property
     def gmail_oauth_configured(self) -> bool:
         return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
+
+    @property
+    def lead_research_configured(self) -> bool:
+        return bool(self.tavily_api_key.strip() or self.exa_api_key.strip())
 
 
 def _is_local_database(url: str) -> bool:

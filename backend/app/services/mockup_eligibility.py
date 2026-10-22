@@ -11,7 +11,7 @@ from app.models.lead import Lead
 from app.models.website_audit import WebsiteAudit
 
 DESIGN_SCORE_LIMIT = 50
-MockupReason = Literal["no_website", "weak_design", "blocked"]
+MockupReason = Literal["no_website", "weak_design", "blocked", "research_insights"]
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ class MockupEligibility:
 
     @property
     def scenario(self) -> Literal["new_site", "redesign"]:
-        return "new_site" if self.reason == "no_website" else "redesign"
+        return "redesign" if self.has_website else "new_site"
 
 
 def lead_has_public_website(lead: Lead) -> bool:
@@ -41,7 +41,23 @@ def evaluate_mockup_eligibility(
     lead: Lead,
     audit: WebsiteAudit | None,
 ) -> MockupEligibility:
-    """Mockups are for missing websites, or existing sites with design score under 50."""
+    """Mockups are for missing websites, researched leads, or existing sites with design score under 50."""
+    has_completed_research = bool(
+        getattr(lead, "research", None)
+        and getattr(lead.research, "status", None) == "COMPLETED"
+    )
+    if has_completed_research:
+        return MockupEligibility(
+            allowed=True,
+            reason="research_insights",
+            message=(
+                "Researched business details and proactive solutions ready. "
+                "Generate a tailored landing page mockup."
+            ),
+            design_score=audit.design_score if audit is not None else None,
+            has_website=lead_has_public_website(lead),
+        )
+
     if not lead_has_public_website(lead):
         return MockupEligibility(
             allowed=True,

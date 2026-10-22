@@ -13,6 +13,7 @@ from app.api.v1 import (
     leads,
     mockups,
     outreach,
+    research,
     workspace,
 )
 
@@ -21,6 +22,7 @@ api_router.include_router(health.router)
 api_router.include_router(integrations.router)
 api_router.include_router(jobs.router)
 api_router.include_router(leads.router)
+api_router.include_router(research.router)
 api_router.include_router(audits.router)
 api_router.include_router(outreach.router)
 api_router.include_router(followups.router)

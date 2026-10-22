@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CalendarClock, Flame, Globe } from "lucide-react";
 
 import { Select } from "../../components/ui/Select";
 import { cn, focusRing } from "../../lib/cn";
+import { formatWhen } from "../../lib/format";
 import type { Lead } from "../../types/lead";
 import { leadStatusOptions, type LeadStatus } from "./statuses";
 
@@ -21,7 +23,7 @@ export function PipelineBoard({ leads, pendingId, onMove }: PipelineBoardProps) 
     <>
       <div className="md:hidden">
         <Select
-          label="Stage"
+          label="Pipeline Stage"
           options={leadStatusOptions}
           value={stage}
           onChange={(event) => {
@@ -76,8 +78,8 @@ function StageColumn({
     <section
       aria-label={label}
       className={cn(
-        "flex flex-col rounded-card border border-gray-200 bg-gray-50",
-        stacked ? "w-full" : "w-[260px] shrink-0",
+        "flex flex-col rounded-card border border-gray-200 bg-gray-50/70",
+        stacked ? "w-full" : "w-[280px] shrink-0",
       )}
       onDragOver={(event) => {
         event.preventDefault();
@@ -90,14 +92,16 @@ function StageColumn({
         }
       }}
     >
-      <header className="flex items-center justify-between px-3 py-3">
-        <h2 className="text-small font-semibold text-ink">{label}</h2>
-        <span className="text-caption text-gray-500">{leads.length}</span>
+      <header className="flex items-center justify-between border-b border-gray-200/60 px-3.5 py-3 bg-white/50 rounded-t-card">
+        <h2 className="text-small font-bold text-ink">{label}</h2>
+        <span className="rounded-full bg-gray-200/70 px-2 py-0.5 text-caption font-bold text-gray-700">
+          {leads.length}
+        </span>
       </header>
-      <div className="flex flex-1 flex-col gap-2 px-3 pb-3">
+      <div className="flex flex-1 flex-col gap-2.5 p-2.5">
         {leads.length === 0 ? (
-          <p className="rounded-control border border-dashed border-gray-300 px-3 py-6 text-small text-gray-500">
-            No leads in this stage.
+          <p className="rounded-control border border-dashed border-gray-300 px-3 py-6 text-center text-caption text-gray-400">
+            No prospects in this stage.
           </p>
         ) : (
           leads.map((lead) => (
@@ -108,16 +112,48 @@ function StageColumn({
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", lead.id);
               }}
-              className="rounded-control border border-gray-200 bg-white p-3"
+              className="rounded-control border border-gray-200 bg-white p-3 shadow-2xs hover:shadow-sm transition-all cursor-grab active:cursor-grabbing"
             >
-              <Link
-                to={`/leads/${lead.id}`}
-                className={cn("font-semibold text-ink hover:text-primary-700", focusRing)}
-              >
-                {lead.business_name}
-              </Link>
-              {lead.city ? <p className="mt-1 text-small text-gray-600">{lead.city}</p> : null}
-              <div className="mt-3">
+              <div className="flex items-start justify-between gap-2">
+                <Link
+                  to={`/leads/${lead.id}`}
+                  className={cn("font-bold text-ink hover:text-primary-700 truncate", focusRing)}
+                >
+                  {lead.business_name}
+                </Link>
+                {lead.lead_score ? (
+                  <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-orange-50 px-1.5 py-0.2 text-[11px] font-bold text-orange-700">
+                    <Flame className="size-3 text-orange-600" />
+                    {lead.lead_score}
+                  </span>
+                ) : null}
+              </div>
+
+              <p className="mt-0.5 text-caption text-gray-500">
+                {[lead.industry, lead.city].filter(Boolean).join(" · ") || "Local Business"}
+              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                {lead.website_url ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">
+                    <Globe className="size-3" />
+                    {lead.website_quality_score ? `Quality ${lead.website_quality_score}` : "Website"}
+                  </span>
+                ) : (
+                  <span className="rounded bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800">
+                    No Website
+                  </span>
+                )}
+
+                {lead.next_followup_at ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">
+                    <CalendarClock className="size-3" />
+                    {formatWhen(lead.next_followup_at)}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-2.5 pt-2 border-t border-gray-100">
                 <Select
                   label={`Move ${lead.business_name}`}
                   options={leadStatusOptions}

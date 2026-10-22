@@ -21,7 +21,7 @@ from app.services.outreach_ai import provider_ready
 
 logger = logging.getLogger(__name__)
 
-MockupProvider = Literal["gemini", "groq"]
+MockupProvider = Literal["gemini", "groq", "stitch", "banani", "magicpath"]
 MockupGoal = Literal["calls", "whatsapp", "bookings", "quotes"]
 
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,40}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$")
@@ -49,13 +49,13 @@ _GOAL_COPY = {
 
 def resolve_mockup_provider(settings: Settings, requested: str) -> MockupProvider:
     name = requested.strip().lower()
-    if name not in {"gemini", "groq"}:
+    if name not in {"gemini", "groq", "stitch", "banani", "magicpath"}:
         raise AppError(
             code="VALIDATION_ERROR",
-            message="Choose Gemini or Groq.",
+            message="Choose Stitch, Banani, MagicPath, Gemini, or Groq.",
             status_code=422,
         )
-    if not provider_ready(settings, name):
+    if name in {"gemini", "groq"} and not provider_ready(settings, name):
         label = "Gemini" if name == "gemini" else "Groq"
         raise AppError(
             code="AI_NOT_CONFIGURED",
@@ -142,6 +142,7 @@ def build_generation_brief(
     notes: str | None = None,
     previous_html: str | None = None,
     refine_instructions: str | None = None,
+    research_summary: str | None = None,
 ) -> str:
     from app.services.design_markdown import fence_guidance
 
@@ -182,6 +183,10 @@ def build_generation_brief(
         if links:
             lines.append("Verified social profiles (optional footer links only):")
             lines.extend(f"- {link}" for link in links[:6])
+    if research_summary and research_summary.strip():
+        lines.append(
+            f"Researched Intelligence & Customer Solutions: {research_summary.strip()[:1500]}"
+        )
     if notes and notes.strip():
         lines.append(f"Internal notes for context only (do not invent facts from these): {notes.strip()[:800]}")
     if email and email.strip():

@@ -14,6 +14,7 @@ from app.models.discovery import DiscoveryRun, DiscoverySearch
 from app.models.followup import Followup
 from app.models.gmail import GmailAccount, GmailOAuthState, LeadEmail
 from app.models.lead import Lead
+from app.models.lead_research import LeadResearch
 from app.models.mockup import Mockup
 from app.models.outreach import OutreachMessage, OutreachTemplate
 from app.models.website_audit import WebsiteAudit
@@ -36,6 +37,7 @@ __all__ = [
     "GmailOAuthState",
     "Lead",
     "LeadEmail",
+    "LeadResearch",
     "Mockup",
     "OutreachMessage",
     "OutreachTemplate",

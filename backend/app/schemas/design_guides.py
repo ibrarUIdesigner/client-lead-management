@@ -78,7 +78,7 @@ class MockupCreate(BaseModel):
     source_mockup_id: UUID | None = None
     design_guide_id: UUID | None = None
     guide_mode: Literal["keep", "selected", "none"] = "none"
-    provider: Literal["gemini", "groq"] = "gemini"
+    provider: Literal["gemini", "groq", "stitch", "banani", "magicpath"] = "stitch"
     goal: Literal["calls", "whatsapp", "bookings", "quotes"] = "calls"
 
     @field_validator("requirements")
@@ -93,7 +93,7 @@ class MockupRefine(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     instructions: str = Field(min_length=1, max_length=4000)
-    provider: Literal["gemini", "groq"] | None = None
+    provider: Literal["gemini", "groq", "stitch", "banani", "magicpath"] | None = None
 
     @field_validator("instructions")
     @classmethod
@@ -104,7 +104,7 @@ class MockupRefine(BaseModel):
 class MockupRetry(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    provider: Literal["gemini", "groq"]
+    provider: Literal["gemini", "groq", "stitch", "banani", "magicpath"]
 
 
 class MockupEligibilityRead(BaseModel):

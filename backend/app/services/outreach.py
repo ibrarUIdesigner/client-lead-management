@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.contact import Contact
-from app.models.enums import AuditStatus, LeadStatus, MockupStatus, OutreachStatus
+from app.models.enums import AuditStatus, LeadStatus, MockupStatus, OutreachStatus, ResearchStatus
 from app.models.lead import Lead
+from app.models.lead_research import LeadResearch
 from app.models.mockup import Mockup
 from app.models.outreach import OutreachMessage, OutreachTemplate
 from app.models.website_audit import WebsiteAudit
@@ -270,7 +271,20 @@ class OutreachService:
                 if isinstance(score, int) and score < 80
             }
         has_website = bool(lead.website_url) and lead.website_status != "missing"
-        sender = data.sender_name or settings.outreach_sender_name
+        sender = data.sender_name or settings.outreach_sender_name or "Ibrar"
+        sender_email = data.sender_email or getattr(settings, "outreach_sender_email", None) or "ibraruidesigner@gmail.com"
+        sender_whatsapp = data.sender_whatsapp or getattr(settings, "outreach_sender_whatsapp", None) or "+923028131491"
+        sender_portfolio = (
+            data.sender_portfolio
+            or getattr(settings, "outreach_sender_portfolio", None)
+            or "https://ibrardevportfolio.netlify.app/"
+        )
+        research = self._completed_research(lead.id)
+        research_summary = research.summary if research else None
+        proactive_solutions = []
+        if research and isinstance(research.research_data, dict):
+            proactive_solutions = research.research_data.get("proactive_solutions") or []
+
         brief = build_brief(
             business=lead.business_name,
             industry=lead.industry,
@@ -286,8 +300,23 @@ class OutreachService:
             offer=data.offer,
             tone=data.tone,
             sender_name=sender,
+            sender_email=sender_email,
+            sender_whatsapp=sender_whatsapp,
+            sender_portfolio=sender_portfolio,
+            research_summary=research_summary,
+            proactive_solutions=proactive_solutions,
         )
         return draft_email(brief, settings)
+
+    def _completed_research(self, lead_id: UUID) -> LeadResearch | None:
+        statement = (
+            select(LeadResearch)
+            .where(
+                LeadResearch.lead_id == lead_id,
+                LeadResearch.status == ResearchStatus.COMPLETED.value,
+            )
+        )
+        return self.session.scalar(statement)
 
     def _completed_audit(self, lead_id: UUID) -> WebsiteAudit | None:
         statement = (

@@ -47,6 +47,13 @@ class AuditStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class ResearchStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
 class MockupStatus(StrEnum):
     PENDING = "PENDING"
     GENERATING = "GENERATING"

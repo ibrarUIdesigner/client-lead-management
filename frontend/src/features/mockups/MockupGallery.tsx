@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
@@ -9,6 +9,7 @@ import { StatusBadge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { useMockups } from "../../hooks/useWorkspace";
 import { cn, focusRing } from "../../lib/cn";
+import { formatWhen } from "../../lib/format";
 import { getMockupEligibility, mockupScreenshotUrl } from "../../services/mockups";
 import type { MockupProvider } from "../../types/mockup";
 import type { MockupItem } from "../../types/workspace";
@@ -173,6 +174,7 @@ function MockupCard({
   onOpen: () => void;
   onRegenerate?: () => void;
 }) {
+  const navigate = useNavigate();
   const preparing = item.status === "PENDING" || item.status === "GENERATING";
   const failed = item.status === "FAILED";
   const color = swatch(item.primary_color);
@@ -224,18 +226,26 @@ function MockupCard({
           <StatusBadge status={item.status} />
         </div>
         {item.design_guide_name ? (
-          <p className="text-small text-gray-600">Design guide: {item.design_guide_name}</p>
+          <p className="text-small text-gray-600">Direction: {item.design_guide_name}</p>
         ) : null}
+        <p className="text-caption text-gray-400">Generated {formatWhen(item.created_at)}</p>
         {item.notes ? <p className="line-clamp-2 text-small text-gray-600">{item.notes}</p> : null}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onOpen}>
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
+          <Button variant="secondary" className="h-8 px-2.5 text-caption" onClick={onOpen}>
             Open
           </Button>
           {onRegenerate ? (
-            <Button variant="secondary" onClick={onRegenerate}>
+            <Button variant="secondary" className="h-8 px-2.5 text-caption" onClick={onRegenerate}>
               Regenerate
             </Button>
           ) : null}
+          <Button
+            variant="primary"
+            className="h-8 px-2.5 text-caption ml-auto"
+            onClick={() => navigate(`/leads/${item.lead_id}?tab=outreach`)}
+          >
+            Outreach →
+          </Button>
         </div>
       </div>
     </article>

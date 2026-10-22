@@ -228,3 +228,67 @@ def test_a_rate_limit_is_reported_without_the_provider_body() -> None:
     assert caught.value.status_code == 429
     assert "free limit" in caught.value.message
     assert "slow down" not in caught.value.message
+
+
+def test_brief_includes_sender_signature_details() -> None:
+    brief = build_brief(
+        business="Northwind Cafe",
+        industry="Cafe",
+        description=None,
+        city=None,
+        country=None,
+        website="https://northwind.example",
+        greeting_name="Ada",
+        findings=[],
+        scores={},
+        offer="A clearer homepage.",
+        tone="professional",
+        sender_name="Ibrar",
+        sender_email="ibraruidesigner@gmail.com",
+        sender_whatsapp="+923028131491",
+        sender_portfolio="https://ibrardevportfolio.netlify.app/",
+    )
+    rendered = render_brief(brief)
+    assert "Sign the email as: Ibrar" in rendered
+    assert "Portfolio: https://ibrardevportfolio.netlify.app/" in rendered
+    assert "WhatsApp: +923028131491" in rendered
+    assert "Email: ibraruidesigner@gmail.com" in rendered
+
+
+def test_draft_email_guarantees_sender_signature() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        message = (
+            "Hi Ada,\n\nI noticed some opportunities to improve your site.\n\n"
+            "Best regards,\nIbrar"
+        )
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps({"subject": "Website improvement", "body": message})}}]},
+        )
+
+    brief = build_brief(
+        business="Northwind Cafe",
+        industry="Cafe",
+        description=None,
+        city=None,
+        country=None,
+        website="https://northwind.example",
+        greeting_name="Ada",
+        findings=[],
+        scores={},
+        offer="A clearer homepage.",
+        tone="professional",
+        sender_name="Ibrar",
+        sender_email="ibraruidesigner@gmail.com",
+        sender_whatsapp="+923028131491",
+        sender_portfolio="https://ibrardevportfolio.netlify.app/",
+    )
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    subject, body = draft_email(
+        brief,
+        _settings(groq_api_key="groq-test", ai_email_provider="groq"),
+        client,
+    )
+    assert "Portfolio: https://ibrardevportfolio.netlify.app/" in body
+    assert "WhatsApp: +923028131491" in body
+    assert "Email: ibraruidesigner@gmail.com" in body

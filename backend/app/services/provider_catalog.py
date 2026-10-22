@@ -57,6 +57,45 @@ def _cache_key(settings: Settings) -> str:
     )
 
 
+def _stitch(settings: Settings, active: bool) -> ProviderRead:
+    configured = bool(settings.stitch_api_key.strip())
+    return ProviderRead(
+        id="stitch",
+        configured=configured,
+        active=active,
+        model="Stitch MCP (GEMINI_3_8_FLASH)",
+        display_name="Google Stitch · Primary Design Engine",
+        listed=True,
+        credits="Connected via Google Stitch MCP (stitch.googleapis.com)" if configured else _MISSING_KEY,
+    )
+
+
+def _banani(settings: Settings, active: bool) -> ProviderRead:
+    configured = bool(settings.banani_api_key.strip())
+    return ProviderRead(
+        id="banani",
+        configured=configured,
+        active=active,
+        model="Banani MCP Copilot",
+        display_name="Banani AI · Interactive UI Copilot",
+        listed=True,
+        credits="Connected via Banani MCP (app.banani.co)" if configured else _MISSING_KEY,
+    )
+
+
+def _magicpath(settings: Settings, active: bool) -> ProviderRead:
+    configured = bool(settings.magicpath_url.strip())
+    return ProviderRead(
+        id="magicpath",
+        configured=configured,
+        active=active,
+        model="MagicPath MCP Canvas",
+        display_name="MagicPath · AI Visual Canvas",
+        listed=True,
+        credits="Connected via MagicPath MCP (api.magicpath.ai)" if configured else _MISSING_KEY,
+    )
+
+
 def _gemini(settings: Settings, client: httpx.Client, active: bool) -> ProviderRead:
     model = settings.gemini_model.strip() or "gemini-3-flash-preview"
     if not settings.gemini_api_key.strip():

@@ -34,6 +34,7 @@ EXPECTED_TABLES = {
     "apify_imports",
     "apify_dismissed_actors",
     "design_guides",
+    "lead_researches",
 }
 
 
@@ -47,6 +48,7 @@ def test_child_rows_are_removed_with_their_lead() -> None:
         "website_audits": "lead_id",
         "brand_profiles": "lead_id",
         "mockups": "lead_id",
+        "lead_researches": "lead_id",
         "outreach_messages": "lead_id",
         "followups": "lead_id",
         "activities": "lead_id",

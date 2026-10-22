@@ -8,6 +8,9 @@ export type OutreachGenerateInput = {
   offer?: string;
   tone?: OutreachTone;
   sender_name?: string;
+  sender_email?: string;
+  sender_whatsapp?: string;
+  sender_portfolio?: string;
   use_ai?: boolean;
 };
 

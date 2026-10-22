@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { CheckCircle2, Sparkles } from "lucide-react";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
 import { QueryGate } from "../../components/feedback/QueryGate";
@@ -59,7 +60,7 @@ export function MessageList({
           description={
             messages.data.length === 0
               ? leadId
-                ? "Write the draft above. It shows up here, ready to send."
+                ? "Write the draft above. It shows up here, ready to review and send."
                 : "Open a lead, write a draft from its audit, then send it from here."
               : "Try another filter. Drafts, sent notes, and replies are kept."
           }
@@ -129,7 +130,7 @@ function MessageCard({
   const copy = async () => {
     try {
       await copyOutreach(subject, body);
-      notify("Copied.", "success");
+      notify("Copied to clipboard.", "success");
     } catch {
       notify("Could not copy the email.", "danger");
     }
@@ -188,7 +189,7 @@ function MessageCard({
         outreach_message_id: item.id,
         idempotency_key: crypto.randomUUID(),
       });
-      notify("Email accepted by Gmail. Delivery is not confirmed yet.", "success");
+      notify("Email sent via Gmail.", "success");
       setOpenedManually(false);
     } catch (error) {
       notify(apiErrorMessage(error, "Could not send via Gmail."), "danger");
@@ -216,11 +217,26 @@ function MessageCard({
   };
 
   return (
-    <Card
-      className={onSelect ? "cursor-pointer transition-colors hover:border-primary-200" : undefined}
-    >
+    <Card className={cn(draft ? "border-primary-200 bg-white shadow-sm" : "")}>
+      {draft ? (
+        <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-primary-600" />
+            <span className="text-caption font-bold uppercase tracking-wider text-primary-800">
+              AI Generated Draft — Manual Review
+            </span>
+          </div>
+          <span className="text-caption text-gray-400">
+            Never sent automatically
+          </span>
+        </div>
+      ) : null}
+
       <div
-        className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        className={cn(
+          "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between",
+          onSelect && "cursor-pointer",
+        )}
         onClick={() => {
           onSelect?.(item);
         }}
@@ -247,14 +263,14 @@ function MessageCard({
           )}
           {onSelect ? <p className="font-semibold text-ink">{item.business_name}</p> : null}
           {editing ? (
-            <p className="font-semibold text-ink">Email draft</p>
+            <p className="font-semibold text-ink">Review & Edit Draft</p>
           ) : (
-            <p className={cn("text-body text-ink", onLeadPage ? "font-semibold" : "mt-1")}>
+            <p className={cn("text-body text-ink font-semibold", onLeadPage ? "" : "mt-1")}>
               {item.subject || "No subject"}
             </p>
           )}
           <p className="mt-1 text-small text-gray-600">
-            {[item.recipient_email, item.channel, formatWhen(when)].filter(Boolean).join(" · ")}
+            To: {item.recipient_email || "No email"} · {formatWhen(when)}
           </p>
           {onSelect ? (
             <p className="mt-2 text-small font-semibold text-primary-700">Open conversation</p>
@@ -265,6 +281,7 @@ function MessageCard({
           <StatusBadge status={item.status} />
         </div>
       </div>
+
       {editing && draft ? (
         <div className="mt-4 space-y-4">
           <Input
@@ -276,6 +293,7 @@ function MessageCard({
           />
           <Textarea
             label="Message"
+            rows={10}
             value={body}
             onChange={(event) => {
               setBody(event.target.value);
@@ -284,7 +302,7 @@ function MessageCard({
         </div>
       ) : item.message ? (
         <p
-          className="mt-4 rounded-control border border-gray-100 bg-gray-50 px-4 py-3 whitespace-pre-wrap text-body text-gray-700"
+          className="mt-4 rounded-control border border-gray-100 bg-gray-50/80 px-4 py-3 whitespace-pre-wrap text-body text-gray-800 leading-relaxed font-normal"
           onClick={() => {
             onSelect?.(item);
           }}
@@ -292,6 +310,23 @@ function MessageCard({
           {item.message}
         </p>
       ) : null}
+
+      {/* Personalization Badges (Section 26) */}
+      {draft ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 text-[11px] text-gray-500">
+          <span className="font-semibold text-gray-600">Personalization used:</span>
+          <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
+            <CheckCircle2 className="size-3 text-emerald-600" /> Website audit
+          </span>
+          <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 font-medium text-indigo-800">
+            <CheckCircle2 className="size-3 text-indigo-600" /> Business research
+          </span>
+          <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-800">
+            <CheckCircle2 className="size-3 text-blue-600" /> Opportunity analysis
+          </span>
+        </div>
+      ) : null}
+
       <div
         className="mt-4"
         onClick={(event) => {
@@ -302,22 +337,24 @@ function MessageCard({
         }}
       >
         <p className="text-caption font-semibold text-gray-500">
-          {draft ? "3. Send it yourself, then record it" : nextStep(item.status)}
+          {draft ? "Actions: Review, edit, or dispatch" : nextStep(item.status)}
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {draft && !editing ? (
             <Button
               variant="secondary"
+              className="h-8 px-3 text-small"
               onClick={() => {
                 setOpenedManually(true);
               }}
             >
-              Edit
+              Edit Draft
             </Button>
           ) : null}
           {draft && editing && dirty ? (
             <Button
               variant="secondary"
+              className="h-8 px-3 text-small"
               isLoading={updateOutreach.isPending && !busy}
               disabled={pending}
               onClick={() => {
@@ -336,21 +373,29 @@ function MessageCard({
                   });
               }}
             >
-              Save
+              Save Changes
             </Button>
           ) : null}
-          <Button variant="secondary" disabled={!ready || pending} onClick={() => void copy()}>
+          <Button
+            variant="secondary"
+            className="h-8 px-3 text-small"
+            disabled={!ready || pending}
+            onClick={() => void copy()}
+          >
             Copy
           </Button>
           <Button
             variant="secondary"
+            className="h-8 px-3 text-small"
             disabled={!ready || !item.recipient_email || pending}
             onClick={() => void openEmail()}
           >
-            Open in email
+            Open in Email Client
           </Button>
           {draft && gmailReady ? (
             <Button
+              variant="primary"
+              className="h-8 px-3 text-small"
               disabled={!ready || !item.recipient_email || pending}
               onClick={() => void sendWithGmail()}
             >
@@ -358,25 +403,31 @@ function MessageCard({
             </Button>
           ) : null}
           {draft ? (
-            <Button variant="secondary" disabled={!ready || pending} onClick={() => void recordSent()}>
-              I sent this
+            <Button
+              variant="secondary"
+              className="h-8 px-3 text-small"
+              disabled={!ready || pending}
+              onClick={() => void recordSent()}
+            >
+              Mark Sent
             </Button>
           ) : null}
           {item.status !== "REPLIED" && item.status !== "CANCELLED" ? (
             <Button
               variant="secondary"
+              className="h-8 px-3 text-small"
               disabled={!ready || pending}
               onClick={() => void recordReply()}
             >
-              They replied
+              Mark Replied
             </Button>
           ) : null}
         </div>
       </div>
       {draft ? (
-        <p className="mt-3 text-small text-gray-600">
-          Open in email uses your mail app. Nothing is sent until you send it there.
-          {item.recipient_email ? "" : " Add an email on the lead to use that button."}
+        <p className="mt-3 text-caption text-gray-500">
+          Open in Email Client uses your default mail client. Send with Gmail delivers directly through your connected Google Workspace account.
+          {item.recipient_email ? "" : " Add an email on the lead to enable direct sending."}
         </p>
       ) : null}
       {item.status === "SENT" || item.status === "OPENED" || item.status === "REPLIED" ? (

@@ -1,4 +1,4 @@
-export type MockupProvider = "gemini" | "groq";
+export type MockupProvider = "stitch" | "banani" | "magicpath" | "gemini" | "groq";
 export type MockupGoal = "calls" | "whatsapp" | "bookings" | "quotes";
 export type GuideMode = "keep" | "selected" | "none";
 

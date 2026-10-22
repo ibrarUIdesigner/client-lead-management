@@ -69,6 +69,11 @@ class EmailBrief:
     tone: str
     sender_name: str | None
     purpose: str
+    sender_email: str | None = None
+    sender_whatsapp: str | None = None
+    sender_portfolio: str | None = None
+    research_summary: str | None = None
+    proactive_solutions: tuple[str, ...] = ()
 
 
 def provider_ready(settings: Settings, name: str) -> bool:
@@ -110,8 +115,13 @@ def build_brief(
     offer: str | None,
     tone: str,
     sender_name: str | None,
+    sender_email: str | None = None,
+    sender_whatsapp: str | None = None,
+    sender_portfolio: str | None = None,
     notes: str | None = None,
     tags: list[str] | tuple[str, ...] | None = None,
+    research_summary: str | None = None,
+    proactive_solutions: list[str] | tuple[str, ...] | None = None,
 ) -> EmailBrief:
     location = ", ".join(part for part in (city, country) if part and part.strip())
     cleaned_offer = " ".join((offer or "").split())
@@ -139,7 +149,12 @@ def build_brief(
         offer=cleaned_offer,
         tone=tone if tone in _TONES else "professional",
         sender_name=cleaned_sender or None,
+        sender_email=" ".join((sender_email or "").split()) or None,
+        sender_whatsapp=" ".join((sender_whatsapp or "").split()) or None,
+        sender_portfolio=" ".join((sender_portfolio or "").split()) or None,
         purpose="review" if has_website else "new_site",
+        research_summary=research_summary.strip() if research_summary and research_summary.strip() else None,
+        proactive_solutions=tuple(s.strip() for s in (proactive_solutions or []) if s.strip())[:5],
     )
 
 
@@ -185,13 +200,58 @@ def render_brief(brief: EmailBrief) -> str:
     else:
         lines.append("Verified findings: none. Do not claim you found specific problems.")
 
+    if brief.research_summary or brief.proactive_solutions:
+        lines.append("=== RESEARCH INTELLIGENCE & PROACTIVE SOLUTIONS ===")
+        if brief.research_summary:
+            lines.append(f"Researched Intelligence Summary: {brief.research_summary}")
+        if brief.proactive_solutions:
+            lines.append("Proactive solutions to offer the customer:")
+            lines.extend(f"- {sol}" for sol in brief.proactive_solutions)
+        lines.append("Instruction: Weave one of these proactive solutions into your value proposition to directly address their specific bottleneck.")
+
     lines.append(f"Offer: {brief.offer}")
     lines.append(f"Tone: {brief.tone}. {_TONES.get(brief.tone, '')}")
-    if brief.sender_name:
-        lines.append(f"Sign the email as: {brief.sender_name}")
-    else:
-        lines.append("Sign off with Best regards, and do not invent a sender name.")
+    sender = brief.sender_name or "Ibrar"
+    lines.append(f"Sign the email as: {sender}")
+    sig_details = []
+    if brief.sender_portfolio:
+        sig_details.append(f"Portfolio: {brief.sender_portfolio}")
+    if brief.sender_whatsapp:
+        sig_details.append(f"WhatsApp: {brief.sender_whatsapp}")
+    if brief.sender_email:
+        sig_details.append(f"Email: {brief.sender_email}")
+    if sig_details:
+        lines.append("Sender signature details to include at the end:")
+        lines.extend(f"- {d}" for d in sig_details)
+        lines.append("Instruction: Always include the portfolio link, WhatsApp number, and email in the sign-off.")
     return "\n".join(lines)
+
+
+def append_sender_signature(
+    body: str,
+    *,
+    name: str | None = None,
+    portfolio: str | None = None,
+    whatsapp: str | None = None,
+    email: str | None = None,
+) -> str:
+    """Ensure sender signature details (portfolio, whatsapp, email) are attached cleanly."""
+    cleaned = body.rstrip()
+    if not (portfolio or whatsapp or email):
+        return cleaned
+
+    parts_to_add: list[str] = []
+    if portfolio and portfolio not in cleaned:
+        parts_to_add.append(f"Portfolio: {portfolio}")
+    if whatsapp and whatsapp not in cleaned:
+        parts_to_add.append(f"WhatsApp: {whatsapp}")
+    if email and email not in cleaned:
+        parts_to_add.append(f"Email: {email}")
+
+    if not parts_to_add:
+        return cleaned
+
+    return cleaned + "\n" + "\n".join(parts_to_add)
 
 
 def draft_email(
@@ -229,7 +289,14 @@ def draft_email(
             logger.warning("email_draft_fallback provider=groq after timeout")
             try:
                 raw = _groq(http, settings, prompt)
-                return parse_draft(raw)
+                s_subj, s_body = parse_draft(raw)
+                return s_subj, append_sender_signature(
+                    s_body,
+                    name=brief.sender_name or getattr(settings, "outreach_sender_name", None) or "Ibrar",
+                    portfolio=brief.sender_portfolio or getattr(settings, "outreach_sender_portfolio", None),
+                    whatsapp=brief.sender_whatsapp or getattr(settings, "outreach_sender_whatsapp", None),
+                    email=brief.sender_email or getattr(settings, "outreach_sender_email", None),
+                )
             except Exception:
                 pass
         raise AppError(
@@ -247,7 +314,19 @@ def draft_email(
     finally:
         if owns_client:
             http.close()
-    return parse_draft(raw)
+    parsed_subj, parsed_body = parse_draft(raw)
+    name = brief.sender_name or getattr(settings, "outreach_sender_name", None) or "Ibrar"
+    portfolio = brief.sender_portfolio or getattr(settings, "outreach_sender_portfolio", None)
+    whatsapp = brief.sender_whatsapp or getattr(settings, "outreach_sender_whatsapp", None)
+    email = brief.sender_email or getattr(settings, "outreach_sender_email", None)
+    parsed_body = append_sender_signature(
+        parsed_body,
+        name=name,
+        portfolio=portfolio,
+        whatsapp=whatsapp,
+        email=email,
+    )
+    return parsed_subj, parsed_body
 
 
 def suggest_offer(
@@ -427,6 +506,7 @@ def _instructions(facts: str, purpose: str) -> str:
         "• Subject line: 3–5 words, sentence case or all lowercase, neutral and curiosity-driven. No clickbait. No fake urgency.\n"
         "• Body: strictly under 110 words. Every sentence must earn its place.\n"
         "• Tone: peer-to-peer — observant, candid, and specific. No sycophancy. No marketing jargon.\n"
+        "• If RESEARCH INTELLIGENCE & PROACTIVE SOLUTIONS are provided below, make sure the value paragraph proactively pitches that exact solution to their situation.\n"
         "• Structure (3 short paragraphs, no bullets):\n"
         "    1. Opening — address ONE specific operational or contextual detail from the Overview. Make it feel observed, not generic.\n"
         "    2. Value — 1–2 sentences showing a clear outcome or operational relief. Focus on result, not feature list.\n"

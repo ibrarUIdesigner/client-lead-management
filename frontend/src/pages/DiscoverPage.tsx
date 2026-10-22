@@ -365,6 +365,65 @@ function RunAllButton({ running }: { running: boolean }) {
   );
 }
 
+const NICHE_CLUSTERS = [
+  ["dentist", "clinic", "pharmacy", "veterinary"],
+  ["restaurant", "cafe", "bakery", "hotel"],
+  ["real_estate", "lawyer", "accountant"],
+  ["plumber", "electrician", "car_repair"],
+  ["gym", "salon", "photographer"],
+];
+
+function getDailyRandomNiches(
+  allCategories: { value: string; label: string }[],
+  count = 4,
+  customSeed?: number,
+): string[] {
+  const allValues = allCategories.map((c) => c.value);
+  if (allValues.length === 0) {
+    return ["dentist", "restaurant", "real_estate", "gym"];
+  }
+
+  let seed = customSeed;
+  if (seed === undefined) {
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+    let hash = 0;
+    for (let i = 0; i < dateStr.length; i++) {
+      hash = (hash * 31 + dateStr.charCodeAt(i)) >>> 0;
+    }
+    seed = hash;
+  }
+
+  const nextRand = () => {
+    seed = (seed! + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  const shuffledClusters = [...NICHE_CLUSTERS].sort(() => nextRand() - 0.5);
+  const picked: string[] = [];
+
+  for (const cluster of shuffledClusters) {
+    if (picked.length >= count) break;
+    const available = cluster.filter((c) => allValues.includes(c) && !picked.includes(c));
+    if (available.length > 0) {
+      const idx = Math.floor(nextRand() * available.length);
+      picked.push(available[idx]);
+    }
+  }
+
+  if (picked.length < count) {
+    const remaining = allValues.filter((c) => !picked.includes(c));
+    remaining.sort(() => nextRand() - 0.5);
+    while (picked.length < count && remaining.length > 0) {
+      picked.push(remaining.pop()!);
+    }
+  }
+
+  return picked;
+}
+
 function SearchForm({
   categories,
   googleConfigured,
@@ -386,9 +445,9 @@ function SearchForm({
   const run = useRunDiscovery();
   const { notify } = useToast();
 
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([
-    categories[0]?.value ?? "dentist",
-  ]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() =>
+    getDailyRandomNiches(categories, 4),
+  );
   const [customInput, setCustomInput] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [selectedCountry, setSelectedCountry] = useState("Worldwide");
@@ -430,6 +489,14 @@ function SearchForm({
   function selectAllCategories() {
     setSelectedCategories(categories.map((c) => c.value));
     setError(null);
+  }
+
+  function selectRandomNiches(count = 4) {
+    const randomSeed = Math.floor(Math.random() * 1000000);
+    const randomSet = getDailyRandomNiches(categories, count, randomSeed);
+    setSelectedCategories(randomSet);
+    setError(null);
+    notify(`Selected ${randomSet.length} random niches across industries.`, "info");
   }
 
   function addCustomNiche() {
@@ -511,7 +578,12 @@ function SearchForm({
       >
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <SectionLabel>Who to find (Niches / Categories)</SectionLabel>
+            <div className="flex items-center gap-2">
+              <SectionLabel>Who to find (Niches / Categories)</SectionLabel>
+              <span className="hidden text-caption text-gray-500 sm:inline">
+                · Rotates multiple random niches daily for diverse leads
+              </span>
+            </div>
             <Badge tone={selectedCategories.length > 0 ? "indigo" : "gray"}>
               {selectedCategories.length === 0
                 ? "No niche selected"
@@ -528,6 +600,13 @@ function SearchForm({
               className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-gray-700 hover:bg-gray-50 transition-colors"
             >
               ⚡ All ({categories.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => selectRandomNiches(4)}
+              className="rounded-md border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+            >
+              🎲 Randomize (4)
             </button>
             <button
               type="button"
@@ -935,11 +1014,17 @@ function SearchRow({ search, running }: { search: DiscoverySearch; running: bool
           ) : null}
         </div>
 
-        <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:w-auto sm:min-w-56">
+        <div className="grid w-full shrink-0 grid-cols-3 gap-2 sm:w-auto sm:min-w-64">
           <Metric label="Found" value={search.last_found_count} />
-          <Metric label="New" value={search.last_created_count} />
-          <Metric label="Updated" value={search.last_updated_count} />
-          <Metric label="Skipped" value={search.last_skipped_count} />
+          <Metric
+            label="Duplicates"
+            value={
+              search.last_updated_count !== null || search.last_skipped_count !== null
+                ? (search.last_updated_count ?? 0) + (search.last_skipped_count ?? 0)
+                : null
+            }
+          />
+          <Metric label="New Leads" value={search.last_created_count} />
         </div>
       </div>
 

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, Sparkles } from "lucide-react";
 
 import { useToast } from "../../components/feedback/useToast";
+import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
@@ -10,6 +12,7 @@ import { Textarea } from "../../components/ui/Textarea";
 import { useLatestAudit } from "../../hooks/useAudit";
 import { useHealth } from "../../hooks/useHealth";
 import { useGenerateOutreach, useSuggestOutreachOffer } from "../../hooks/useOutreach";
+import { useLeadResearch } from "../../hooks/useResearch";
 import { useOutreachTemplates } from "../../hooks/useWorkspace";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
@@ -28,6 +31,9 @@ const DEFAULT_OFFER =
 const OFFER_KEY = "outreach-offer";
 const TONE_KEY = "outreach-tone";
 const SENDER_KEY = "outreach-sender-name";
+const SENDER_EMAIL_KEY = "outreach-sender-email";
+const SENDER_WHATSAPP_KEY = "outreach-sender-whatsapp";
+const SENDER_PORTFOLIO_KEY = "outreach-sender-portfolio";
 
 const toneOptions: { value: OutreachTone; label: string }[] = [
   { value: "professional", label: "Professional" },
@@ -48,10 +54,15 @@ export function OutreachComposer({
   const audit = useLatestAudit(leadId);
   const health = useHealth();
   const generate = useGenerateOutreach(leadId);
+  const researchQuery = useLeadResearch(leadId);
+  const research = researchQuery.data;
   const [templateId, setTemplateId] = useState("");
   const [offer, setOffer] = useState(() => readStored(OFFER_KEY, DEFAULT_OFFER));
   const [tone, setTone] = useState<OutreachTone>(() => readTone());
-  const [senderName, setSenderName] = useState(() => readStored(SENDER_KEY, ""));
+  const [senderName, setSenderName] = useState(() => readStored(SENDER_KEY, "Ibrar"));
+  const [senderEmail, setSenderEmail] = useState(() => readStored(SENDER_EMAIL_KEY, "ibraruidesigner@gmail.com"));
+  const [senderWhatsapp, setSenderWhatsapp] = useState(() => readStored(SENDER_WHATSAPP_KEY, "+923028131491"));
+  const [senderPortfolio, setSenderPortfolio] = useState(() => readStored(SENDER_PORTFOLIO_KEY, "https://ibrardevportfolio.netlify.app/"));
   const [pending, setPending] = useState<"ai" | "template" | null>(null);
   const [offerTouched, setOfferTouched] = useState(false);
   const appliedSuggestion = useRef<string | null>(null);
@@ -89,6 +100,9 @@ export function OutreachComposer({
             offer: offer.trim() || undefined,
             tone,
             sender_name: senderName.trim() || undefined,
+            sender_email: senderEmail.trim() || undefined,
+            sender_whatsapp: senderWhatsapp.trim() || undefined,
+            sender_portfolio: senderPortfolio.trim() || undefined,
             use_ai: true,
           }
         : {
@@ -133,6 +147,52 @@ export function OutreachComposer({
         hasWebsite={hasWebsite}
         lines={lines}
       />
+
+      {research && research.status === "COMPLETED" && research.research_data?.proactive_solutions?.length ? (
+        <div className="mt-4 rounded-lg border border-primary-200 bg-primary-50/50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary-600" />
+              <h4 className="text-small font-semibold text-primary-950">
+                Researched Proactive Solutions
+              </h4>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Badge tone="indigo">Tavily</Badge>
+              <Badge tone="blue">Exa</Badge>
+            </div>
+          </div>
+          <p className="mt-1 text-caption text-primary-800">
+            These tailored proactive solutions were extracted from lead intelligence and will be included in the AI draft:
+          </p>
+          <div className="mt-2.5 space-y-2">
+            {research.research_data.proactive_solutions.slice(0, 3).map((solution, i) => (
+              <div
+                key={i}
+                className="flex items-start justify-between gap-2 rounded border border-primary-100 bg-white/90 p-2.5 text-small text-gray-800 shadow-2xs"
+              >
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="size-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span>{solution}</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-7 px-2 shrink-0 text-caption text-primary-700 hover:text-primary-900"
+                  onClick={() => {
+                    setOffer(solution);
+                    setOfferTouched(true);
+                    writeStored(OFFER_KEY, solution);
+                    notify("Applied proactive solution as email offer.", "success");
+                  }}
+                >
+                  Use as offer
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="mt-6 border-t border-gray-200 pt-6">
         <p className="text-caption font-semibold text-gray-500">2. Generate the draft</p>
         <p className="mt-1 text-body text-gray-600">
@@ -142,16 +202,45 @@ export function OutreachComposer({
           You review the draft here, then send it from your own inbox.
         </p>
         <div className="mt-4 grid gap-4">
-          <Input
-            label="Your name"
-            hint="Optional. Used as the sign-off."
-            value={senderName}
-            onChange={(event) => {
-              const next = event.target.value;
-              setSenderName(next);
-              writeStored(SENDER_KEY, next);
-            }}
-          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              label="Your name"
+              value={senderName}
+              onChange={(event) => {
+                const next = event.target.value;
+                setSenderName(next);
+                writeStored(SENDER_KEY, next);
+              }}
+            />
+            <Input
+              label="Your email"
+              type="email"
+              value={senderEmail}
+              onChange={(event) => {
+                const next = event.target.value;
+                setSenderEmail(next);
+                writeStored(SENDER_EMAIL_KEY, next);
+              }}
+            />
+            <Input
+              label="Your WhatsApp"
+              value={senderWhatsapp}
+              onChange={(event) => {
+                const next = event.target.value;
+                setSenderWhatsapp(next);
+                writeStored(SENDER_WHATSAPP_KEY, next);
+              }}
+            />
+            <Input
+              label="Your Portfolio"
+              value={senderPortfolio}
+              onChange={(event) => {
+                const next = event.target.value;
+                setSenderPortfolio(next);
+                writeStored(SENDER_PORTFOLIO_KEY, next);
+              }}
+            />
+          </div>
           <div>
             <Textarea
               label="Your offer"

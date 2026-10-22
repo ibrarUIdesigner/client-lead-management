@@ -11,6 +11,8 @@ def _settings() -> Settings:
     return Settings(
         app_env="test",
         database_url="postgresql+psycopg://app:app@127.0.0.1:1/client_acquisition",
+        postgres_url="",
+        storage_dir="/tmp/storage",
         cors_origins="http://localhost:5175,http://127.0.0.1:5175",
         log_level="WARNING",
         gemini_api_key="",

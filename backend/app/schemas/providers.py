@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class ProviderRead(BaseModel):
-    id: Literal["gemini", "groq"]
+    id: Literal["gemini", "groq", "stitch", "banani", "magicpath"]
     configured: bool
     active: bool
     model: str

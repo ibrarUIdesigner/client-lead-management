@@ -32,6 +32,8 @@ def get_integrations(request: Request) -> IntegrationsResponse:
 
     gemini_key = bool(settings.gemini_api_key.strip())
     groq_key = bool(settings.groq_api_key.strip())
+    tavily_key = bool(settings.tavily_api_key.strip())
+    exa_key = bool(settings.exa_api_key.strip())
     apollo_key = bool(settings.apollo_api_key.strip())
     serpapi_key = bool(settings.serpapi_api_key.strip())
     scrapingbee_key = bool(settings.scrapingbee_api_key.strip())
@@ -42,6 +44,28 @@ def get_integrations(request: Request) -> IntegrationsResponse:
     yelp_key = bool(settings.yelp_api_key.strip())
 
     items: list[IntegrationItem] = [
+        IntegrationItem(
+            id="tavily",
+            name="Tavily Search API",
+            category="Lead Research",
+            description="Autonomous web search engine designed for LLMs to research company offerings, reputation, reviews, and market presence.",
+            status="ready" if tavily_key else "not_configured",
+            is_configured=tavily_key,
+            env_var="TAVILY_API_KEY",
+            details="API key configured · Advanced web research enabled" if tavily_key else "Missing TAVILY_API_KEY",
+            website="https://tavily.com",
+        ),
+        IntegrationItem(
+            id="exa",
+            name="Exa AI Search",
+            category="Lead Research",
+            description="Neural search engine designed to discover company news, semantic context, highlights, and industry intelligence.",
+            status="ready" if exa_key else "not_configured",
+            is_configured=exa_key,
+            env_var="EXA_API_KEY",
+            details="API key configured · Neural web intelligence enabled" if exa_key else "Missing EXA_API_KEY",
+            website="https://exa.ai",
+        ),
         IntegrationItem(
             id="gemini",
             name="Google Gemini AI",

@@ -1,38 +1,53 @@
 import {
   ArrowLeft,
   CalendarClock,
+  CheckCircle2,
   CircleDot,
+  Flame,
   Globe,
+  Images,
   Mail,
   MapPin,
   Phone,
   RefreshCw,
+  Sparkles,
   Tag,
+  Target,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, type ReactNode } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { EmptyState } from "../components/feedback/EmptyState";
 import { LoadingState } from "../components/feedback/LoadingState";
 import { OfflineState } from "../components/feedback/OfflineState";
 import { useToast } from "../components/feedback/useToast";
-import { PageHeader } from "../components/layout/PageHeader";
 import { Badge, StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Tabs } from "../components/ui/Tabs";
-import { MockupGallery } from "../features/mockups/MockupGallery";
+import { AuditPanel } from "../features/audits/AuditPanel";
 import { ConversationPanel } from "../features/gmail/ConversationPanel";
 import { GmailComposer } from "../features/gmail/GmailComposer";
+import { LeadJourney } from "../features/leads/LeadJourney";
+import { LeadResearchSection } from "../features/leads/LeadResearchSection";
+import { NextBestActionBanner } from "../features/leads/NextBestActionBanner";
+import { MockupGallery } from "../features/mockups/MockupGallery";
 import { MessageList } from "../features/outreach/MessageList";
 import { OutreachComposer } from "../features/outreach/OutreachComposer";
-import { AuditPanel } from "../features/audits/AuditPanel";
-import { useOnline } from "../hooks/useOnline";
+import { useLatestAudit } from "../hooks/useAudit";
 import { useDeleteLead, useLead } from "../hooks/useLeads";
+import { useOnline } from "../hooks/useOnline";
+import { useLeadResearch } from "../hooks/useResearch";
+import { useFollowups, useMockups, useOutreachMessages } from "../hooks/useWorkspace";
 import { apiErrorCode, apiErrorMessage, isOfflineError } from "../lib/apiError";
 import { cn, focusRing } from "../lib/cn";
 import { formatWhen } from "../lib/format";
+import {
+  getLeadJourneySteps,
+  getNextBestAction,
+  getOpportunitySummary,
+} from "../lib/leadWorkflow";
 import type { Activity, LeadDetail } from "../types/lead";
 
 function BackToLeads() {
@@ -41,12 +56,12 @@ function BackToLeads() {
   return (
     <Button
       variant="ghost"
-      className="-ml-3 mb-4"
+      className="-ml-3 mb-4 h-8 px-2 text-small text-gray-600"
       onClick={() => {
         navigate("/leads");
       }}
     >
-      <ArrowLeft className="size-4" aria-hidden="true" />
+      <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
       Back to leads
     </Button>
   );
@@ -138,10 +153,40 @@ export function LeadDetailPage() {
 
 function LeadDetailView({ lead }: { lead: LeadDetail }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { notify } = useToast();
   const removeLead = useDeleteLead();
+
+  // Queries for surrounding workflow artifacts
+  const auditQuery = useLatestAudit(lead.id);
+  const researchQuery = useLeadResearch(lead.id);
+  const mockupsQuery = useMockups(lead.id);
+  const outreachQuery = useOutreachMessages(lead.id);
+  const followupsQuery = useFollowups();
+
+  const audit = auditQuery.data;
+  const research = researchQuery.data;
+  const mockups = mockupsQuery.data ?? [];
+  const outreach = outreachQuery.data ?? [];
+  const followups = (followupsQuery.data ?? []).filter((f) => f.lead_id === lead.id);
+
+  // Tab synchronization with URL query param `?tab=...`
+  const initialTab = searchParams.get("tab") || "overview";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [confirming, setConfirming] = useState(false);
   const [outreachFocus, setOutreachFocus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const handleSelectTab = (tabId: string) => {
+    setActiveTab(tabId);
+    setSearchParams({ tab: tabId });
+  };
 
   const remove = () => {
     removeLead.mutate(lead.id, {
@@ -155,59 +200,175 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
     });
   };
 
+  // Compute Next Best Action & Acquisition Journey
+  const nba = getNextBestAction(lead, {
+    audit,
+    research,
+    mockups,
+    outreach,
+    followups,
+  });
+
+  const steps = getLeadJourneySteps(lead, {
+    audit,
+    research,
+    mockups,
+    outreach,
+  });
+
+  const opportunitySummary = getOpportunitySummary(lead, audit, research);
+
+  const place = [lead.city, lead.country].filter(Boolean).join(", ");
+  const score = lead.lead_score ?? audit?.raw_analysis?.opportunity_score ?? null;
+
   return (
-    <>
+    <div className="space-y-4">
       <BackToLeads />
-      <PageHeader
-        title={lead.business_name}
-        description={
-          [lead.industry, lead.city, lead.country].filter(Boolean).join(" · ") || undefined
-        }
-        actions={
-          <div className="flex w-full flex-col gap-3 sm:w-auto">
-            <div className="flex flex-wrap gap-2">
-              {lead.email_unread ? <Badge tone="orange">Unread reply</Badge> : null}
-              {lead.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
-              <StatusBadge status={lead.lead_status} />
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  navigate(`/leads/${lead.id}/edit`);
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setConfirming(true);
-                }}
-              >
-                Delete
-              </Button>
-            </div>
+
+      {/* Main Lead Header */}
+      <div className="flex flex-col gap-4 rounded-card border border-gray-200 bg-white p-5 shadow-2xs lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-h2 font-bold tracking-tight text-ink">
+              {lead.business_name}
+            </h1>
+            {lead.email_unread ? <Badge tone="orange">Unread reply</Badge> : null}
+            {lead.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
+            <StatusBadge status={lead.lead_status} />
           </div>
-        }
-      />
+
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-small text-gray-600">
+            {lead.industry ? <span className="font-medium text-ink">{lead.industry}</span> : null}
+            {place ? (
+              <span className="flex items-center gap-1">
+                <MapPin className="size-3.5 text-gray-400" />
+                {place}
+              </span>
+            ) : null}
+            {lead.website_url ? (
+              <a
+                href={lead.website_url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-primary-700 hover:underline"
+              >
+                <Globe className="size-3.5" />
+                <span>{lead.website_url.replace(/^https?:\/\//, "")}</span>
+              </a>
+            ) : (
+              <span className="rounded bg-amber-50 px-2 py-0.5 text-caption font-medium text-amber-800">
+                No website listed
+              </span>
+            )}
+            {score !== null ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-caption font-bold text-orange-700"
+                title="AI / heuristic opportunity score"
+              >
+                <Flame className="size-3.5 text-orange-600" />
+                Score: {score}/100
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Primary Acquisition Workflow Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            className="h-9 px-3 text-small"
+            onClick={() => handleSelectTab("audit")}
+          >
+            <Globe className="size-4 mr-1 text-gray-500" />
+            Audit
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-9 px-3 text-small"
+            onClick={() => handleSelectTab("research")}
+          >
+            <Sparkles className="size-4 mr-1 text-primary-600" />
+            Research
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-9 px-3 text-small"
+            onClick={() => handleSelectTab("mockups")}
+          >
+            <Images className="size-4 mr-1 text-purple-600" />
+            Mockup
+          </Button>
+          <Button
+            variant="primary"
+            className="h-9 px-3 text-small"
+            onClick={() => handleSelectTab("outreach")}
+          >
+            <Mail className="size-4 mr-1" />
+            Outreach
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-9 px-2 text-small text-gray-500 hover:text-ink"
+            onClick={() => navigate(`/leads/${lead.id}/edit`)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-9 px-2 text-small text-gray-500 hover:text-danger"
+            onClick={() => setConfirming(true)}
+          >
+            Delete
+          </Button>
+        </div>
+      </div>
+
+      {/* Visual Acquisition Journey Bar (Section 13) */}
+      <LeadJourney steps={steps} onSelectTab={handleSelectTab} />
+
+      {/* Primary Workspace Tabs: Overview | Audit | Research | Mockup | Outreach | Activity */}
       <Tabs
-        label="Lead sections"
+        label="Lead acquisition workspace"
+        value={activeTab}
+        onValueChange={handleSelectTab}
         tabs={[
-          { id: "overview", label: "Overview", content: <Overview lead={lead} /> },
+          {
+            id: "overview",
+            label: "Overview",
+            content: (
+              <Overview
+                lead={lead}
+                audit={audit}
+                research={research}
+                mockups={mockups}
+                outreach={outreach}
+                followups={followups}
+                nba={nba}
+                opportunitySummary={opportunitySummary}
+                onSelectTab={handleSelectTab}
+              />
+            ),
+          },
           {
             id: "audit",
             label: "Audit",
             content: <AuditPanel leadId={lead.id} websiteUrl={lead.website_url} />,
           },
           {
+            id: "research",
+            label: "Research",
+            content: <LeadResearchSection lead={lead} onSelectTab={handleSelectTab} />,
+          },
+          {
             id: "mockups",
             label: "Mockups",
+            count: mockups.length > 0 ? mockups.length : undefined,
             content: <MockupGallery leadId={lead.id} />,
           },
           {
             id: "outreach",
             label: "Outreach",
+            count: outreach.length > 0 ? outreach.length : undefined,
             content: (
               <div className="space-y-4">
                 <OutreachComposer
@@ -221,7 +382,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
                     <section className="min-w-0 p-4 sm:p-5">
                       <h2 className="text-h4 font-semibold text-ink">Messages</h2>
                       <p className="mt-1 text-small text-gray-600">
-                        Drafts from the form above land here.
+                        Drafts from the generator land here for manual review.
                       </p>
                       <div className="mt-3">
                         <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
@@ -244,10 +405,11 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           },
         ]}
       />
+
       <ConfirmDialog
         open={confirming}
         title="Delete this lead?"
-        description="Notes and activity for this lead will be removed."
+        description="Notes and activity for this lead will be removed permanently."
         confirmLabel="Delete lead"
         isLoading={removeLead.isPending}
         onConfirm={remove}
@@ -257,7 +419,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           }
         }}
       />
-    </>
+    </div>
   );
 }
 
@@ -270,7 +432,27 @@ const websiteStatusLabels: Record<string, string> = {
   failed: "Audit failed",
 };
 
-function Overview({ lead }: { lead: LeadDetail }) {
+function Overview({
+  lead,
+  audit,
+  research,
+  mockups,
+  outreach,
+  followups,
+  nba,
+  opportunitySummary,
+  onSelectTab,
+}: {
+  lead: LeadDetail;
+  audit?: any;
+  research?: any;
+  mockups: any[];
+  outreach: any[];
+  followups: any[];
+  nba: any;
+  opportunitySummary: { title: string; bullets: string[]; highlightScore: number | null };
+  onSelectTab: (tabId: string) => void;
+}) {
   const place = [lead.city, lead.country].filter(Boolean).join(", ");
   const socials = [
     linkItem("LinkedIn", lead.linkedin_url),
@@ -282,63 +464,123 @@ function Overview({ lead }: { lead: LeadDetail }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-        <Card className="shadow-sm">
-          <p className="text-caption font-semibold text-gray-500">Lead score</p>
-          <p className="mt-2 text-h2 font-bold text-ink tabular-nums">{lead.lead_score ?? "—"}</p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
-            <div
-              className={cn("h-full rounded-full", scoreColor(lead.lead_score))}
-              style={{ width: `${scoreWidth(lead.lead_score)}%` }}
-            />
+      {/* 1. Next Best Action (Section 14 & 47) */}
+      <NextBestActionBanner
+        action={nba}
+        onExecute={() => onSelectTab(nba.targetTab)}
+      />
+
+      {/* 2. Opportunity Summary (Section 14 & 21) */}
+      <Card className="border-primary-100 bg-gradient-to-r from-primary-50/40 via-white to-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="size-4 text-primary-600" />
+            <h3 className="text-h4 font-bold text-ink">{opportunitySummary.title}</h3>
           </div>
-          <p className="mt-2 text-caption text-gray-500">
-            Higher means a stronger reason to pitch.
-          </p>
-        </Card>
-        <SummaryCard
-          label="Website"
-          value={websiteStatusLabels[lead.website_status ?? ""] ?? lead.website_status ?? "Unknown"}
-          detail={
-            lead.website_quality_score === null ? null : `Quality ${lead.website_quality_score}`
-          }
-        />
-        <SummaryCard
-          label="Last contacted"
-          value={lead.last_contacted_at ? formatWhen(lead.last_contacted_at) : "Not yet"}
-        />
-        <SummaryCard
-          label="Last reply"
-          value={lead.last_replied_at ? formatWhen(lead.last_replied_at) : "None yet"}
-          emphasis={lead.email_unread}
-        />
-        <SummaryCard
-          label="Next follow-up"
-          value={lead.next_followup_at ? formatWhen(lead.next_followup_at) : "None set"}
-          emphasis={followUpOverdue}
-        />
+          <span className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold">
+            Opportunity Intelligence
+          </span>
+        </div>
+        <p className="mt-1 text-small text-gray-600">
+          Synthesized from website health, research signals, and competitive positioning:
+        </p>
+        <ul className="mt-3 space-y-2">
+          {opportunitySummary.bullets.map((bullet, idx) => (
+            <li key={idx} className="flex items-start gap-2 text-small text-gray-800">
+              <CheckCircle2 className="size-4 shrink-0 text-emerald-600 mt-0.5" />
+              <span>{bullet}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* 3. Current Situation Grid (Section 14) */}
+      <div>
+        <h4 className="text-caption font-bold uppercase tracking-wider text-gray-500 mb-2">
+          Current Acquisition Situation
+        </h4>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <SummaryCard
+            label="Opportunity Score"
+            value={lead.lead_score ? `${lead.lead_score}/100` : "Pending"}
+            detail="AI / heuristic estimate"
+          />
+          <SummaryCard
+            label="Website Health"
+            value={
+              audit?.performance_score !== undefined && audit?.performance_score !== null
+                ? `${audit.performance_score}/100`
+                : websiteStatusLabels[lead.website_status ?? ""] ?? lead.website_status ?? "Not Audited"
+            }
+            detail={
+              audit?.status === "COMPLETED"
+                ? "Full audit complete"
+                : lead.website_url
+                ? "Click Audit tab to run"
+                : "No website discovered"
+            }
+          />
+          <SummaryCard
+            label="Research Intelligence"
+            value={
+              research?.status === "COMPLETED"
+                ? "Completed"
+                : research?.status === "RUNNING"
+                ? "Running..."
+                : "Not Run"
+            }
+            detail={
+              research?.status === "COMPLETED"
+                ? `${research.sources?.length || 0} sources verified`
+                : "Tavily & Exa deep search"
+            }
+          />
+          <SummaryCard
+            label="Homepage Mockup"
+            value={mockups.length > 0 ? `${mockups.length} Version(s)` : "None"}
+            detail={mockups.some((m) => m.status === "READY") ? "Ready to pitch" : "Create in Mockup tab"}
+          />
+          <SummaryCard
+            label="Outreach Status"
+            value={
+              lead.last_contacted_at
+                ? "Contacted"
+                : outreach.length > 0
+                ? `${outreach.length} Draft(s)`
+                : "Not Sent"
+            }
+            detail={lead.last_contacted_at ? formatWhen(lead.last_contacted_at) : "Awaiting draft"}
+          />
+          <SummaryCard
+            label="Follow-up"
+            value={lead.next_followup_at ? formatWhen(lead.next_followup_at) : followups.length > 0 ? "Scheduled" : "None Set"}
+            emphasis={followUpOverdue}
+            detail={followUpOverdue ? "Overdue" : followups.length > 0 ? `${followups.length} scheduled` : "No follow-up set"}
+          />
+        </div>
       </div>
 
+      {/* 4. Business Snapshot & Details (Section 14) */}
       <div className="grid gap-4 lg:grid-cols-5">
         <Card className="shadow-sm lg:col-span-3">
-          <h2 className="text-h4 font-semibold text-ink">How to reach them</h2>
+          <h2 className="text-h4 font-bold text-ink">How to Reach Them</h2>
           <dl className="mt-2">
             <Fact icon={<Mail className="size-4" aria-hidden="true" />} label="Email">
               {lead.email ? (
-                <a href={`mailto:${lead.email}`} className={cn("break-all text-primary-700", focusRing)}>
+                <a href={`mailto:${lead.email}`} className={cn("break-all text-primary-700 font-medium", focusRing)}>
                   {lead.email}
                 </a>
               ) : (
-                "—"
+                <span className="text-gray-400">No email on file</span>
               )}
             </Fact>
             <Fact icon={<Phone className="size-4" aria-hidden="true" />} label="Phone">
               {lead.phone ? (
-                <a href={`tel:${lead.phone}`} className={cn("text-primary-700", focusRing)}>
+                <a href={`tel:${lead.phone}`} className={cn("text-primary-700 font-medium", focusRing)}>
                   {lead.phone}
                 </a>
               ) : (
-                "—"
+                <span className="text-gray-400">No phone on file</span>
               )}
             </Fact>
             <Fact icon={<Globe className="size-4" aria-hidden="true" />} label="Website">
@@ -347,12 +589,12 @@ function Overview({ lead }: { lead: LeadDetail }) {
                   href={lead.website_url}
                   target="_blank"
                   rel="noreferrer"
-                  className={cn("break-all text-primary-700", focusRing)}
+                  className={cn("break-all text-primary-700 font-medium", focusRing)}
                 >
                   {lead.website_url}
                 </a>
               ) : (
-                "—"
+                <span className="text-gray-400">No website discovered</span>
               )}
             </Fact>
             <Fact icon={<MapPin className="size-4" aria-hidden="true" />} label="Location">
@@ -372,7 +614,7 @@ function Overview({ lead }: { lead: LeadDetail }) {
                     focusRing,
                   )}
                 >
-                  {item.label}
+                  {item.label} ↗
                 </a>
               ))}
             </div>
@@ -380,12 +622,12 @@ function Overview({ lead }: { lead: LeadDetail }) {
         </Card>
 
         <Card className="shadow-sm lg:col-span-2">
-          <h2 className="text-h4 font-semibold text-ink">About this lead</h2>
+          <h2 className="text-h4 font-bold text-ink">Prospect Metadata</h2>
           <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <DetailItem label="Industry" value={lead.industry} />
-            <DetailItem label="Source" value={lead.source} />
-            <DetailItem label="Added" value={formatWhen(lead.created_at)} />
-            <DetailItem label="Updated" value={formatWhen(lead.updated_at)} />
+            <DetailItem label="Acquisition Source" value={lead.source} />
+            <DetailItem label="Discovered" value={formatWhen(lead.created_at)} />
+            <DetailItem label="Last Activity" value={formatWhen(lead.updated_at)} />
           </dl>
           {lead.tags.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-1 border-t border-gray-100 pt-4">
@@ -399,14 +641,14 @@ function Overview({ lead }: { lead: LeadDetail }) {
 
       {lead.description ? (
         <Card className="shadow-sm">
-          <h2 className="text-h4 font-semibold text-ink">Description</h2>
-          <p className="mt-3 whitespace-pre-wrap text-body text-gray-700">{lead.description}</p>
+          <h2 className="text-h4 font-bold text-ink">Business Description</h2>
+          <p className="mt-2 whitespace-pre-wrap text-body text-gray-700 leading-relaxed">{lead.description}</p>
         </Card>
       ) : null}
       {lead.notes ? (
         <Card className="shadow-sm">
-          <h2 className="text-h4 font-semibold text-ink">Notes</h2>
-          <p className="mt-3 whitespace-pre-wrap text-body text-gray-700">{lead.notes}</p>
+          <h2 className="text-h4 font-bold text-ink">Internal Notes</h2>
+          <p className="mt-2 whitespace-pre-wrap text-body text-gray-700 leading-relaxed">{lead.notes}</p>
         </Card>
       ) : null}
     </div>
@@ -416,7 +658,7 @@ function Overview({ lead }: { lead: LeadDetail }) {
 function ActivityList({ lead }: { lead: LeadDetail }) {
   if (lead.activities.length === 0) {
     return (
-      <EmptyState title="No activity yet" description="Changes to this lead will collect here." />
+      <EmptyState title="No activity yet" description="Events and interactions for this lead will collect here." />
     );
   }
 
@@ -432,7 +674,7 @@ function ActivityList({ lead }: { lead: LeadDetail }) {
           </span>
           <article className="min-w-0 flex-1 rounded-card border border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-4">
             <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-3">
-              <h3 className="font-medium text-ink">{activity.title}</h3>
+              <h3 className="font-semibold text-ink">{activity.title}</h3>
               <time className="text-caption text-gray-500" dateTime={activity.created_at}>
                 {formatWhen(activity.created_at)}
               </time>
@@ -481,10 +723,10 @@ function SummaryCard({
   emphasis?: boolean;
 }) {
   return (
-    <Card className={cn("shadow-sm", emphasis && "border-amber-200 bg-amber-50")}>
+    <Card className={cn("shadow-sm p-4", emphasis && "border-amber-200 bg-amber-50/70")}>
       <p className="text-caption font-semibold text-gray-500">{label}</p>
-      <p className="mt-2 text-h4 font-semibold break-words text-ink">{value}</p>
-      {detail ? <p className="mt-1 text-caption text-gray-500">{detail}</p> : null}
+      <p className="mt-1.5 text-h4 font-bold break-words text-ink">{value}</p>
+      {detail ? <p className="mt-1 text-caption text-gray-500 truncate">{detail}</p> : null}
     </Card>
   );
 }
@@ -519,6 +761,12 @@ function ActivityIcon({ type }: { type: string }) {
   }
   if (type.startsWith("audit")) {
     return <Globe className={className} aria-hidden="true" />;
+  }
+  if (type.startsWith("research")) {
+    return <Sparkles className={className} aria-hidden="true" />;
+  }
+  if (type.startsWith("mockup")) {
+    return <Images className={className} aria-hidden="true" />;
   }
   if (type.startsWith("followup")) {
     return <CalendarClock className={className} aria-hidden="true" />;
@@ -566,26 +814,6 @@ function linkItem(label: string, href: string | null): { label: string; href: st
     return null;
   }
   return { label, href };
-}
-
-function scoreWidth(score: number | null): number {
-  if (score === null) {
-    return 0;
-  }
-  return Math.max(0, Math.min(100, score));
-}
-
-function scoreColor(score: number | null): string {
-  if (score === null) {
-    return "bg-gray-200";
-  }
-  if (score >= 70) {
-    return "bg-emerald-500";
-  }
-  if (score >= 40) {
-    return "bg-amber-400";
-  }
-  return "bg-red-400";
 }
 
 function isPast(value: string | null): boolean {

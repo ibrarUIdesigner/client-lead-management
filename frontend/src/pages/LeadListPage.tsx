@@ -1,6 +1,6 @@
-import { ChevronDown } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { ChevronDown, Compass, ExternalLink, Flame, Globe, Images, Mail, MapPin, Sparkles } from "lucide-react";
+import { useState, type FormEvent, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useToast } from "../components/feedback/useToast";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -13,6 +13,8 @@ import { leadStatusOptions } from "../features/leads/statuses";
 import { useBulkUpdateLeads, useLeads } from "../hooks/useLeads";
 import { apiErrorMessage } from "../lib/apiError";
 import { cn, focusRing } from "../lib/cn";
+import { formatWhen } from "../lib/format";
+import { getNextBestAction } from "../lib/leadWorkflow";
 import type { Lead, LeadListParams } from "../types/lead";
 
 type Filters = {
@@ -115,11 +117,43 @@ function toParams(filters: Filters, page: number): LeadListParams {
   };
 }
 
+// Filter pill definitions
+type QuickFilterPill = {
+  id: string;
+  label: string;
+  statusMatch?: string;
+  minScoreMatch?: string;
+  icon?: any;
+};
+
+const filterPills: QuickFilterPill[] = [
+  { id: "all", label: "All" },
+  { id: "hot", label: "Hot", minScoreMatch: "70", icon: Flame },
+  { id: "new", label: "New", statusMatch: "NEW" },
+  { id: "audited", label: "Audited", statusMatch: "AUDIT_COMPLETE" },
+  { id: "mockup_ready", label: "Mockup Ready", statusMatch: "MOCKUP_READY" },
+  { id: "contacted", label: "Contacted", statusMatch: "CONTACTED" },
+  { id: "replied", label: "Replied", statusMatch: "REPLIED" },
+  { id: "won", label: "Won", statusMatch: "WON" },
+  { id: "lost", label: "Lost", statusMatch: "LOST" },
+];
+
 export function LeadListPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { notify } = useToast();
-  const [draft, setDraft] = useState(defaultFilters);
-  const [applied, setApplied] = useState(defaultFilters);
+
+  const [draft, setDraft] = useState<Filters>(() => {
+    const statusParam = searchParams.get("lead_status");
+    const minScoreParam = searchParams.get("min_score");
+    return {
+      ...defaultFilters,
+      lead_status: statusParam || defaultFilters.lead_status,
+      min_score: minScoreParam || defaultFilters.min_score,
+    };
+  });
+
+  const [applied, setApplied] = useState<Filters>(draft);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -131,6 +165,22 @@ export function LeadListPage() {
   const pageCount = leads.data ? Math.max(1, Math.ceil(leads.data.total / leads.data.limit)) : 1;
   const hasFilters = filtersAreActive(applied);
   const pageSelected = rows.length > 0 && rows.every((row) => selected.has(row.id));
+
+  // Sync when URL query params change
+  useEffect(() => {
+    const statusParam = searchParams.get("lead_status");
+    const minScoreParam = searchParams.get("min_score");
+    if (statusParam !== null || minScoreParam !== null) {
+      const next = {
+        ...defaultFilters,
+        lead_status: statusParam || "",
+        min_score: minScoreParam || "",
+      };
+      setDraft(next);
+      setApplied(next);
+      setPage(1);
+    }
+  }, [searchParams]);
 
   const updateDraft = (key: keyof Filters, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -151,6 +201,28 @@ export function LeadListPage() {
     setSelected(new Set());
   };
 
+  const handleSelectPill = (pill: QuickFilterPill) => {
+    const next: Filters = {
+      ...draft,
+      lead_status: pill.statusMatch ?? "",
+      min_score: pill.minScoreMatch ?? "",
+    };
+    setDraft(next);
+    setApplied(next);
+    setPage(1);
+    setSelected(new Set());
+  };
+
+  const isPillActive = (pill: QuickFilterPill) => {
+    if (pill.id === "all") {
+      return !applied.lead_status && !applied.min_score;
+    }
+    if (pill.minScoreMatch) {
+      return applied.min_score === pill.minScoreMatch && !applied.lead_status;
+    }
+    return applied.lead_status === pill.statusMatch;
+  };
+
   const toggle = (id: string) => {
     setSelected((current) => {
       const next = new Set(current);
@@ -167,34 +239,39 @@ export function LeadListPage() {
     setSelected((current) => {
       const next = new Set(current);
       if (pageSelected) {
-        rows.forEach((row) => next.delete(row.id));
+        for (const row of rows) {
+          next.delete(row.id);
+        }
       } else {
-        rows.forEach((row) => next.add(row.id));
+        for (const row of rows) {
+          next.add(row.id);
+        }
       }
       return next;
     });
   };
 
   const applyBulk = () => {
-    const tags = bulkTag
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0);
+    const ids = Array.from(selected);
+    if (ids.length === 0) {
+      return;
+    }
+    const tags = bulkTag.trim() ? [bulkTag.trim()] : undefined;
     bulkUpdate.mutate(
       {
-        ids: [...selected],
-        lead_status: bulkStatus || null,
+        ids,
+        lead_status: bulkStatus || undefined,
         add_tags: tags,
       },
       {
-        onSuccess: () => {
-          notify("Leads updated.", "success");
+        onSuccess: (result) => {
+          notify(`Updated ${result.items.length} ${result.items.length === 1 ? "lead" : "leads"}.`, "success");
           setSelected(new Set());
           setBulkStatus("");
           setBulkTag("");
         },
         onError: (error) => {
-          notify(apiErrorMessage(error, "Could not update those leads."), "danger");
+          notify(apiErrorMessage(error, "Could not update the selected leads."), "danger");
         },
       },
     );
@@ -224,19 +301,30 @@ export function LeadListPage() {
       id: "business",
       header: "Business",
       cell: (row) => (
-        <div className="flex max-w-72 flex-col gap-1.5 py-2">
-          <Link
-            to={`/leads/${row.id}`}
-            className={cn("font-medium text-ink hover:text-primary-700", focusRing)}
-          >
-            {row.business_name}
-          </Link>
+        <div className="flex max-w-72 flex-col gap-1 py-1">
+          <div className="flex items-center gap-1.5">
+            <Link
+              to={`/leads/${row.id}`}
+              className={cn("font-bold text-ink hover:text-primary-700", focusRing)}
+            >
+              {row.business_name}
+            </Link>
+            {row.email_unread ? (
+              <span className="size-2 rounded-full bg-orange-500 shrink-0" title="Unread reply" />
+            ) : null}
+          </div>
+          {row.city || row.country ? (
+            <span className="text-caption text-gray-500 flex items-center gap-1">
+              <MapPin className="size-3" />
+              {[row.city, row.country].filter(Boolean).join(", ")}
+            </span>
+          ) : null}
           {row.tags.length > 0 ? (
-            <span className="flex flex-wrap gap-1">
+            <span className="flex flex-wrap gap-1 mt-0.5">
               {row.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-caption font-medium text-gray-700"
+                  className="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.2 text-[10px] font-medium text-gray-600"
                 >
                   {tag}
                 </span>
@@ -247,68 +335,139 @@ export function LeadListPage() {
       ),
     },
     {
-      id: "status",
-      header: "Status",
-      cell: (row) => <StatusBadge status={row.lead_status} />,
+      id: "industry",
+      header: "Industry",
+      cell: (row) => <span className="text-small text-gray-700">{row.industry || "—"}</span>,
     },
     {
-      id: "score",
-      header: "Score",
-      cell: (row) =>
-        row.lead_score === null ? (
-          "—"
-        ) : (
-          <span className="font-medium tabular-nums">{row.lead_score}</span>
-        ),
-    },
-    {
-      id: "email",
-      header: "Email",
-      cell: (row) =>
-        row.email ? (
-          <a
-            href={`mailto:${row.email}`}
-            title={row.email}
-            className={cn("block max-w-56 truncate text-primary-700 hover:underline", focusRing)}
-          >
-            {row.email}
-          </a>
-        ) : (
-          "—"
-        ),
+      id: "opportunity",
+      header: "Opportunity",
+      cell: (row) => {
+        const score = row.lead_score;
+        if (score === null || score === undefined) {
+          return <span className="text-caption text-gray-400">Pending</span>;
+        }
+        const isHot = score >= 70;
+        const isMedium = score >= 45;
+
+        return (
+          <div className="flex flex-col gap-0.5" title="AI / heuristic opportunity score">
+            <span
+              className={cn(
+                "inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-caption font-bold tabular-nums",
+                isHot
+                  ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200"
+                  : isMedium
+                  ? "bg-blue-50 text-blue-700"
+                  : "bg-gray-100 text-gray-600",
+              )}
+            >
+              {isHot ? <Flame className="size-3 text-orange-600" /> : null}
+              {score} / 100
+            </span>
+            <span className="text-[10px] text-gray-400">
+              {row.website_url ? (row.website_quality_score ? `Quality ${row.website_quality_score}` : "Poor Web") : "No Website"}
+            </span>
+          </div>
+        );
+      },
     },
     {
       id: "website",
       header: "Website",
       cell: (row) =>
         row.website_url ? (
-          <a
-            href={row.website_url}
-            target="_blank"
-            rel="noreferrer"
-            title={row.website_url}
-            className={cn("block max-w-48 truncate text-primary-700 hover:underline", focusRing)}
-          >
-            {websiteLabel(row.website_url)}
-          </a>
+          <div className="flex items-center gap-1.5 max-w-44">
+            <a
+              href={row.website_url}
+              target="_blank"
+              rel="noreferrer"
+              title={row.website_url}
+              className={cn("truncate text-small text-primary-700 hover:underline", focusRing)}
+            >
+              {websiteLabel(row.website_url)}
+            </a>
+            <ExternalLink className="size-3 text-gray-400 shrink-0" />
+          </div>
         ) : (
-          "—"
+          <span className="inline-flex items-center rounded bg-amber-50 px-2 py-0.5 text-caption font-medium text-amber-800">
+            No Website
+          </span>
         ),
     },
     {
-      id: "location",
-      header: "Location",
-      cell: (row) => row.country || "—",
+      id: "status",
+      header: "Status",
+      cell: (row) => <StatusBadge status={row.lead_status} />,
     },
     {
-      id: "industry",
-      header: "Industry",
-      cell: (row) => row.industry || "—",
+      id: "activity",
+      header: "Last Activity",
+      cell: (row) => {
+        const time = row.last_replied_at || row.last_contacted_at || row.updated_at || row.created_at;
+        return (
+          <div className="text-caption text-gray-500 whitespace-nowrap">
+            {row.last_replied_at ? "Replied " : row.last_contacted_at ? "Contacted " : "Updated "}
+            {formatWhen(time)}
+          </div>
+        );
+      },
     },
     {
-      id: "source",
-      header: "Source",
-      cell: (row) => row.source || "—",
+      id: "nextAction",
+      header: "Next Best Action",
+      cell: (row) => {
+        const nba = getNextBestAction(row);
+        return (
+          <Button
+            variant={nba.priority === "critical" || nba.priority === "high" ? "primary" : "secondary"}
+            className="h-7 px-2.5 text-caption font-medium whitespace-nowrap shadow-2xs"
+            onClick={() => navigate(`/leads/${row.id}?tab=${nba.targetTab}`)}
+          >
+            {nba.action} →
+          </Button>
+        );
+      },
+    },
+    {
+      id: "quickActions",
+      header: "Actions",
+      cell: (row) => (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            title="Website Audit"
+            onClick={() => navigate(`/leads/${row.id}?tab=audit`)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+          >
+            <Globe className="size-4" />
+          </button>
+          <button
+            type="button"
+            title="Lead Research"
+            onClick={() => navigate(`/leads/${row.id}?tab=research`)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+          >
+            <Sparkles className="size-4" />
+          </button>
+          <button
+            type="button"
+            title="Homepage Mockup"
+            onClick={() => navigate(`/leads/${row.id}?tab=mockups`)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+          >
+            <Images className="size-4" />
+          </button>
+          <button
+            type="button"
+            title="Outreach Draft"
+            onClick={() => navigate(`/leads/${row.id}?tab=outreach`)}
+            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+          >
+            <Mail className="size-4" />
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -316,11 +475,22 @@ export function LeadListPage() {
     <>
       <PageHeader
         title="Leads"
-        description="Businesses you want to contact."
+        description="Prospects and businesses you want to qualify, audit, pitch, and convert."
         actions={
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
+              className="h-9 px-3 text-small"
+              onClick={() => {
+                navigate("/discover");
+              }}
+            >
+              <Compass className="size-4" />
+              <span>Find Leads</span>
+            </Button>
+            <Button
+              variant="secondary"
+              className="h-9 px-3 text-small"
               onClick={() => {
                 navigate("/leads/import");
               }}
@@ -328,20 +498,50 @@ export function LeadListPage() {
               Import CSV
             </Button>
             <Button
+              variant="primary"
+              className="h-9 px-3 text-small"
               onClick={() => {
                 navigate("/leads/new");
               }}
             >
-              Add lead
+              Add Lead
             </Button>
-          </>
+          </div>
         }
       />
+
+      {/* Quick Filter Pills Row (Section 8) */}
+      <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {filterPills.map((pill) => {
+          const active = isPillActive(pill);
+          const Icon = pill.icon;
+          return (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => handleSelectPill(pill)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-caption font-semibold transition-all shrink-0",
+                focusRing,
+                active
+                  ? "bg-primary-600 text-white shadow-2xs"
+                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-ink",
+              )}
+            >
+              {Icon ? <Icon className={cn("size-3.5", active ? "text-white" : "text-orange-500")} /> : null}
+              <span>{pill.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search and Secondary Filter Bar */}
       <form className="mb-4" onSubmit={applyFilters}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <div className="min-w-0 lg:w-80 lg:shrink-0">
             <Input
-              label="Search"
+              label="Search leads"
+              placeholder="Search business, website, city..."
               value={draft.q}
               onChange={(event) => {
                 updateDraft("q", event.target.value);
@@ -376,14 +576,15 @@ export function LeadListPage() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit">Apply</Button>
+            <Button type="submit" className="h-9 px-4 text-small">Apply</Button>
             {hasFilters || filtersAreActive(draft) ? (
-              <Button variant="secondary" onClick={clearFilters}>
+              <Button variant="secondary" className="h-9 px-3 text-small" onClick={clearFilters}>
                 Clear
               </Button>
             ) : null}
             <Button
               variant="ghost"
+              className="h-9 px-2 text-small"
               aria-expanded={showMoreFilters}
               aria-controls="lead-extra-filters"
               onClick={() => {
@@ -477,18 +678,18 @@ export function LeadListPage() {
             }}
           />
           <Button
-            className="w-full md:w-auto"
+            className="w-full md:w-auto h-9"
             onClick={applyBulk}
             isLoading={bulkUpdate.isPending}
             disabled={!bulkStatus && bulkTag.trim() === ""}
           >
-            Apply to {selected.size}
+            Apply to {selected.size} leads
           </Button>
         </div>
       ) : null}
 
       {rows.length > 0 ? (
-        <div className="mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <label className="inline-flex min-h-11 items-center gap-3 text-body text-ink">
             <input
               type="checkbox"
@@ -500,7 +701,7 @@ export function LeadListPage() {
           </label>
           {leads.data ? (
             <p className="text-small text-gray-500">
-              {leads.data.total} {leads.data.total === 1 ? "lead" : "leads"}
+              Showing {rows.length} of {leads.data.total} {leads.data.total === 1 ? "lead" : "leads"}
             </p>
           ) : null}
         </div>
@@ -523,11 +724,12 @@ export function LeadListPage() {
         }
         emptyAction={
           hasFilters ? (
-            <Button variant="secondary" onClick={clearFilters}>
+            <Button variant="secondary" className="h-9 px-3 text-small" onClick={clearFilters}>
               Clear filters
             </Button>
           ) : (
             <Button
+              className="h-9 px-3 text-small"
               onClick={() => {
                 navigate("/leads/new");
               }}
@@ -542,92 +744,61 @@ export function LeadListPage() {
           setPage(nextPage);
           setSelected(new Set());
         }}
-        renderCard={(row) => (
-          <article className="flex gap-3">
-            <label className="inline-flex size-11 shrink-0 items-start justify-center pt-0.5">
-              <input
-                type="checkbox"
-                className={cn("size-4 accent-primary", focusRing)}
-                aria-label={`Select ${row.business_name}`}
-                checked={selected.has(row.id)}
-                onChange={() => {
-                  toggle(row.id);
-                }}
-              />
-            </label>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <Link
-                  to={`/leads/${row.id}`}
-                  className={cn(
-                    "text-h4 font-semibold break-words text-ink hover:text-primary-700",
-                    focusRing,
-                  )}
-                >
-                  {row.business_name}
-                </Link>
-                <span className="shrink-0 text-h4 font-semibold tabular-nums text-ink">
-                  {row.lead_score === null ? "—" : row.lead_score}
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <StatusBadge status={row.lead_status} />
-                {row.industry ? <span className="text-small text-gray-600">{row.industry}</span> : null}
-              </div>
-              <dl className="mt-3 space-y-1 text-small text-gray-700">
-                <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-gray-500">Email</dt>
-                  <dd className="min-w-0 break-all">
-                    {row.email ? (
-                      <a href={`mailto:${row.email}`} className={cn("text-primary-700", focusRing)}>
-                        {row.email}
-                      </a>
-                    ) : (
-                      "—"
+        renderCard={(row) => {
+          const nba = getNextBestAction(row);
+          return (
+            <article className="flex gap-3">
+              <label className="inline-flex size-11 shrink-0 items-start justify-center pt-0.5">
+                <input
+                  type="checkbox"
+                  className={cn("size-4 accent-primary", focusRing)}
+                  aria-label={`Select ${row.business_name}`}
+                  checked={selected.has(row.id)}
+                  onChange={() => {
+                    toggle(row.id);
+                  }}
+                />
+              </label>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    to={`/leads/${row.id}`}
+                    className={cn(
+                      "text-h4 font-bold break-words text-ink hover:text-primary-700",
+                      focusRing,
                     )}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-gray-500">Website</dt>
-                  <dd className="min-w-0 truncate">
-                    {row.website_url ? (
-                      <a
-                        href={row.website_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={cn("text-primary-700", focusRing)}
-                      >
-                        {websiteLabel(row.website_url)}
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-gray-500">Place</dt>
-                  <dd className="min-w-0">{[row.city, row.country].filter(Boolean).join(", ") || "—"}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-gray-500">Source</dt>
-                  <dd className="min-w-0">{row.source || "—"}</dd>
-                </div>
-              </dl>
-              {row.tags.length > 0 ? (
-                <span className="mt-3 flex flex-wrap gap-1">
-                  {row.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-caption font-medium text-gray-700"
-                    >
-                      {tag}
+                  >
+                    {row.business_name}
+                  </Link>
+                  {row.lead_score ? (
+                    <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-caption font-bold text-orange-700">
+                      <Flame className="size-3" />
+                      {row.lead_score}
                     </span>
-                  ))}
-                </span>
-              ) : null}
-            </div>
-          </article>
-        )}
+                  ) : null}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={row.lead_status} />
+                  {row.industry ? <span className="text-small text-gray-600">{row.industry}</span> : null}
+                  {row.city ? <span className="text-caption text-gray-500">• {row.city}</span> : null}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                  <span className="text-caption text-gray-500">
+                    Next: <strong className="text-ink">{nba.action}</strong>
+                  </span>
+                  <Button
+                    variant="primary"
+                    className="h-7 px-2.5 text-caption font-medium"
+                    onClick={() => navigate(`/leads/${row.id}?tab=${nba.targetTab}`)}
+                  >
+                    {nba.ctaLabel}
+                  </Button>
+                </div>
+              </div>
+            </article>
+          );
+        }}
       />
     </>
   );

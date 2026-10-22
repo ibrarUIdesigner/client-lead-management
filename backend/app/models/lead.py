@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.contact import Contact
     from app.models.followup import Followup
     from app.models.gmail import LeadEmail
+    from app.models.lead_research import LeadResearch
     from app.models.mockup import Mockup
     from app.models.outreach import OutreachMessage
     from app.models.website_audit import WebsiteAudit
@@ -129,4 +130,10 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="lead",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+    research: Mapped["LeadResearch | None"] = relationship(
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )

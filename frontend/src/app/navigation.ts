@@ -1,8 +1,6 @@
 import {
-  BarChart3,
   Bot,
   CalendarClock,
-  FileText,
   Images,
   LayoutDashboard,
   Mail,
@@ -19,68 +17,97 @@ export type NavItem = {
   icon: LucideIcon;
   end?: boolean;
   description?: string;
+  badge?: string;
 };
 
-export const navItems: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+export type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
+export const navigationGroups: NavGroup[] = [
   {
-    to: "/leads",
-    label: "Leads",
-    icon: Users,
-    description: "Businesses you want to contact will show up here.",
+    title: "MAIN",
+    items: [
+      {
+        to: "/",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        end: true,
+        description: "Daily client acquisition command center.",
+      },
+      {
+        to: "/leads",
+        label: "Leads",
+        icon: Users,
+        description: "Businesses you want to qualify and contact.",
+      },
+      {
+        to: "/discover",
+        label: "Find Leads",
+        icon: MapPinned,
+        description: "Search markets and directories for businesses.",
+      },
+    ],
   },
   {
-    to: "/discover",
-    label: "Find leads",
-    icon: MapPinned,
-    description: "Daily searches for businesses you can pitch.",
+    title: "SALES",
+    items: [
+      {
+        to: "/pipeline",
+        label: "Pipeline",
+        icon: SquareKanban,
+        description: "Move prospects through acquisition stages.",
+      },
+      {
+        to: "/outreach",
+        label: "Outreach",
+        icon: Mail,
+        description: "Personalized pitch drafts and Gmail messaging.",
+      },
+      {
+        to: "/follow-ups",
+        label: "Follow-ups",
+        icon: CalendarClock,
+        description: "Today, overdue, and scheduled prospect check-ins.",
+      },
+    ],
   },
   {
-    to: "/apify",
-    label: "Apify",
-    icon: Bot,
-    description: "Actors you connect from Apify will show up here.",
+    title: "CREATIVE",
+    items: [
+      {
+        to: "/mockups",
+        label: "Mockups",
+        icon: Images,
+        description: "Homepage concepts generated for prospects.",
+      },
+    ],
   },
   {
-    to: "/pipeline",
-    label: "Pipeline",
-    icon: SquareKanban,
-    description: "Prospects will move through stages here.",
+    title: "AUTOMATION",
+    items: [
+      {
+        to: "/apify",
+        label: "Apify",
+        icon: Bot,
+        description: "Actor automations and scraper connectors.",
+      },
+    ],
   },
-  {
-    to: "/design-md",
-    label: "Design MD",
-    icon: FileText,
-    description: "Markdown design guides for homepage mockups.",
-  },
-  {
-    to: "/mockups",
-    label: "Mockups",
-    icon: Images,
-    description: "Homepage concepts for a prospect will show up here.",
-  },
-  {
-    to: "/outreach",
-    label: "Outreach",
-    icon: Mail,
-    description: "Drafts you can edit before sending will show up here.",
-  },
-  {
-    to: "/follow-ups",
-    label: "Follow-ups",
-    icon: CalendarClock,
-    description: "Today, overdue, and upcoming follow-ups will show up here.",
-  },
-  {
-    to: "/analytics",
-    label: "Analytics",
-    icon: BarChart3,
-    description: "Acquisition activity will show up here after you start working leads.",
-  },
+];
+
+export const utilityNavItems: NavItem[] = [
   {
     to: "/settings",
     label: "Settings",
     icon: Settings,
-    description: "Workspace preferences will show up here.",
+    description: "Workspace preferences and integrations.",
   },
+];
+
+// Flat export for backwards compatibility
+export const navItems: NavItem[] = [
+  ...navigationGroups.flatMap((group) => group.items),
+  ...utilityNavItems,
 ];
