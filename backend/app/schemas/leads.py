@@ -148,6 +148,10 @@ class LeadStatusUpdate(BaseModel):
     lead_status: LeadStatus
 
 
+class BulkLeadDelete(BaseModel):
+    ids: list[UUID] = Field(min_length=1, max_length=500)
+
+
 class BulkLeadUpdate(BaseModel):
     ids: list[UUID] = Field(min_length=1, max_length=100)
     lead_status: LeadStatus | None = None

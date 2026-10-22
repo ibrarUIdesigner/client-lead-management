@@ -8,7 +8,21 @@ import {
   listOutreachMessages,
   listOutreachTemplates,
 } from "../services/workspace";
-import { processMockup } from "../services/mockups";
+import { deleteMockup, processMockup } from "../services/mockups";
+import { useMutation } from "@tanstack/react-query";
+
+export function useDeleteMockup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteMockup(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["mockups"] });
+      void queryClient.invalidateQueries({ queryKey: ["mockup"] });
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["lead"] });
+    },
+  });
+}
 
 export function useMockups(leadId?: string) {
   const queryClient = useQueryClient();

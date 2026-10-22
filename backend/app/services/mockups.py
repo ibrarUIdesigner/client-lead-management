@@ -700,6 +700,20 @@ class MockupService:
         return source
 
 
+    def delete(self, mockup_id: UUID) -> None:
+        mockup = self._get(mockup_id)
+        # Clean up screenshot files on disk if they exist
+        for variant in ("desktop", "mobile"):
+            screenshot_path = self.storage_dir / f"mockup-{mockup_id}-{variant}.png"
+            if screenshot_path.exists():
+                try:
+                    screenshot_path.unlink()
+                except OSError:
+                    pass
+
+        self.session.delete(mockup)
+        self.session.commit()
+
 def _looks_like_image(payload: bytes) -> bool:
     return (
         payload.startswith(b"\x89PNG\r\n\x1a\n")

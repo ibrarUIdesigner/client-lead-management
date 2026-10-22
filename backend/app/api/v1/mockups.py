@@ -207,6 +207,12 @@ def get_mockup(mockup_id: UUID, request: Request, session: SessionDep) -> Mockup
     return detail
 
 
+@router.delete("/mockups/{mockup_id}", status_code=204)
+def delete_mockup(mockup_id: UUID, request: Request, session: SessionDep) -> Response:
+    MockupService(session, request.app.state.settings, request.app.state.settings.storage_dir).delete(mockup_id)
+    return Response(status_code=204)
+
+
 @router.post("/mockups/{mockup_id}/refine", response_model=MockupCreated, status_code=201)
 async def refine_mockup(
     mockup_id: UUID,

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  bulkDeleteLeads,
   bulkUpdateLeads,
   createLead,
   deleteLead,
@@ -64,6 +65,16 @@ export function useUpdateLeadStatus() {
   return useMutation({
     mutationFn: ({ id, leadStatus }: { id: string; leadStatus: string }) =>
       updateLeadStatus(id, leadStatus),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
+export function useBulkDeleteLeads() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkDeleteLeads(ids),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["leads"] });
     },

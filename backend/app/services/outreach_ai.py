@@ -19,7 +19,7 @@ DEFAULT_OFFER = (
 NEW_SITE_OFFER = (
     "I can create a professional website for the business, with a clear homepage "
     "and a simple way for customers to get in touch. "
-    "The settled price for that first site is $1,400."
+    "The settled price for that first site is $850."
 )
 _SCORE_LABELS = {
     "performance": "Performance",
@@ -337,6 +337,8 @@ def suggest_offer(
     findings: list[tuple[str, str]],
     scores: dict[str, int],
     settings: Settings,
+    research_summary: str | None = None,
+    proactive_solutions: list[str] | tuple[str, ...] | None = None,
     client: httpx.Client | None = None,
 ) -> tuple[str, str]:
     """Return (offer, source) where source is ai, audit, or default."""
@@ -356,6 +358,8 @@ def suggest_offer(
         has_website=has_website,
         findings=findings,
         scores=scores,
+        research_summary=research_summary,
+        proactive_solutions=proactive_solutions,
     )
     owns_client = client is None
     http = client or httpx.Client(timeout=30.0)
@@ -433,16 +437,17 @@ def _settled_quote(
     findings: list[tuple[str, str]],
     scores: dict[str, int],
 ) -> tuple[int, str]:
+    """Calculate pricing strictly between $500 and $1,000 USD based on audit & research complexity."""
     if not has_website:
-        return 1400, "refresh"
+        return 850, "refresh"
     weak = [score for score in scores.values() if isinstance(score, int) and score < 70]
     severe = [score for score in weak if score < 45]
     issue_count = len([title for title, _detail in findings if title.strip()])
     if severe or len(weak) >= 3 or issue_count >= 4:
-        return 1450, "redesign"
+        return 950, "redesign"
     if len(weak) >= 2 or issue_count >= 2:
-        return 950, "repair"
-    return 650, "refresh"
+        return 750, "repair"
+    return 550, "refresh"
 
 
 def _issue_sentence(
@@ -740,6 +745,8 @@ def _offer_instructions(
     has_website: bool,
     findings: list[tuple[str, str]],
     scores: dict[str, int],
+    research_summary: str | None = None,
+    proactive_solutions: list[str] | tuple[str, ...] | None = None,
 ) -> str:
     price, package = _settled_quote(
         has_website=has_website,
@@ -775,6 +782,12 @@ def _offer_instructions(
         if findings:
             lines.append("Findings to address:")
             lines.extend(f"- {title}: {detail}" for title, detail in findings[:4])
+    if research_summary:
+        lines.append(f"Business Context: {research_summary}")
+    if proactive_solutions:
+        lines.append("Proactive solutions identified:")
+        lines.extend(f"- {sol}" for sol in proactive_solutions[:3])
+        lines.append("Instruction: Anchor the value proposition of the offer around solving these bottlenecks.")
     lines.append('Return JSON with key "offer".')
     return "\n".join(lines)
 

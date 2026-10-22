@@ -9,6 +9,7 @@ from app.core.errors import AppError
 from app.models.enums import LeadStatus
 from app.repositories.leads import LeadQuery
 from app.schemas.leads import (
+    BulkLeadDelete,
     BulkLeadResult,
     BulkLeadUpdate,
     LeadCreate,
@@ -55,6 +56,12 @@ async def import_leads(
             status_code=400,
         ) from None
     return LeadService(session).import_csv(content, dry_run=dry_run)
+
+
+@router.post("/leads/bulk-delete")
+def bulk_delete_leads(data: BulkLeadDelete, session: SessionDep) -> dict[str, int]:
+    count = LeadService(session).bulk_delete(data.ids)
+    return {"deleted": count}
 
 
 @router.patch("/leads/bulk", response_model=BulkLeadResult)

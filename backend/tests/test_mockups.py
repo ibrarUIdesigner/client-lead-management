@@ -436,3 +436,27 @@ def test_eligibility_rules() -> None:
     denied = evaluate_mockup_eligibility(with_site, strong)
     assert denied.allowed is False
 
+
+
+def test_delete_mockup_removes_record_and_screenshots(tmp_path: Path) -> None:
+    session = Mock(spec=Session)
+    mockup_id = uuid4()
+    mockup = Mock(id=mockup_id, lead_id=uuid4(), version=1, title="Test Mockup")
+    session.get.return_value = mockup
+
+    # Create dummy screenshot files in tmp_path
+    desktop_file = tmp_path / f"mockup-{mockup_id}-desktop.png"
+    desktop_file.write_bytes(b"dummy desktop png")
+    mobile_file = tmp_path / f"mockup-{mockup_id}-mobile.png"
+    mobile_file.write_bytes(b"dummy mobile png")
+
+    assert desktop_file.exists()
+    assert mobile_file.exists()
+
+    service = MockupService(session, _settings(), storage_dir=tmp_path)
+    service.delete(mockup_id)
+
+    session.delete.assert_called_once_with(mockup)
+    session.commit.assert_called_once()
+    assert not desktop_file.exists()
+    assert not mobile_file.exists()

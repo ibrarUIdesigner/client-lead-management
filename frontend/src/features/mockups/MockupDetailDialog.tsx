@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { Trash2 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Modal } from "../../components/ui/Modal";
 import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { useToast } from "../../components/feedback/useToast";
+import { useDeleteMockup } from "../../hooks/useWorkspace";
 import { apiErrorMessage } from "../../lib/apiError";
 import { cn } from "../../lib/cn";
 import {
@@ -41,6 +44,22 @@ export function MockupDetailDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const processKicked = useRef(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const removeMockup = useDeleteMockup();
+
+  const onDelete = () => {
+    if (!mockupId) return;
+    removeMockup.mutate(mockupId, {
+      onSuccess: () => {
+        notify("Mockup deleted successfully.", "success");
+        setConfirmDelete(false);
+        onClose();
+      },
+      onError: (err) => {
+        notify(apiErrorMessage(err, "Could not delete mockup."), "danger");
+      },
+    });
+  };
 
   const detail = useQuery({
     queryKey: ["mockup", mockupId],
@@ -200,7 +219,7 @@ export function MockupDetailDialog({
             {failed ? (
               <div className="space-y-3 rounded-control border border-danger/30 bg-red-50 px-4 py-4">
                 <p className="text-body text-danger">{item.notes || "Generation failed."}</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     disabled={busy}
                     onClick={() => void onRetry((item.provider as MockupProvider) || "gemini")}
@@ -215,6 +234,14 @@ export function MockupDetailDialog({
                     }
                   >
                     Switch provider
+                  </Button>
+                  <Button
+                    variant="danger"
+                    disabled={busy || removeMockup.isPending}
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete
                   </Button>
                   {onOpenCreate ? (
                     <Button
@@ -265,6 +292,15 @@ export function MockupDetailDialog({
                       Mobile PNG
                     </Button>
                   ) : null}
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    disabled={busy || removeMockup.isPending}
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 className="size-4" />
+                    Delete mockup
+                  </Button>
                 </div>
                 <div className="overflow-hidden rounded-control border border-gray-200 bg-gray-100">
                   {item.has_desktop_screenshot || item.has_mobile_screenshot ? (
@@ -349,6 +385,19 @@ export function MockupDetailDialog({
           </p>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this mockup?"
+        description="This mockup version and its generated screenshots will be removed permanently."
+        confirmLabel="Delete mockup"
+        isLoading={removeMockup.isPending}
+        onConfirm={onDelete}
+        onClose={() => {
+          if (!removeMockup.isPending) {
+            setConfirmDelete(false);
+          }
+        }}
+      />
     </Modal>
   );
 }

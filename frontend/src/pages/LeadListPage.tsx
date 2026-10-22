@@ -1,4 +1,4 @@
-import { ChevronDown, Compass, ExternalLink, Flame, Globe, Images, Mail, MapPin, Sparkles } from "lucide-react";
+import { ChevronDown, Compass, ExternalLink, Flame, Globe, Images, Mail, MapPin, Sparkles, Trash2 } from "lucide-react";
 import { useState, type FormEvent, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -7,10 +7,11 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { DataTable, type DataColumn } from "../components/data/DataTable";
 import { StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
 import { leadStatusOptions } from "../features/leads/statuses";
-import { useBulkUpdateLeads, useLeads } from "../hooks/useLeads";
+import { useBulkDeleteLeads, useBulkUpdateLeads, useDeleteLead, useLeads } from "../hooks/useLeads";
 import { apiErrorMessage } from "../lib/apiError";
 import { cn, focusRing } from "../lib/cn";
 import { formatWhen } from "../lib/format";
@@ -161,6 +162,43 @@ export function LeadListPage() {
   const [bulkTag, setBulkTag] = useState("");
   const leads = useLeads(toParams(applied, page));
   const bulkUpdate = useBulkUpdateLeads();
+  const bulkDelete = useBulkDeleteLeads();
+  const deleteLead = useDeleteLead();
+  const [leadToDelete, setLeadToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
+  const handleDeleteLead = () => {
+    if (!leadToDelete) return;
+    deleteLead.mutate(leadToDelete.id, {
+      onSuccess: () => {
+        notify("Lead deleted successfully.", "success");
+        setLeadToDelete(null);
+        setSelected((curr) => {
+          const next = new Set(curr);
+          next.delete(leadToDelete.id);
+          return next;
+        });
+      },
+      onError: (err) => {
+        notify(apiErrorMessage(err, "Failed to delete lead."), "danger");
+      },
+    });
+  };
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    bulkDelete.mutate(ids, {
+      onSuccess: (deletedCount) => {
+        notify(`Deleted ${deletedCount} leads.`, "success");
+        setSelected(new Set());
+        setConfirmBulkDelete(false);
+      },
+      onError: (err) => {
+        notify(apiErrorMessage(err, "Failed to delete leads."), "danger");
+      },
+    });
+  };
   const rows = leads.data?.items ?? [];
   const pageCount = leads.data ? Math.max(1, Math.ceil(leads.data.total / leads.data.limit)) : 1;
   const hasFilters = filtersAreActive(applied);
@@ -466,6 +504,14 @@ export function LeadListPage() {
           >
             <Mail className="size-4" />
           </button>
+          <button
+            type="button"
+            title="Delete Lead"
+            onClick={() => setLeadToDelete({ id: row.id, name: row.business_name })}
+            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-danger transition-colors"
+          >
+            <Trash2 className="size-4" />
+          </button>
         </div>
       ),
     },
@@ -660,30 +706,43 @@ export function LeadListPage() {
       </form>
 
       {selected.size > 0 ? (
-        <div className="mb-6 grid items-end gap-4 rounded-card border border-gray-200 bg-white p-4 md:grid-cols-[1fr_1fr_auto]">
-          <Select
-            label="Set status"
-            placeholder="Keep current status"
-            options={leadStatusOptions}
-            value={bulkStatus}
-            onChange={(event) => {
-              setBulkStatus(event.target.value);
-            }}
-          />
-          <Input
-            label="Add tag"
-            value={bulkTag}
-            onChange={(event) => {
-              setBulkTag(event.target.value);
-            }}
-          />
+        <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 rounded-card border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex-1">
+            <Select
+              label="Set status"
+              placeholder="Keep current status"
+              options={leadStatusOptions}
+              value={bulkStatus}
+              onChange={(event) => {
+                setBulkStatus(event.target.value);
+              }}
+            />
+          </div>
+          <div className="flex-1">
+            <Input
+              label="Add tag"
+              value={bulkTag}
+              onChange={(event) => {
+                setBulkTag(event.target.value);
+              }}
+            />
+          </div>
           <Button
-            className="w-full md:w-auto h-9"
+            className="h-9 whitespace-nowrap"
             onClick={applyBulk}
             isLoading={bulkUpdate.isPending}
             disabled={!bulkStatus && bulkTag.trim() === ""}
           >
             Apply to {selected.size} leads
+          </Button>
+          <Button
+            variant="danger"
+            className="h-9 whitespace-nowrap"
+            onClick={() => setConfirmBulkDelete(true)}
+            isLoading={bulkDelete.isPending}
+          >
+            <Trash2 className="size-4" />
+            Delete ({selected.size})
           </Button>
         </div>
       ) : null}
@@ -784,9 +843,19 @@ export function LeadListPage() {
                 </div>
 
                 <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-                  <span className="text-caption text-gray-500">
-                    Next: <strong className="text-ink">{nba.action}</strong>
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      title="Delete Lead"
+                      onClick={() => setLeadToDelete({ id: row.id, name: row.business_name })}
+                      className="inline-flex size-7 items-center justify-center rounded border border-gray-200 text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-danger transition-colors"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                    <span className="text-caption text-gray-500">
+                      Next: <strong className="text-ink">{nba.action}</strong>
+                    </span>
+                  </div>
                   <Button
                     variant="primary"
                     className="h-7 px-2.5 text-caption font-medium"
@@ -798,6 +867,38 @@ export function LeadListPage() {
               </div>
             </article>
           );
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(leadToDelete)}
+        title="Delete lead?"
+        description={
+          leadToDelete
+            ? `Are you sure you want to delete "${leadToDelete.name}"? All associated audits, mockups, outreach drafts, and notes will be permanently removed.`
+            : "This lead will be deleted."
+        }
+        confirmLabel="Delete lead"
+        isLoading={deleteLead.isPending}
+        onConfirm={handleDeleteLead}
+        onClose={() => {
+          if (!deleteLead.isPending) {
+            setLeadToDelete(null);
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`Delete ${selected.size} selected leads?`}
+        description="All associated audits, mockups, outreach drafts, and notes for the selected leads will be permanently deleted."
+        confirmLabel={`Delete ${selected.size} leads`}
+        isLoading={bulkDelete.isPending}
+        onConfirm={handleBulkDelete}
+        onClose={() => {
+          if (!bulkDelete.isPending) {
+            setConfirmBulkDelete(false);
+          }
         }}
       />
     </>

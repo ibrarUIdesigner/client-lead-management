@@ -13,6 +13,7 @@ import {
   Sparkles,
   Tag,
   Target,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -314,11 +315,12 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
             Edit
           </Button>
           <Button
-            variant="ghost"
-            className="h-9 px-2 text-small text-gray-500 hover:text-danger"
+            variant="danger"
+            className="h-9 px-3 text-small"
             onClick={() => setConfirming(true)}
           >
-            Delete
+            <Trash2 className="size-4" />
+            Delete Lead
           </Button>
         </div>
       </div>

@@ -104,6 +104,18 @@ class LeadService:
     def delete(self, lead_id: UUID) -> None:
         lead = self._require(lead_id)
         self.session.delete(lead)
+        self.session.commit()
+
+    def bulk_delete(self, ids: list[UUID]) -> int:
+        unique_ids = list(dict.fromkeys(ids))
+        deleted_count = 0
+        for lead_id in unique_ids:
+            lead = self.leads.get(lead_id)
+            if lead is not None:
+                self.session.delete(lead)
+                deleted_count += 1
+        self.session.commit()
+        return deleted_count
 
     def bulk_update(self, data: BulkLeadUpdate) -> BulkLeadResult:
         ids = list(dict.fromkeys(data.ids))

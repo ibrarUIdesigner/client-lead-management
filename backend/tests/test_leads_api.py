@@ -80,3 +80,26 @@ def test_csv_preview_reports_invalid_rows_without_writing() -> None:
     assert body["created"] == 0
     assert len(body["valid_rows"]) == 1
     assert body["invalid_rows"] == [{"row_number": 3, "message": "Enter a business name."}]
+
+
+def test_delete_lead_deletes_record() -> None:
+    session = Mock()
+    lead = Mock(id=uuid4())
+    session.get.return_value = lead
+    with _client(session) as client:
+        response = client.delete(f"/api/v1/leads/{lead.id}")
+    assert response.status_code == 204
+    session.delete.assert_called_once_with(lead)
+    session.commit.assert_called_once()
+
+
+def test_bulk_delete_leads_deletes_records() -> None:
+    session = Mock()
+    id1, id2 = uuid4(), uuid4()
+    lead1, lead2 = Mock(id=id1), Mock(id=id2)
+    session.get.side_effect = lambda model, lid: lead1 if lid == id1 else lead2
+    with _client(session) as client:
+        response = client.post("/api/v1/leads/bulk-delete", json={"ids": [str(id1), str(id2)]})
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 2}
+    session.commit.assert_called_once()

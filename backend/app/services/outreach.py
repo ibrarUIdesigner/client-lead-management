@@ -74,6 +74,12 @@ class OutreachService:
                 if isinstance(score, int) and score < 80
             }
         has_website = bool(lead.website_url) and lead.website_status != "missing"
+        research = self._completed_research(lead.id)
+        research_summary = research.summary if research else None
+        proactive_solutions = []
+        if research and isinstance(research.research_data, dict):
+            proactive_solutions = research.research_data.get("proactive_solutions") or []
+
         offer, source = suggest_offer(
             business=lead.business_name,
             industry=lead.industry,
@@ -81,6 +87,8 @@ class OutreachService:
             findings=finding_items(issues, report),
             scores=scores,
             settings=settings,
+            research_summary=research_summary,
+            proactive_solutions=proactive_solutions,
         )
         return OutreachOfferSuggestion(offer=offer, source=source)
 

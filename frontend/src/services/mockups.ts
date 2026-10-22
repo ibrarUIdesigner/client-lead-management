@@ -75,6 +75,10 @@ export async function retryMockupScreenshots(mockupId: string): Promise<MockupDe
   return data;
 }
 
+export async function deleteMockup(mockupId: string): Promise<void> {
+  await api.delete(`/mockups/${mockupId}`);
+}
+
 export function mockupScreenshotUrl(
   mockupId: string,
   variant: "desktop" | "mobile" | "thumb" = "desktop",

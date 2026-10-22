@@ -1,4 +1,6 @@
+import { apiErrorMessage } from "../../lib/apiError";
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -7,7 +9,8 @@ import { QueryGate } from "../../components/feedback/QueryGate";
 import { useToast } from "../../components/feedback/useToast";
 import { StatusBadge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { useMockups } from "../../hooks/useWorkspace";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { useDeleteMockup, useMockups } from "../../hooks/useWorkspace";
 import { cn, focusRing } from "../../lib/cn";
 import { formatWhen } from "../../lib/format";
 import { getMockupEligibility, mockupScreenshotUrl } from "../../services/mockups";
@@ -32,6 +35,21 @@ export function MockupGallery({ leadId }: MockupGalleryProps) {
   const [createProvider, setCreateProvider] = useState<MockupProvider | undefined>();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [regenerateFrom, setRegenerateFrom] = useState<MockupItem | null>(null);
+  const [mockupToDelete, setMockupToDelete] = useState<MockupItem | null>(null);
+  const removeMockup = useDeleteMockup();
+
+  const handleConfirmDelete = () => {
+    if (!mockupToDelete) return;
+    removeMockup.mutate(mockupToDelete.id, {
+      onSuccess: () => {
+        notify("Mockup deleted successfully.", "success");
+        setMockupToDelete(null);
+      },
+      onError: (err) => {
+        notify(apiErrorMessage(err, "Failed to delete mockup."), "danger");
+      },
+    });
+  };
 
   const canCreate = Boolean(leadId && eligibility.data?.allowed);
   const eligibilityMessage = eligibility.data?.message;
@@ -100,6 +118,7 @@ export function MockupGallery({ leadId }: MockupGalleryProps) {
                 key={item.id}
                 item={item}
                 onOpen={() => setActiveId(item.id)}
+                onDelete={() => setMockupToDelete(item)}
                 onRegenerate={
                   canCreate
                     ? () => setRegenerateFrom(item)
@@ -147,6 +166,23 @@ export function MockupGallery({ leadId }: MockupGalleryProps) {
           }}
         />
       ) : null}
+      <ConfirmDialog
+        open={Boolean(mockupToDelete)}
+        title="Delete this mockup?"
+        description={
+          mockupToDelete
+            ? `Delete ${mockupToDelete.title || "Homepage concept"} (Version ${mockupToDelete.version})? All generated screenshots will be removed.`
+            : "This mockup will be deleted."
+        }
+        confirmLabel="Delete mockup"
+        isLoading={removeMockup.isPending}
+        onConfirm={handleConfirmDelete}
+        onClose={() => {
+          if (!removeMockup.isPending) {
+            setMockupToDelete(null);
+          }
+        }}
+      />
       <MockupDetailDialog
         open={Boolean(activeId)}
         mockupId={activeId}
@@ -169,10 +205,12 @@ function MockupCard({
   item,
   onOpen,
   onRegenerate,
+  onDelete,
 }: {
   item: MockupItem;
   onOpen: () => void;
   onRegenerate?: () => void;
+  onDelete: () => void;
 }) {
   const navigate = useNavigate();
   const preparing = item.status === "PENDING" || item.status === "GENERATING";
@@ -239,6 +277,14 @@ function MockupCard({
               Regenerate
             </Button>
           ) : null}
+          <button
+            type="button"
+            title="Delete mockup"
+            className="inline-flex size-8 items-center justify-center rounded border border-gray-200 text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-danger transition-colors"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
           <Button
             variant="primary"
             className="h-8 px-2.5 text-caption ml-auto"

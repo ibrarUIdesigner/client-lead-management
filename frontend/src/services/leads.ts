@@ -49,6 +49,11 @@ export async function deleteLead(id: string): Promise<void> {
   await api.delete(`/leads/${id}`);
 }
 
+export async function bulkDeleteLeads(ids: string[]): Promise<number> {
+  const response = await api.post<{ deleted: number }>("/leads/bulk-delete", { ids });
+  return response.data.deleted;
+}
+
 export async function bulkUpdateLeads(payload: BulkLeadUpdate): Promise<BulkLeadResult> {
   const response = await api.patch<BulkLeadResult>("/leads/bulk", payload);
   return response.data;
