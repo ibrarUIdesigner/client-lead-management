@@ -22,7 +22,20 @@ from app.services.outreach_ai import provider_ready
 logger = logging.getLogger(__name__)
 
 MockupProvider = Literal["gemini", "groq", "stitch", "banani", "magicpath"]
-MockupGoal = Literal["calls", "whatsapp", "bookings", "quotes"]
+MockupGoal = Literal[
+    "calls",
+    "whatsapp",
+    "bookings",
+    "quotes",
+    "reserve_table",
+    "book_consultation",
+    "schedule_viewing",
+    "request_demo",
+    "buy_product",
+    "get_started",
+    "visit_location",
+    "submit_inquiry",
+]
 
 _MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,40}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,40})?$")
 _GEMINI_FALLBACK_MODELS = (
@@ -39,11 +52,19 @@ _GROQ_FALLBACK_MODELS = (
 _GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-_GOAL_COPY = {
-    "calls": "Primary action: call the business (tel: link). Label it clearly.",
-    "whatsapp": "Primary action: enquire on WhatsApp. Use a wa.me link only if a phone number is provided; otherwise use a placeholder.",
-    "bookings": "Primary action: book an appointment. Use a button that does not submit a real form.",
-    "quotes": "Primary action: request a quote. Use a button that does not submit a real form.",
+_GOAL_COPY: dict[str, str] = {
+    "calls": "Primary action: call the business directly. Emphasize a prominent phone number button or link with clear business hours.",
+    "whatsapp": "Primary action: chat/enquire on WhatsApp. Use a prominent WhatsApp CTA button with clear response expectation.",
+    "bookings": "Primary action: book an appointment. Feature a prominent booking button or scheduling widget container above the fold and repeated near the bottom.",
+    "quotes": "Primary action: request an estimate/quote. Highlight a clear quote request form or button with estimated turnaround.",
+    "reserve_table": "Primary action: reserve a table. Feature reservation date/party CTA in hero and a prominent reservation banner.",
+    "book_consultation": "Primary action: book a discovery consultation / audit. Emphasize expert advisor intake button with no-obligation reassurance.",
+    "schedule_viewing": "Primary action: schedule a property/facility tour or viewing. Clear scheduling CTA with flexible times.",
+    "request_demo": "Primary action: request an interactive product walkthrough or demo.",
+    "buy_product": "Primary action: browse catalog or shop featured products/packages.",
+    "get_started": "Primary action: get started / onboard. Clean direct onboarding entry point.",
+    "visit_location": "Primary action: visit the physical location / showroom. Clear address, map placeholder, parking & directions.",
+    "submit_inquiry": "Primary action: submit a general inquiry / message with guaranteed quick response.",
 }
 
 
@@ -260,7 +281,7 @@ def _instructions(brief: str) -> str:
         "- No external stylesheets, fonts, CDNs, or iframes.\n"
         "- For images: when approved image assets are provided in the brief, you MUST place them across the layout using src=\"asset:0\", src=\"asset:1\", etc., or CSS background-image: url('asset:0'). Style them with object-fit: cover, border-radius, and modern proportions. Do not use any unauthorized remote image domains.\n"
         "- Use system font stacks only (for example: system-ui, Segoe UI, sans-serif).\n"
-        "- Sections required: navigation, hero, services, business information, contact, footer.\n"
+        "- Sections required: follow the EVIDENCE-BASED SECTION ARCHITECTURE in the brief strictly. Structure the page to highlight the primary conversion goal and solve the specific audit problems.\n"
         "- Follow the design guide for colors, typography, spacing, components, and responsive rules.\n"
         "- Use only verified business facts from the brief. Never invent testimonials, prices, "
         "certifications, awards, ratings, performance claims, or fictional brand themes.\n"

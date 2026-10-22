@@ -79,7 +79,20 @@ class MockupCreate(BaseModel):
     design_guide_id: UUID | None = None
     guide_mode: Literal["keep", "selected", "none"] = "none"
     provider: Literal["gemini", "groq", "stitch", "banani", "magicpath"] = "stitch"
-    goal: Literal["calls", "whatsapp", "bookings", "quotes"] = "calls"
+    goal: Literal[
+        "calls",
+        "whatsapp",
+        "bookings",
+        "quotes",
+        "reserve_table",
+        "book_consultation",
+        "schedule_viewing",
+        "request_demo",
+        "buy_product",
+        "get_started",
+        "visit_location",
+        "submit_inquiry",
+    ] = "calls"
 
     @field_validator("requirements")
     @classmethod

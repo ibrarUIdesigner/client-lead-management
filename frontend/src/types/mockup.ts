@@ -1,5 +1,17 @@
 export type MockupProvider = "stitch" | "banani" | "magicpath" | "gemini" | "groq";
-export type MockupGoal = "calls" | "whatsapp" | "bookings" | "quotes";
+export type MockupGoal =
+  | "calls"
+  | "whatsapp"
+  | "bookings"
+  | "quotes"
+  | "reserve_table"
+  | "book_consultation"
+  | "schedule_viewing"
+  | "request_demo"
+  | "buy_product"
+  | "get_started"
+  | "visit_location"
+  | "submit_inquiry";
 export type GuideMode = "keep" | "selected" | "none";
 
 export type MockupCreateWrite = {

@@ -46,6 +46,7 @@ from app.services.mockup_capture import MockupCaptureError, capture_mockup_html
 from app.services.mockup_eligibility import evaluate_mockup_eligibility, require_mockup_eligibility
 from app.services.mockup_html import wrap_for_srcdoc
 from app.services.mockup_images import fetch_relevant_mockup_images
+from app.services.mockup_planner import MockupPlanner
 from app.services.storage import (
     mockup_asset_key,
     mockup_screenshot_key,
@@ -95,26 +96,41 @@ class MockupService:
         stock_assets: list[dict[str, object]] = []
         if not assets:
             try:
-                stock_assets = fetch_relevant_mockup_images(
+                planner = MockupPlanner(settings=self.settings)
+                plan = planner.build_plan(
                     lead=lead,
                     audit=audit,
                     research=getattr(lead, "research", None),
-                    settings=self.settings,
+                    goal=data.goal,
+                    requirements=data.requirements,
+                    guidance=snapshot,
                 )
+                stock_assets = plan.curated_assets
+                brief = plan.brief_text
             except Exception as exc:
-                logger.warning("mockup_create_stock_images_failed: %s", exc)
-
-        asset_labels = self._asset_labels(stock_assets) if stock_assets else []
-        brief = self._brief_for_lead(
-            lead=lead,
-            findings=findings,
-            requirements=data.requirements,
-            guidance=snapshot,
-            goal=data.goal,  # type: ignore[arg-type]
-            asset_labels=asset_labels,
-            scenario=eligibility.scenario,
-            design_score=eligibility.design_score,
-        )
+                logger.warning("mockup_create_planner_failed: %s", exc)
+                asset_labels = self._asset_labels(stock_assets) if stock_assets else []
+                brief = self._brief_for_lead(
+                    lead=lead,
+                    findings=findings,
+                    requirements=data.requirements,
+                    guidance=snapshot,
+                    goal=data.goal,  # type: ignore[arg-type]
+                    asset_labels=asset_labels,
+                    scenario=eligibility.scenario,
+                    design_score=eligibility.design_score,
+                )
+        else:
+            brief = self._brief_for_lead(
+                lead=lead,
+                findings=findings,
+                requirements=data.requirements,
+                guidance=snapshot,
+                goal=data.goal,  # type: ignore[arg-type]
+                asset_labels=[],
+                scenario=eligibility.scenario,
+                design_score=eligibility.design_score,
+            )
         mockup = Mockup(
             lead_id=lead.id,
             audit_id=audit.id if audit is not None else None,
@@ -287,6 +303,25 @@ class MockupService:
         previous_html: str | None = None,
         refine_instructions: str | None = None,
     ) -> str:
+        try:
+            audit, _ = self._latest_findings(lead.id)
+            research = getattr(lead, "research", None)
+            planner = MockupPlanner(settings=self.settings)
+            plan = planner.build_plan(
+                lead=lead,
+                audit=audit,
+                research=research,
+                goal=goal,
+                requirements=requirements,
+                guidance=guidance,
+                asset_labels=asset_labels,
+                previous_html=previous_html,
+                refine_instructions=refine_instructions,
+            )
+            return plan.brief_text
+        except Exception as exc:
+            logger.warning("mockup_planner_brief_fallback: %s", exc)
+
         social = [
             value
             for value in (
@@ -394,26 +429,19 @@ class MockupService:
             resolve_mockup_provider(self.settings, provider)
             if not mockup.asset_refs:
                 try:
-                    audit, findings = self._latest_findings(lead.id)
-                    stock_assets = fetch_relevant_mockup_images(
+                    audit, _ = self._latest_findings(lead.id)
+                    planner = MockupPlanner(settings=self.settings)
+                    plan = planner.build_plan(
                         lead=lead,
                         audit=audit,
                         research=getattr(lead, "research", None),
-                        settings=self.settings,
+                        goal=mockup.goal or "calls",
                         client=client,
+                        guidance=mockup.design_guide_snapshot,
                     )
-                    if stock_assets:
-                        mockup.asset_refs = stock_assets
-                        mockup.prompt = self._brief_for_lead(
-                            lead=lead,
-                            findings=findings,
-                            requirements=None,
-                            guidance=mockup.design_guide_snapshot,
-                            goal=mockup.goal or "calls",
-                            asset_labels=self._asset_labels(mockup.asset_refs),
-                            scenario="redesign" if audit is not None else "new_site",
-                            design_score=audit.design_score if audit is not None else None,
-                        )
+                    if plan.curated_assets:
+                        mockup.asset_refs = plan.curated_assets
+                        mockup.prompt = plan.brief_text
                         self.session.flush()
                 except Exception as img_err:
                     logger.warning("mockup_execute_stock_assets_failed: %s", img_err)
