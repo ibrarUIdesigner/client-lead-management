@@ -372,15 +372,17 @@ function AuditResults({
           </div>
           <div className="flex flex-wrap gap-2">
             {missingWebsite ? (
-              <Button variant="secondary" onClick={onRetry}>
+              <Button variant="secondary" size="sm" onClick={onRetry}>
                 Add website URL
               </Button>
             ) : (
-              <Button variant="secondary" onClick={onRetry} isLoading={retrying}>
+              <Button variant="secondary" size="sm" onClick={onRetry} isLoading={retrying}>
                 Run again
               </Button>
             )}
-            <Button onClick={onCreateMockup}>Create mockup</Button>
+            <Button size="sm" onClick={onCreateMockup}>
+              Create mockup
+            </Button>
           </div>
         </div>
         {analysis?.opportunity_breakdown && analysis.opportunity_breakdown.length > 0 ? (
@@ -391,9 +393,9 @@ function AuditResults({
       </Card>
 
       {analysis?.report && analysis.report.length > 0 ? (
-        <Card>
-          <h2 className="text-h4 font-semibold text-ink">What to mention</h2>
-          <p className="mt-2 text-small text-gray-600">
+        <Card className="shadow-2xs">
+          <h2 className="text-h4 font-bold text-ink">What to mention</h2>
+          <p className="mt-1 text-small text-gray-500">
             {analysis.pages && analysis.pages.length > 0
               ? `The strongest checked issues from ${pageList(analysis.pages)}.`
               : "The strongest checked issues."}
@@ -402,19 +404,19 @@ function AuditResults({
             {analysis.report.map((item) => (
               <li
                 key={`${item.code}-${item.url}`}
-                className="rounded-control border border-gray-200 p-4"
+                className="rounded-card border border-gray-200/90 bg-white p-4 shadow-2xs hover:border-gray-300 transition-colors"
               >
-                <p className="font-medium text-ink">{item.title}</p>
-                <p className="mt-1 text-small text-gray-600">{item.detail}</p>
+                <p className="font-semibold text-ink">{item.title}</p>
+                <p className="mt-1 text-small text-gray-600 leading-relaxed">{item.detail}</p>
                 {item.fix ? (
-                  <p className="mt-3 rounded-control bg-primary-50 px-3 py-2 text-small text-primary-800">
+                  <p className="mt-3 rounded-md bg-primary-50 px-3 py-2 text-small text-primary-800 font-medium ring-1 ring-inset ring-primary-500/20">
                     Fix: {item.fix}
                   </p>
                 ) : null}
                 {item.url ? (
                   <a
                     href={item.url}
-                    className="mt-2 block truncate text-caption text-primary-700"
+                    className="mt-2 block truncate text-caption text-primary-700 hover:underline"
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -430,16 +432,16 @@ function AuditResults({
         </Card>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         {scores.map((score) => (
-          <Card key={score.label} className="shadow-sm">
+          <Card key={score.label} className="p-3.5 shadow-2xs">
             <div className="flex items-baseline justify-between gap-2">
-              <p className="text-caption font-semibold text-gray-500">{score.label}</p>
-              <p className="text-h4 font-semibold text-ink tabular-nums">{score.value ?? "—"}</p>
+              <p className="text-[12px] font-semibold text-gray-500">{score.label}</p>
+              <p className="text-h3 font-bold text-ink tabular-nums">{score.value ?? "—"}</p>
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
               <div
-                className={cn("h-full rounded-full", meterColor(score.value))}
+                className={cn("h-full rounded-full transition-all duration-300", meterColor(score.value))}
                 style={{ width: `${meterWidth(score.value)}%` }}
               />
             </div>

@@ -147,19 +147,19 @@ function AnalyticsBody({ data }: { data: AnalyticsSummary }) {
 
 function RateCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <Card className="shadow-sm">
-      <p className="text-caption font-semibold text-gray-500">{label}</p>
-      <p className="mt-2 text-h2 font-bold text-ink tabular-nums">{value}</p>
-      <p className="mt-1 text-caption text-gray-500">{detail}</p>
+    <Card className="shadow-2xs p-4 sm:p-5">
+      <p className="text-[12px] font-semibold text-gray-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
+      <p className="mt-1 text-caption text-gray-400">{detail}</p>
     </Card>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="shadow-sm">
-      <p className="text-caption font-semibold text-gray-500">{label}</p>
-      <p className="mt-2 text-h3 font-semibold text-ink tabular-nums">{value}</p>
+    <Card className="shadow-2xs p-3.5">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
+      <p className="mt-1.5 text-xl font-bold text-ink tabular-nums">{value}</p>
     </Card>
   );
 }

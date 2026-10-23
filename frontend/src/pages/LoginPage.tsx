@@ -8,6 +8,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Layers,
   Lock,
   Mail,
   ShieldCheck,
@@ -90,14 +91,14 @@ export function LoginPage() {
         {/* Top Header / Branding */}
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="inline-flex size-9 items-center justify-center rounded-control bg-primary text-small font-bold text-white shadow-sm ring-1 ring-white/20">
-              CA
-            </span>
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary-600 to-primary-700 text-white shadow-xs ring-1 ring-white/20">
+              <Layers className="size-5" aria-hidden="true" />
+            </div>
             <div>
-              <p className="text-body font-semibold tracking-tight text-white">
+              <p className="text-body font-bold tracking-tight text-white">
                 Client Acquisition
               </p>
-              <p className="text-caption text-white/50">Workspace Suite</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Growth Workspace</p>
             </div>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-caption font-medium text-white/80 backdrop-blur-xs">

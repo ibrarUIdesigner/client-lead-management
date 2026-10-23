@@ -12,11 +12,11 @@ export function Checkbox({ id, label, className, ...props }: CheckboxProps) {
   const inputId = id ?? generatedId;
 
   return (
-    <label htmlFor={inputId} className="inline-flex min-h-11 items-center gap-3 text-body text-ink">
+    <label htmlFor={inputId} className="inline-flex min-h-10 cursor-pointer items-center gap-2.5 text-body font-medium text-ink select-none">
       <input
         id={inputId}
         type="checkbox"
-        className={`size-4 accent-primary ${focusRing} ${className ?? ""}`}
+        className={`size-4 rounded-xs accent-primary cursor-pointer ${focusRing} ${className ?? ""}`}
         {...props}
       />
       {label}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -313,21 +313,22 @@ export function CreateMockupDialog({
     ];
   }, [providers.data]);
 
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (!open) {
-      return;
+    if (open && !prevOpenRef.current) {
+      const initialMode = savedGuideName ? "keep" : "none";
+      setMode(initialMode);
+      setGuideId(null);
+      setRequirements("");
+      const recommended = recommendGoal(archetype);
+      setGoal(recommended);
+      setFiles([]);
+      setError(null);
+      setSaving(false);
+      setShowSectionDetails(false);
+      setProvider(defaultProvider ?? "stitch");
     }
-    const initialMode = savedGuideName ? "keep" : "none";
-    setMode(initialMode);
-    setGuideId(null);
-    setRequirements("");
-    const recommended = recommendGoal(archetype);
-    setGoal(recommended);
-    setFiles([]);
-    setError(null);
-    setSaving(false);
-    setShowSectionDetails(false);
-    setProvider(defaultProvider ?? "stitch");
+    prevOpenRef.current = open;
   }, [open, savedGuideName, defaultProvider, archetype]);
 
   async function onSubmit() {

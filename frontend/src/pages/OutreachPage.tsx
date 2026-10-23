@@ -56,7 +56,7 @@ export function OutreachPage() {
         <Count label="Replies" value={messages.isPending ? null : counts.replied} />
       </div>
       <div
-        className="mt-6 flex flex-wrap gap-1 rounded-card bg-gray-100 p-1"
+        className="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-gray-200/70 bg-gray-100/80 p-1 [scrollbar-width:none]"
         role="tablist"
         aria-label="Outreach views"
       >
@@ -69,19 +69,21 @@ export function OutreachPage() {
               role="tab"
               aria-selected={active}
               className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-control px-3 text-body font-medium",
+                "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-small font-medium transition-all duration-150",
                 focusRing,
-                active ? "bg-white text-ink shadow-sm" : "text-gray-600 hover:text-ink",
+                active
+                  ? "bg-white font-semibold text-ink shadow-2xs"
+                  : "text-gray-600 hover:bg-white/60 hover:text-ink",
               )}
               onClick={() => {
                 setView(item.id);
               }}
             >
-              {item.label}
+              <span>{item.label}</span>
               <span
                 className={cn(
-                  "rounded-full px-1.5 text-caption font-semibold tabular-nums",
-                  active ? "bg-primary-50 text-primary-700" : "bg-white text-gray-500",
+                  "rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums",
+                  active ? "bg-primary-50 text-primary-700" : "bg-gray-200/80 text-gray-600",
                 )}
               >
                 {messages.isPending ? "—" : counts[item.id]}
@@ -105,12 +107,12 @@ export function OutreachPage() {
 
 function Count({ label, value }: { label: string; value: number | null }) {
   return (
-    <Card className="shadow-sm">
-      <p className="text-caption font-semibold text-gray-500">{label}</p>
+    <Card className="shadow-2xs p-4 sm:p-5">
+      <p className="text-[12px] font-semibold text-gray-500">{label}</p>
       {value === null ? (
         <Skeleton className="mt-2 h-8 w-12" />
       ) : (
-        <p className="mt-2 text-h2 font-bold text-ink tabular-nums">{value}</p>
+        <p className="mt-1.5 text-2xl font-bold tracking-tight text-ink tabular-nums">{value}</p>
       )}
     </Card>
   );

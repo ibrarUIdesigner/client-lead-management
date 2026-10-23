@@ -11,6 +11,7 @@ type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "id"> & {
   error?: string;
   leftIcon?: ReactNode;
   rightElement?: ReactNode;
+  hideLabel?: boolean;
 };
 
 export function Input({
@@ -20,6 +21,7 @@ export function Input({
   error,
   leftIcon,
   rightElement,
+  hideLabel,
   className,
   ...props
 }: InputProps) {
@@ -27,7 +29,7 @@ export function Input({
   const inputId = id ?? generatedId;
 
   return (
-    <Field id={inputId} label={label} hint={hint} error={error}>
+    <Field id={inputId} label={label} hint={hint} error={error} hideLabel={hideLabel}>
       <div className="relative flex items-center">
         {leftIcon ? (
           <span className="pointer-events-none absolute left-3 flex items-center text-gray-400">
@@ -39,7 +41,7 @@ export function Input({
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy(inputId, hint, error)}
           className={cn(
-            "h-11 w-full rounded-control border border-gray-300 bg-white px-3 text-body text-ink transition-colors placeholder:text-gray-400 lg:h-10",
+            "h-11 w-full rounded-control border border-gray-300 bg-white px-3 text-body text-ink shadow-2xs transition-all placeholder:text-gray-400 hover:border-gray-400/80 lg:h-10",
             focusRing,
             leftIcon ? "pl-9" : "",
             rightElement ? "pr-10" : "",

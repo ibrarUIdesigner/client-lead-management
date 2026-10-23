@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useToast } from "../../components/feedback/useToast";
 import { Button } from "../../components/ui/Button";
@@ -40,7 +40,7 @@ export function GmailComposer({
   const [attachAudit, setAttachAudit] = useState(false);
   const [mockupIds, setMockupIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
-  const [autoPicked, setAutoPicked] = useState(false);
+  const autoPickedRef = useRef(false);
 
   const connected = Boolean(gmail.data?.connected && !gmail.data.needs_reauth);
   const ready = to.trim().length > 0 && subject.trim().length > 0 && body.trim().length > 0;
@@ -55,12 +55,12 @@ export function GmailComposer({
   );
 
   useEffect(() => {
-    if (autoPicked || attachableMockups.length === 0) {
+    if (autoPickedRef.current || attachableMockups.length === 0) {
       return;
     }
+    autoPickedRef.current = true;
     setMockupIds([attachableMockups[0].id]);
-    setAutoPicked(true);
-  }, [attachableMockups, autoPicked]);
+  }, [attachableMockups]);
 
   if (!connected) {
     return (

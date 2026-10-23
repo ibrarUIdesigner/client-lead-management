@@ -178,8 +178,8 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && tabParam !== activeTab) {
-      setActiveTab(tabParam);
+    if (tabParam) {
+      setActiveTab((prev) => (prev === tabParam ? prev : tabParam));
     }
   }, [searchParams]);
 
@@ -262,7 +262,7 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
             )}
             {score !== null ? (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-caption font-bold text-orange-700"
+                className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-caption font-bold text-orange-700 ring-1 ring-inset ring-orange-500/20"
                 title="AI / heuristic opportunity score"
               >
                 <Flame className="size-3.5 text-orange-600" />
@@ -276,17 +276,17 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="secondary"
-            className="h-9 px-3 text-small"
+            size="sm"
             onClick={() => navigate(`/leads/${lead.id}/edit`)}
           >
             Edit Lead
           </Button>
           <Button
             variant="danger"
-            className="h-9 px-3 text-small"
+            size="sm"
             onClick={() => setConfirming(true)}
           >
-            <Trash2 className="size-4 mr-1" />
+            <Trash2 className="size-3.5 mr-1" />
             Delete Lead
           </Button>
         </div>

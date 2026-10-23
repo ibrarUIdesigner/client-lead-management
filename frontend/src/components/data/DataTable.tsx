@@ -51,7 +51,7 @@ export function DataTable<T>({
   const showRows = !showOffline && !isLoading && !error && rows.length > 0;
 
   return (
-    <div className="overflow-hidden rounded-card border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-card border border-gray-200/85 bg-white shadow-2xs">
       {showOffline ? (
         <div className="p-4 sm:p-6">
           <OfflineState onRetry={onRetry} />
@@ -77,7 +77,7 @@ export function DataTable<T>({
       ) : null}
 
       {!showOffline && !isLoading && !error && rows.length === 0 ? (
-        <div className="p-4 sm:p-6">
+        <div className="p-6 sm:p-10">
           <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
         </div>
       ) : null}
@@ -86,14 +86,14 @@ export function DataTable<T>({
         <>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-max min-w-full border-collapse text-left">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50/90 border-b border-gray-200">
                 <tr>
                   {columns.map((column) => (
                     <th
                       key={column.id}
                       scope="col"
                       className={cn(
-                        "px-4 py-3 text-caption font-semibold whitespace-nowrap text-gray-500",
+                        "px-4 py-3 text-[12px] font-semibold whitespace-nowrap text-gray-500 tracking-tight",
                         column.className,
                       )}
                     >
@@ -102,14 +102,17 @@ export function DataTable<T>({
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-100">
                 {rows.map((row) => (
-                  <tr key={getRowId(row)} className="border-t border-gray-200 hover:bg-gray-50">
+                  <tr
+                    key={getRowId(row)}
+                    className="transition-colors duration-100 hover:bg-gray-50/80"
+                  >
                     {columns.map((column) => (
                       <td
                         key={column.id}
                         className={cn(
-                          "min-h-16 px-4 py-2 align-middle text-body text-ink",
+                          "px-4 py-3.5 align-middle text-body text-ink",
                           column.className,
                         )}
                       >
@@ -121,7 +124,7 @@ export function DataTable<T>({
               </tbody>
             </table>
           </div>
-          <ul className="divide-y divide-gray-200 md:hidden">
+          <ul className="divide-y divide-gray-100 md:hidden">
             {rows.map((row) => (
               <li key={getRowId(row)} className="px-4 py-4">
                 {renderCard ? (
@@ -146,7 +149,7 @@ export function DataTable<T>({
       pageCount !== undefined &&
       onPageChange &&
       showRows ? (
-        <div className="border-t border-gray-200 px-4 py-3">
+        <div className="border-t border-gray-200 bg-gray-50/40 px-4 py-3">
           <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} />
         </div>
       ) : null}

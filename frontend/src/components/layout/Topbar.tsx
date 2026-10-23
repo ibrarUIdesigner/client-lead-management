@@ -31,7 +31,7 @@ export function Topbar({ collapsed, onOpenMenu, onToggleSidebar }: TopbarProps) 
 
   return (
     <>
-      <header className="sticky top-0 z-20 flex h-topbar items-center justify-between gap-2 border-b border-gray-200 bg-white/95 backdrop-blur-xs px-4 sm:gap-3 lg:px-8">
+      <header className="sticky top-0 z-20 flex h-topbar items-center justify-between gap-2 border-b border-gray-200/90 bg-white/95 backdrop-blur-sm px-4 sm:gap-3 lg:px-8 shadow-2xs">
         <div className="flex items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
@@ -45,9 +45,10 @@ export function Topbar({ collapsed, onOpenMenu, onToggleSidebar }: TopbarProps) 
           <div className="hidden lg:block">
             <Button
               variant="ghost"
-              size="icon"
+              size="icon-sm"
               aria-expanded={!collapsed}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="text-gray-500 hover:text-ink"
               onClick={onToggleSidebar}
             >
               {collapsed ? (
@@ -57,7 +58,12 @@ export function Topbar({ collapsed, onOpenMenu, onToggleSidebar }: TopbarProps) 
               )}
             </Button>
           </div>
-          <p className="truncate text-h4 font-bold text-ink lg:hidden">Client Acquisition</p>
+          <div className="flex items-center gap-2 lg:hidden">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-white font-bold text-caption">
+              CA
+            </span>
+            <p className="truncate text-body font-bold text-ink">Client Acquisition</p>
+          </div>
         </div>
 
         {/* Global Search Bar (⌘K / Ctrl+K trigger) */}
@@ -65,23 +71,23 @@ export function Topbar({ collapsed, onOpenMenu, onToggleSidebar }: TopbarProps) 
           <button
             type="button"
             onClick={() => setCommandPaletteOpen(true)}
-            className="flex w-full items-center justify-between rounded-control border border-gray-200 bg-gray-50/70 px-3 py-1.5 text-small text-gray-500 hover:border-gray-300 hover:bg-white transition-all shadow-2xs"
+            className="flex w-full items-center justify-between rounded-control border border-gray-200/90 bg-gray-50/70 px-3.5 py-1.5 text-small text-gray-500 hover:border-gray-300 hover:bg-white transition-all shadow-2xs"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <Search className="size-4 text-gray-400" />
-              <span>Search leads, websites, mockups...</span>
+              <span className="text-gray-400">Search leads, websites, mockups...</span>
             </div>
-            <kbd className="inline-flex items-center rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-semibold text-gray-400 shadow-2xs">
+            <kbd className="inline-flex items-center rounded border border-gray-200/90 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 shadow-2xs">
               Ctrl K
             </kbd>
           </button>
         </div>
 
-        {/* Right side controls: Mobile search button, Quick New Dropdown, Sign Out */}
+        {/* Right side controls: Mobile search button, Quick New Dropdown, Notifications, Sign Out */}
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-sm"
             className="sm:hidden text-gray-500"
             aria-label="Search"
             onClick={() => setCommandPaletteOpen(true)}
@@ -93,16 +99,19 @@ export function Topbar({ collapsed, onOpenMenu, onToggleSidebar }: TopbarProps) 
 
           <NotificationBell />
 
+          <div className="h-5 w-px bg-gray-200/80 mx-1 hidden sm:block" aria-hidden="true" />
+
           <Button
             variant="ghost"
-            className="h-8 text-gray-600 hover:text-danger gap-1.5 px-2.5 text-small"
+            size="sm"
+            className="text-gray-600 hover:text-danger gap-1.5 px-2.5 text-small"
             aria-label="Sign out"
             onClick={() => {
               signOut();
               navigate("/login", { replace: true });
             }}
           >
-            <LogOut size={16} aria-hidden="true" />
+            <LogOut size={15} aria-hidden="true" />
             <span className="hidden md:inline">Sign out</span>
           </Button>
         </div>

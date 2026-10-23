@@ -72,18 +72,19 @@ export function QuickNewDropdown() {
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <Button
         variant="primary"
-        className="h-8 gap-1.5 px-3 text-small font-medium shadow-xs"
+        size="sm"
+        className="gap-1.5 px-3"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <Plus className="size-4" />
+        <Plus className="size-3.5" />
         <span>New</span>
       </Button>
 
       {open ? (
-        <div className="absolute right-0 z-30 mt-2 w-64 origin-top-right rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
-          <div className="px-2.5 py-1.5 text-caption font-semibold uppercase tracking-wider text-gray-400">
+        <div className="absolute right-0 z-30 mt-2 w-64 origin-top-right rounded-card border border-gray-200/90 bg-white p-1.5 shadow-lg ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
+          <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-gray-400">
             Quick Actions
           </div>
           <div className="space-y-0.5">
@@ -97,7 +98,7 @@ export function QuickNewDropdown() {
                     setOpen(false);
                     navigate(item.to);
                   }}
-                  className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-gray-50 transition-colors group"
+                  className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-gray-50/80 transition-colors group cursor-pointer"
                 >
                   <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-600 group-hover:bg-primary-600 group-hover:text-white transition-colors">
                     <Icon className="size-3.5" />

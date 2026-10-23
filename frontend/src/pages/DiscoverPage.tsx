@@ -307,16 +307,16 @@ function StatCard({
   hint: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4 shadow-2xs">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-caption font-semibold uppercase tracking-wide text-gray-500">
+          <p className="text-[12px] font-semibold text-gray-500">
             {label}
           </p>
-          <p className="mt-2 text-h2 font-bold tabular-nums text-ink">{value}</p>
-          <p className="mt-1 text-caption text-gray-500">{hint}</p>
+          <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums text-ink">{value}</p>
+          <p className="mt-1 text-caption text-gray-400">{hint}</p>
         </div>
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-control bg-primary-50 text-primary-700">
+        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-gray-50 text-gray-400">
           {icon}
         </span>
       </div>

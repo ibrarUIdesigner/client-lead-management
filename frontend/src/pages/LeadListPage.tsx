@@ -206,16 +206,17 @@ export function LeadListPage() {
 
   // Sync when URL query params change
   useEffect(() => {
-    const statusParam = searchParams.get("lead_status");
-    const minScoreParam = searchParams.get("min_score");
-    if (statusParam !== null || minScoreParam !== null) {
-      const next = {
-        ...defaultFilters,
-        lead_status: statusParam || "",
-        min_score: minScoreParam || "",
-      };
-      setDraft(next);
-      setApplied(next);
+    const statusParam = searchParams.get("lead_status") || "";
+    const minScoreParam = searchParams.get("min_score") || "";
+    if (searchParams.has("lead_status") || searchParams.has("min_score")) {
+      setDraft((prev) => {
+        if (prev.lead_status === statusParam && prev.min_score === minScoreParam) return prev;
+        return { ...prev, lead_status: statusParam, min_score: minScoreParam };
+      });
+      setApplied((prev) => {
+        if (prev.lead_status === statusParam && prev.min_score === minScoreParam) return prev;
+        return { ...prev, lead_status: statusParam, min_score: minScoreParam };
+      });
       setPage(1);
     }
   }, [searchParams]);
@@ -475,42 +476,47 @@ export function LeadListPage() {
           <button
             type="button"
             title="Website Audit"
+            aria-label="Website Audit"
             onClick={() => navigate(`/leads/${row.id}?tab=audit`)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+            className="flex size-7.5 items-center justify-center rounded-md border border-transparent text-gray-400 hover:border-gray-200 hover:bg-gray-50 hover:text-primary-700 transition-all cursor-pointer"
           >
-            <Globe className="size-4" />
+            <Globe className="size-3.5" />
           </button>
           <button
             type="button"
             title="Lead Research"
+            aria-label="Lead Research"
             onClick={() => navigate(`/leads/${row.id}?tab=research`)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+            className="flex size-7.5 items-center justify-center rounded-md border border-transparent text-gray-400 hover:border-gray-200 hover:bg-gray-50 hover:text-primary-700 transition-all cursor-pointer"
           >
-            <Sparkles className="size-4" />
+            <Sparkles className="size-3.5" />
           </button>
           <button
             type="button"
             title="Homepage Mockup"
+            aria-label="Homepage Mockup"
             onClick={() => navigate(`/leads/${row.id}?tab=mockups`)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+            className="flex size-7.5 items-center justify-center rounded-md border border-transparent text-gray-400 hover:border-gray-200 hover:bg-gray-50 hover:text-primary-700 transition-all cursor-pointer"
           >
-            <Images className="size-4" />
+            <Images className="size-3.5" />
           </button>
           <button
             type="button"
             title="Outreach Draft"
+            aria-label="Outreach Draft"
             onClick={() => navigate(`/leads/${row.id}?tab=outreach`)}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-primary-700 transition-colors"
+            className="flex size-7.5 items-center justify-center rounded-md border border-transparent text-gray-400 hover:border-gray-200 hover:bg-gray-50 hover:text-primary-700 transition-all cursor-pointer"
           >
-            <Mail className="size-4" />
+            <Mail className="size-3.5" />
           </button>
           <button
             type="button"
             title="Delete Lead"
+            aria-label="Delete Lead"
             onClick={() => setLeadToDelete({ id: row.id, name: row.business_name })}
-            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-danger transition-colors"
+            className="flex size-7.5 items-center justify-center rounded-md border border-transparent text-gray-400 hover:border-red-200 hover:bg-red-50 hover:text-danger transition-all cursor-pointer"
           >
-            <Trash2 className="size-4" />
+            <Trash2 className="size-3.5" />
           </button>
         </div>
       ),
@@ -526,7 +532,7 @@ export function LeadListPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="secondary"
-              className="h-9 px-3 text-small"
+              size="sm"
               onClick={() => {
                 navigate("/discover");
               }}
@@ -536,7 +542,7 @@ export function LeadListPage() {
             </Button>
             <Button
               variant="secondary"
-              className="h-9 px-3 text-small"
+              size="sm"
               onClick={() => {
                 navigate("/leads/import");
               }}
@@ -545,7 +551,7 @@ export function LeadListPage() {
             </Button>
             <Button
               variant="primary"
-              className="h-9 px-3 text-small"
+              size="sm"
               onClick={() => {
                 navigate("/leads/new");
               }}
@@ -567,11 +573,11 @@ export function LeadListPage() {
               type="button"
               onClick={() => handleSelectPill(pill)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-caption font-semibold transition-all shrink-0",
+                "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-caption font-semibold transition-all shrink-0 cursor-pointer shadow-2xs",
                 focusRing,
                 active
-                  ? "bg-primary-600 text-white shadow-2xs"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-ink",
+                  ? "bg-primary text-white"
+                  : "bg-white border border-gray-200/90 text-gray-600 hover:bg-gray-50 hover:text-ink",
               )}
             >
               {Icon ? <Icon className={cn("size-3.5", active ? "text-white" : "text-orange-500")} /> : null}
@@ -582,7 +588,10 @@ export function LeadListPage() {
       </div>
 
       {/* Search and Secondary Filter Bar */}
-      <form className="mb-4" onSubmit={applyFilters}>
+      <form
+        className="mb-4 rounded-card border border-gray-200/85 bg-white p-4 shadow-2xs"
+        onSubmit={applyFilters}
+      >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
           <div className="min-w-0 lg:w-80 lg:shrink-0">
             <Input
@@ -594,7 +603,7 @@ export function LeadListPage() {
               }}
             />
           </div>
-          <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-3 sm:max-w-xl">
+          <div className="grid flex-1 grid-cols-1 gap-3 min-[480px]:grid-cols-3 sm:max-w-xl">
             <Select
               label="Status"
               placeholder="Any status"
@@ -621,16 +630,18 @@ export function LeadListPage() {
               }}
             />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" className="h-9 px-4 text-small">Apply</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" size="default" className="px-5">
+              Apply
+            </Button>
             {hasFilters || filtersAreActive(draft) ? (
-              <Button variant="secondary" className="h-9 px-3 text-small" onClick={clearFilters}>
+              <Button variant="secondary" size="default" onClick={clearFilters}>
                 Clear
               </Button>
             ) : null}
             <Button
               variant="ghost"
-              className="h-9 px-2 text-small"
+              size="default"
               aria-expanded={showMoreFilters}
               aria-controls="lead-extra-filters"
               onClick={() => {
@@ -706,7 +717,7 @@ export function LeadListPage() {
       </form>
 
       {selected.size > 0 ? (
-        <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 rounded-card border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-6 flex flex-col md:flex-row md:items-end gap-3 rounded-card border border-primary-200 bg-primary-50/30 p-4 shadow-sm ring-1 ring-primary-500/10">
           <div className="flex-1">
             <Select
               label="Set status"
@@ -728,7 +739,8 @@ export function LeadListPage() {
             />
           </div>
           <Button
-            className="h-9 whitespace-nowrap"
+            size="default"
+            className="whitespace-nowrap"
             onClick={applyBulk}
             isLoading={bulkUpdate.isPending}
             disabled={!bulkStatus && bulkTag.trim() === ""}
@@ -737,7 +749,8 @@ export function LeadListPage() {
           </Button>
           <Button
             variant="danger"
-            className="h-9 whitespace-nowrap"
+            size="default"
+            className="whitespace-nowrap gap-1.5"
             onClick={() => setConfirmBulkDelete(true)}
             isLoading={bulkDelete.isPending}
           >

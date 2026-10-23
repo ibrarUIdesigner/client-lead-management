@@ -92,15 +92,15 @@ function StageColumn({
         }
       }}
     >
-      <header className="flex items-center justify-between border-b border-gray-200/60 px-3.5 py-3 bg-white/50 rounded-t-card">
+      <header className="flex items-center justify-between border-b border-gray-200/80 px-3.5 py-3 bg-white rounded-t-card">
         <h2 className="text-small font-bold text-ink">{label}</h2>
-        <span className="rounded-full bg-gray-200/70 px-2 py-0.5 text-caption font-bold text-gray-700">
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-caption font-bold text-gray-600 ring-1 ring-inset ring-gray-400/15">
           {leads.length}
         </span>
       </header>
       <div className="flex flex-1 flex-col gap-2.5 p-2.5">
         {leads.length === 0 ? (
-          <p className="rounded-control border border-dashed border-gray-300 px-3 py-6 text-center text-caption text-gray-400">
+          <p className="rounded-control border border-dashed border-gray-200 px-3 py-6 text-center text-caption text-gray-400">
             No prospects in this stage.
           </p>
         ) : (
@@ -112,7 +112,7 @@ function StageColumn({
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", lead.id);
               }}
-              className="rounded-control border border-gray-200 bg-white p-3 shadow-2xs hover:shadow-sm transition-all cursor-grab active:cursor-grabbing"
+              className="rounded-control border border-gray-200/90 bg-white p-3 shadow-2xs hover:border-gray-300 hover:shadow-xs transition-all cursor-grab active:cursor-grabbing"
             >
               <div className="flex items-start justify-between gap-2">
                 <Link

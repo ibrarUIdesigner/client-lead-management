@@ -63,16 +63,17 @@ export function NotificationsPage() {
             {unreadCount > 0 ? (
               <Button
                 variant="secondary"
+                size="sm"
                 onClick={() => markAllRead.mutate()}
                 isLoading={markAllRead.isPending}
-                className="gap-1.5 h-9 text-small px-3"
+                className="gap-1.5 px-3"
               >
                 <CheckCheck className="size-4" />
                 <span>Mark all as read</span>
               </Button>
             ) : null}
             <Link to="/settings">
-              <Button variant="ghost" className="h-9 text-small px-3">
+              <Button variant="ghost" size="sm" className="px-3">
                 Push settings
               </Button>
             </Link>

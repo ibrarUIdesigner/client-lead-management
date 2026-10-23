@@ -1,5 +1,6 @@
 import { Inbox, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn } from "../../lib/cn";
 
 type EmptyStateProps = {
   title: string;
@@ -7,6 +8,7 @@ type EmptyStateProps = {
   action?: ReactNode;
   compact?: boolean;
   icon?: LucideIcon;
+  align?: "center" | "start";
 };
 
 export function EmptyState({
@@ -15,23 +17,38 @@ export function EmptyState({
   action,
   compact = false,
   icon: Icon = Inbox,
+  align = "center",
 }: EmptyStateProps) {
+  const isCenter = align === "center";
+
   return (
     <div
-      className={
-        compact
-          ? "flex flex-col items-start gap-2 rounded-card border border-dashed border-gray-300 bg-white px-4 py-4"
-          : "flex flex-col items-start gap-3 rounded-card border border-dashed border-gray-300 bg-white px-4 py-8 sm:px-6 sm:py-10"
-      }
+      className={cn(
+        "flex flex-col rounded-card border border-dashed border-gray-200/90 bg-gray-50/40 transition-colors",
+        isCenter ? "items-center text-center mx-auto" : "items-start text-left",
+        compact ? "p-4 gap-2.5 max-w-lg" : "p-8 sm:p-12 gap-3 max-w-xl",
+      )}
     >
-      <span className="inline-flex size-10 items-center justify-center rounded-full bg-gray-100 text-gray-500">
+      <span className="inline-flex size-11 items-center justify-center rounded-full bg-white shadow-2xs border border-gray-200/80 text-gray-400">
         <Icon className="size-5" aria-hidden="true" />
       </span>
-      <h2 className={compact ? "text-h4 font-semibold text-ink" : "text-h3 font-semibold text-ink"}>
+      <h3
+        className={cn(
+          "font-semibold text-ink",
+          compact ? "text-body-lg" : "text-h3 font-bold tracking-tight",
+        )}
+      >
         {title}
-      </h2>
-      <p className="max-w-lg text-body leading-normal text-gray-600">{description}</p>
-      {action}
+      </h3>
+      <p
+        className={cn(
+          "text-body text-gray-500 leading-relaxed",
+          isCenter ? "max-w-md" : "max-w-lg",
+        )}
+      >
+        {description}
+      </p>
+      {action ? <div className="mt-2 flex flex-wrap gap-2">{action}</div> : null}
     </div>
   );
 }

@@ -5,12 +5,12 @@ import { cn } from "../../lib/cn";
 export type BadgeTone = "gray" | "indigo" | "blue" | "green" | "orange" | "red";
 
 const tones: Record<BadgeTone, string> = {
-  gray: "bg-gray-100 text-gray-700",
-  indigo: "bg-primary-50 text-primary-700",
-  blue: "bg-blue-50 text-blue-700",
-  green: "bg-emerald-50 text-emerald-800",
-  orange: "bg-amber-50 text-amber-800",
-  red: "bg-red-50 text-red-700",
+  gray: "bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-400/25",
+  indigo: "bg-primary-50 text-primary-700 ring-1 ring-inset ring-primary-500/25",
+  blue: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-500/25",
+  green: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-500/25",
+  orange: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-500/25",
+  red: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-500/25",
 };
 
 type BadgeProps = {
@@ -23,7 +23,7 @@ export function Badge({ tone = "gray", className, children }: BadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-control px-2 py-1 text-caption font-medium",
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold tracking-tight whitespace-nowrap",
         tones[tone],
         className,
       )}
@@ -99,6 +99,15 @@ type StatusBadgeProps = {
   status: string;
 };
 
+const dotTones: Record<BadgeTone, string> = {
+  gray: "bg-gray-400",
+  indigo: "bg-primary-500",
+  blue: "bg-blue-500",
+  green: "bg-emerald-500",
+  orange: "bg-amber-500",
+  red: "bg-red-500",
+};
+
 export function StatusBadge({ status }: StatusBadgeProps) {
   const label =
     statusLabels[status] ??
@@ -108,5 +117,12 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join(" ");
 
-  return <Badge tone={statusTones[status] ?? "gray"}>{label}</Badge>;
+  const tone = statusTones[status] ?? "gray";
+
+  return (
+    <Badge tone={tone}>
+      <span className={cn("size-1.5 rounded-full shrink-0", dotTones[tone])} aria-hidden="true" />
+      <span>{label}</span>
+    </Badge>
+  );
 }

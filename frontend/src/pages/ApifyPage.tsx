@@ -45,11 +45,12 @@ export function ApifyPage() {
         description="Actors from your Apify account are listed here. Run one with your own filters, then import the records you want as leads."
         actions={
           <Button
+            size="sm"
             onClick={() => {
               setAddOpen(true);
             }}
           >
-            <Plus size={18} aria-hidden="true" />
+            <Plus size={16} aria-hidden="true" />
             Add connector
           </Button>
         }

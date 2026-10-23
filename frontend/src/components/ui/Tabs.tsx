@@ -35,7 +35,7 @@ export function Tabs({ label, tabs, value, onValueChange }: TabsProps) {
       <div
         role="tablist"
         aria-label={label}
-        className="flex gap-1 overflow-x-auto rounded-card bg-gray-100 p-1 [scrollbar-width:thin]"
+        className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-gray-200/70 bg-gray-100/80 p-1 [scrollbar-width:none]"
       >
         {tabs.map((tab) => {
           const selected = tab.id === activeTab?.id;
@@ -50,9 +50,11 @@ export function Tabs({ label, tabs, value, onValueChange }: TabsProps) {
               aria-controls={`${baseId}-panel-${tab.id}`}
               tabIndex={selected ? 0 : -1}
               className={cn(
-                "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-control px-3 text-body font-medium whitespace-nowrap",
+                "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3.5 text-small font-medium whitespace-nowrap transition-all duration-150",
                 focusRing,
-                selected ? "bg-white text-ink shadow-sm" : "text-gray-600 hover:text-ink",
+                selected
+                  ? "bg-white font-semibold text-ink shadow-2xs"
+                  : "text-gray-600 hover:bg-white/60 hover:text-ink",
               )}
               onClick={() => {
                 selectTab(tab.id);
@@ -71,12 +73,12 @@ export function Tabs({ label, tabs, value, onValueChange }: TabsProps) {
                 selectTab(tabs[nextIndex]?.id ?? tab.id);
               }}
             >
-              {tab.label}
+              <span>{tab.label}</span>
               {tab.count !== undefined ? (
                 <span
                   className={cn(
-                    "rounded-full px-1.5 text-caption font-semibold tabular-nums",
-                    selected ? "bg-primary-50 text-primary-700" : "bg-white text-gray-500",
+                    "rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums",
+                    selected ? "bg-primary-50 text-primary-700" : "bg-gray-200/80 text-gray-600",
                   )}
                 >
                   {tab.count}

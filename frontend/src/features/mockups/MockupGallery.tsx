@@ -218,8 +218,8 @@ function MockupCard({
   const color = swatch(item.primary_color);
 
   return (
-    <article className="overflow-hidden rounded-card border border-gray-200 bg-white">
-      <button type="button" onClick={onOpen} className={cn("block w-full text-left", focusRing)}>
+    <article className="overflow-hidden rounded-card border border-gray-200/90 bg-white shadow-2xs hover:border-gray-300 hover:shadow-xs transition-all group">
+      <button type="button" onClick={onOpen} className={cn("block w-full text-left cursor-pointer", focusRing)}>
         {preparing ? (
           <div className="flex h-44 items-center justify-center bg-gray-50 px-4 text-center text-small text-gray-600">
             Generating homepage…
@@ -229,11 +229,13 @@ function MockupCard({
             Generation failed. Open to retry or switch provider.
           </div>
         ) : item.has_desktop_screenshot ? (
-          <img
-            src={mockupScreenshotUrl(item.id, "desktop")}
-            alt=""
-            className="h-44 w-full object-cover object-top bg-gray-100"
-          />
+          <div className="overflow-hidden bg-gray-100">
+            <img
+              src={mockupScreenshotUrl(item.id, "desktop")}
+              alt=""
+              className="h-44 w-full object-cover object-top transition-transform duration-300 group-hover:scale-102"
+            />
+          </div>
         ) : (
           <div className="bg-gray-100 p-4">
             <div className="rounded-control bg-white p-4 shadow-sm">
@@ -269,25 +271,27 @@ function MockupCard({
         <p className="text-caption text-gray-400">Generated {formatWhen(item.created_at)}</p>
         {item.notes ? <p className="line-clamp-2 text-small text-gray-600">{item.notes}</p> : null}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100">
-          <Button variant="secondary" className="h-8 px-2.5 text-caption" onClick={onOpen}>
+          <Button variant="secondary" size="sm" onClick={onOpen}>
             Open
           </Button>
           {onRegenerate ? (
-            <Button variant="secondary" className="h-8 px-2.5 text-caption" onClick={onRegenerate}>
+            <Button variant="secondary" size="sm" onClick={onRegenerate}>
               Regenerate
             </Button>
           ) : null}
           <button
             type="button"
             title="Delete mockup"
-            className="inline-flex size-8 items-center justify-center rounded border border-gray-200 text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-danger transition-colors"
+            aria-label="Delete mockup"
+            className="inline-flex size-8 items-center justify-center rounded-md border border-gray-200 text-gray-400 hover:border-red-300 hover:bg-red-50 hover:text-danger transition-colors cursor-pointer"
             onClick={onDelete}
           >
             <Trash2 className="size-3.5" />
           </button>
           <Button
             variant="primary"
-            className="h-8 px-2.5 text-caption ml-auto"
+            size="sm"
+            className="ml-auto"
             onClick={() => navigate(`/leads/${item.lead_id}?tab=outreach`)}
           >
             Outreach →

@@ -67,25 +67,25 @@ export function FollowUpsPage() {
 
       {/* Summary KPI row */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-card border border-gray-200 bg-white p-3.5 shadow-2xs">
-          <span className="text-caption font-semibold text-gray-500">Overdue</span>
-          <p className={cn("mt-1 text-h3 font-bold tabular-nums", overdueCount > 0 ? "text-danger" : "text-ink")}>
+        <div className="rounded-card border border-gray-200/90 bg-white p-4 shadow-2xs">
+          <span className="text-[12px] font-semibold text-gray-500">Overdue</span>
+          <p className={cn("mt-1.5 text-2xl font-bold tracking-tight tabular-nums", overdueCount > 0 ? "text-danger" : "text-ink")}>
             {overdueCount}
           </p>
         </div>
-        <div className="rounded-card border border-gray-200 bg-white p-3.5 shadow-2xs">
-          <span className="text-caption font-semibold text-gray-500">Due Today</span>
-          <p className={cn("mt-1 text-h3 font-bold tabular-nums", todayCount > 0 ? "text-amber-600" : "text-ink")}>
+        <div className="rounded-card border border-gray-200/90 bg-white p-4 shadow-2xs">
+          <span className="text-[12px] font-semibold text-gray-500">Due Today</span>
+          <p className={cn("mt-1.5 text-2xl font-bold tracking-tight tabular-nums", todayCount > 0 ? "text-amber-600" : "text-ink")}>
             {todayCount}
           </p>
         </div>
-        <div className="rounded-card border border-gray-200 bg-white p-3.5 shadow-2xs">
-          <span className="text-caption font-semibold text-gray-500">Upcoming</span>
-          <p className="mt-1 text-h3 font-bold tabular-nums text-ink">{upcomingCount}</p>
+        <div className="rounded-card border border-gray-200/90 bg-white p-4 shadow-2xs">
+          <span className="text-[12px] font-semibold text-gray-500">Upcoming</span>
+          <p className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums text-ink">{upcomingCount}</p>
         </div>
-        <div className="rounded-card border border-gray-200 bg-white p-3.5 shadow-2xs">
-          <span className="text-caption font-semibold text-gray-500">Completed</span>
-          <p className="mt-1 text-h3 font-bold tabular-nums text-emerald-700">{completedCount}</p>
+        <div className="rounded-card border border-gray-200/90 bg-white p-4 shadow-2xs">
+          <span className="text-[12px] font-semibold text-gray-500">Completed</span>
+          <p className="mt-1.5 text-2xl font-bold tracking-tight tabular-nums text-emerald-700">{completedCount}</p>
         </div>
       </div>
 

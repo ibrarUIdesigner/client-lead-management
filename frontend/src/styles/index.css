@@ -27,6 +27,8 @@
   --radius-card: 12px;
   --radius-panel: 16px;
 
+  --shadow-2xs: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-xs: 0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.04);
   --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.04);
   --shadow-md: 0 4px 12px rgb(16 24 40 / 0.06);
   --shadow-lg: 0 12px 32px rgb(16 24 40 / 0.08);
@@ -95,8 +97,8 @@ body {
 }
 
 dialog {
-  width: min(480px, calc(100% - 32px));
-  max-height: calc(100dvh - 32px);
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
   margin: auto;
   padding: 0;
   overflow: auto;
@@ -104,6 +106,7 @@ dialog {
   border-radius: 16px;
   background: #ffffff;
   color: inherit;
+  box-shadow: 0 20px 48px -12px rgb(16 24 40 / 0.18), 0 1px 3px rgb(16 24 40 / 0.05);
 }
 
 dialog.dialog-lg {
@@ -119,7 +122,32 @@ dialog:modal {
 }
 
 dialog::backdrop {
-  background: rgb(11 15 25 / 0.4);
+  background: rgb(11 15 25 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+/* Subtle clean scrollbars across browser engines */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 
 @media (prefers-reduced-motion: reduce) {

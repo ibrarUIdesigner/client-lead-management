@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -49,9 +50,11 @@ export function DashboardPage() {
 
   const leadItems = topLeads.data?.items ?? [];
 
-  // Compute greeting dynamically
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // Compute greeting dynamically on mount
+  const [greeting] = useState(() => {
+    const h = new Date().getHours();
+    return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  });
 
   // Compute key metric counts
   const data = analytics.data;
@@ -178,15 +181,16 @@ export function DashboardPage() {
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
+            size="sm"
             onClick={() => navigate("/discover")}
-            className="gap-2 h-9 px-3 text-small"
+            className="gap-2"
           >
             <Compass className="size-4" />
             <span>Find Leads</span>
           </Button>
           <Button
             variant="secondary"
-            className="h-9 px-3 text-small"
+            size="sm"
             onClick={() => navigate("/analytics")}
           >
             Full Analytics
@@ -286,27 +290,27 @@ export function DashboardPage() {
               <Card
                 key={item.id}
                 className={cn(
-                  "flex flex-col justify-between border-l-4 p-4 shadow-sm transition-all hover:shadow-md",
+                  "flex flex-col justify-between border-l-4 p-4 transition-all hover:border-gray-300 hover:shadow-xs",
                   item.tone === "orange"
-                    ? "border-l-amber-600"
+                    ? "border-l-amber-500"
                     : item.tone === "emerald"
-                    ? "border-l-emerald-600"
-                    : "border-l-primary-600",
+                    ? "border-l-emerald-500"
+                    : "border-l-primary-500",
                 )}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="text-caption font-semibold uppercase tracking-wider text-gray-500">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                       {item.title}
                     </span>
                     {item.score ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-orange-50 px-2 py-0.5 text-caption font-bold text-orange-700">
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-orange-50 px-2 py-0.5 text-caption font-bold text-orange-700 ring-1 ring-inset ring-orange-500/20">
                         <Flame className="size-3" />
                         {item.score}
                       </span>
                     ) : null}
                   </div>
-                  <h3 className="mt-1.5 text-h4 font-bold text-ink truncate">
+                  <h3 className="mt-1.5 text-body-lg font-bold text-ink truncate">
                     {item.businessName}
                   </h3>
                   {item.city ? (
@@ -315,7 +319,7 @@ export function DashboardPage() {
                       {item.city}
                     </p>
                   ) : null}
-                  <p className="mt-2 text-small text-gray-600 line-clamp-2">
+                  <p className="mt-2 text-small text-gray-600 line-clamp-2 leading-relaxed">
                     {item.description}
                   </p>
                 </div>
@@ -323,14 +327,16 @@ export function DashboardPage() {
                 <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3">
                   <Button
                     variant="ghost"
-                    className="text-caption px-2 text-gray-600 h-8"
+                    size="sm"
+                    className="text-gray-600 px-2"
                     onClick={() => navigate(`/leads/${item.leadId}`)}
                   >
                     Open Lead
                   </Button>
                   <Button
                     variant={item.tone === "orange" ? "primary" : "secondary"}
-                    className="gap-1.5 font-medium shadow-2xs h-8 px-3 text-caption"
+                    size="sm"
+                    className="gap-1.5 font-medium"
                     onClick={() => navigate(item.actionUrl)}
                   >
                     <span>{item.ctaLabel}</span>
@@ -401,7 +407,8 @@ export function DashboardPage() {
                   </span>
                   <Button
                     variant="secondary"
-                    className="text-caption font-semibold h-8 px-2.5"
+                    size="sm"
+                    className="font-semibold px-2.5"
                     onClick={() => navigate(`/leads/${lead.id}?tab=${nba.targetTab}`)}
                   >
                     {nba.ctaLabel}
@@ -416,7 +423,7 @@ export function DashboardPage() {
       {/* Quick Acquisition Pipeline Overview */}
       <section className="grid gap-4 lg:grid-cols-3">
         {/* Acquisition Stage Progress */}
-        <Card className="lg:col-span-2 p-5 shadow-sm">
+        <Card className="lg:col-span-2 p-5 shadow-2xs">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div>
               <h3 className="text-h4 font-bold text-ink">Acquisition Funnel</h3>
@@ -424,8 +431,9 @@ export function DashboardPage() {
             </div>
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => navigate("/pipeline")}
-              className="text-primary-700 gap-1 text-small h-8 px-2"
+              className="text-primary-700 gap-1 px-2"
             >
               <span>Open Pipeline</span>
               <ArrowRight className="size-3.5" />
@@ -514,26 +522,26 @@ function MetricCard({
       type="button"
       onClick={() => navigate(to)}
       className={cn(
-        "group flex flex-col justify-between rounded-card border border-gray-200 bg-white p-4 text-left transition-all hover:border-primary-300 hover:shadow-md",
+        "group flex flex-col justify-between rounded-card border border-gray-200/90 bg-white p-4 text-left shadow-2xs transition-all hover:border-primary-300 hover:shadow-xs cursor-pointer",
         focusRing,
       )}
     >
       <div className="flex items-center justify-between w-full">
-        <span className="text-caption font-semibold text-gray-500 group-hover:text-primary-700">
+        <span className="text-[12px] font-semibold text-gray-500 group-hover:text-primary-700 transition-colors">
           {label}
         </span>
         <div
           className={cn(
-            "flex size-7 items-center justify-center rounded-lg text-gray-400 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors",
-            tone === "orange" && "text-orange-500",
-            tone === "emerald" && "text-emerald-600",
+            "flex size-7.5 items-center justify-center rounded-lg border border-gray-100 bg-gray-50 text-gray-400 group-hover:border-primary-200 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors",
+            tone === "orange" && "text-orange-500 bg-orange-50/50 border-orange-100",
+            tone === "emerald" && "text-emerald-600 bg-emerald-50/50 border-emerald-100",
           )}
         >
           <Icon className="size-4" />
         </div>
       </div>
-      <div className="mt-2">
-        <p className="text-h2 font-bold tabular-nums text-ink">{count}</p>
+      <div className="mt-3">
+        <p className="text-2xl font-bold tracking-tight tabular-nums text-ink">{count}</p>
         <p className="mt-0.5 text-caption text-gray-400 truncate">{detail}</p>
       </div>
     </button>
@@ -542,7 +550,7 @@ function MetricCard({
 
 function StageBox({ label, count, desc }: { label: string; count: number; desc: string }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-center">
+    <div className="rounded-xl border border-gray-200/70 bg-gray-50/50 p-3.5 text-center transition-colors">
       <span className="text-caption font-semibold text-gray-500">{label}</span>
       <p className="mt-1 text-h3 font-bold text-ink tabular-nums">{count}</p>
       <span className="text-[11px] text-gray-400">{desc}</span>
@@ -552,18 +560,25 @@ function StageBox({ label, count, desc }: { label: string; count: number; desc: 
 
 function IntegrationLine({ name, role, ready }: { name: string; role: string; ready: boolean }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-gray-50/60 p-2.5">
+    <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50/50 p-2.5 transition-colors">
       <div>
         <p className="text-small font-semibold text-ink">{name}</p>
         <p className="text-[11px] text-gray-500">{role}</p>
       </div>
       <span
         className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
-          ready ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-600",
+          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+          ready
+            ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-500/20"
+            : "bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-400/20",
         )}
       >
-        <span className={cn("size-1.5 rounded-full", ready ? "bg-emerald-500" : "bg-gray-400")} />
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            ready ? "bg-emerald-500 animate-pulse" : "bg-gray-400",
+          )}
+        />
         {ready ? "Active" : "Ready"}
       </span>
     </div>

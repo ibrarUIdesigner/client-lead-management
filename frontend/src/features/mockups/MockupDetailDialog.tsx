@@ -99,11 +99,12 @@ export function MockupDetailDialog({
       });
   }, [open, mockupId, detail.data, queryClient]);
 
+  const detailProvider = detail.data?.provider;
   useEffect(() => {
-    if (detail.data?.provider) {
-      setProvider(detail.data.provider as MockupProvider);
+    if (detailProvider) {
+      setProvider((current) => (current === detailProvider ? current : (detailProvider as MockupProvider)));
     }
-  }, [detail.data?.provider]);
+  }, [detailProvider]);
 
   useEffect(() => {
     if (detail.data?.status === "READY" || detail.data?.status === "FAILED") {
