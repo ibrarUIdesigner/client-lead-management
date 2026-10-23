@@ -2,11 +2,25 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarClock, Flame, Globe, Zap } from "lucide-react";
 
+import { Button } from "../../components/ui/Button";
 import { Select } from "../../components/ui/Select";
 import { cn, focusRing } from "../../lib/cn";
 import { formatWhen } from "../../lib/format";
 import type { Lead } from "../../types/lead";
 import { leadStatusOptions, type LeadStatus } from "./statuses";
+
+const CORE_STAGES: LeadStatus[] = [
+  "NEW",
+  "QUALIFIED",
+  "AUDIT_COMPLETE",
+  "MOCKUP_READY",
+  "CONTACTED",
+  "FOLLOW_UP",
+  "REPLIED",
+  "MEETING",
+  "PROPOSAL",
+  "WON",
+];
 
 type PipelineBoardProps = {
   leads: Lead[];
@@ -15,16 +29,46 @@ type PipelineBoardProps = {
 };
 
 export function PipelineBoard({ leads, pendingId, onMove }: PipelineBoardProps) {
+  const [showAllStages, setShowAllStages] = useState(false);
   const [stage, setStage] = useState<string>(leadStatusOptions[0].value);
+
+  const displayedColumns = showAllStages
+    ? leadStatusOptions
+    : leadStatusOptions.filter((col) => CORE_STAGES.includes(col.value as LeadStatus));
+
   const mobileColumn =
     leadStatusOptions.find((column) => column.value === stage) ?? leadStatusOptions[0];
 
   return (
     <>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={showAllStages ? "secondary" : "primary"}
+            onClick={() => setShowAllStages(false)}
+          >
+            Core Stages ({CORE_STAGES.length})
+          </Button>
+          <Button
+            size="sm"
+            variant={showAllStages ? "primary" : "secondary"}
+            onClick={() => setShowAllStages(true)}
+          >
+            All Stages ({leadStatusOptions.length})
+          </Button>
+        </div>
+        <p className="text-caption text-gray-500 hidden sm:block">
+          {showAllStages
+            ? "Showing all statuses including pending and closed"
+            : "Showing active prospect progression stages"}
+        </p>
+      </div>
+
       <div className="md:hidden">
         <Select
           label="Pipeline Stage"
-          options={leadStatusOptions}
+          options={displayedColumns}
           value={stage}
           onChange={(event) => {
             setStage(event.target.value);
@@ -42,7 +86,7 @@ export function PipelineBoard({ leads, pendingId, onMove }: PipelineBoardProps) 
         </div>
       </div>
       <div className="hidden gap-4 overflow-x-auto pb-4 md:flex">
-        {leadStatusOptions.map((column) => (
+        {displayedColumns.map((column) => (
           <StageColumn
             key={column.value}
             status={column.value}

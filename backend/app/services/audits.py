@@ -291,17 +291,21 @@ class AuditService:
             return None
 
     def _remember_screenshots(self, audit: WebsiteAudit, desktop: bytes, mobile: bytes) -> None:
+        if audit.desktop_screenshot_url and audit.mobile_screenshot_url:
+            return
         raw = audit.raw_analysis
         if not isinstance(raw, dict):
             return
         stored = dict(raw)
-        desktop_png = encode_png(desktop)
-        mobile_png = encode_png(mobile)
-        if desktop_png:
-            stored["desktop_png"] = desktop_png
-        if mobile_png:
-            stored["mobile_png"] = mobile_png
-        if desktop_png or mobile_png:
+        if not audit.desktop_screenshot_url:
+            desktop_png = encode_png(desktop)
+            if desktop_png:
+                stored["desktop_png"] = desktop_png
+        if not audit.mobile_screenshot_url:
+            mobile_png = encode_png(mobile)
+            if mobile_png:
+                stored["mobile_png"] = mobile_png
+        if not audit.desktop_screenshot_url or not audit.mobile_screenshot_url:
             audit.raw_analysis = stored
 
     def _touch_lead_status(self, lead: Lead, audit_status: str) -> None:

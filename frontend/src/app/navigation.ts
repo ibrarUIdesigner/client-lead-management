@@ -1,12 +1,15 @@
 import {
+  Bell,
   Bot,
   CalendarClock,
   Images,
   LayoutDashboard,
   Mail,
   MapPinned,
+  Palette,
   Settings,
   SquareKanban,
+  TrendingUp,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -71,6 +74,12 @@ export const navigationGroups: NavGroup[] = [
         icon: CalendarClock,
         description: "Today, overdue, and scheduled prospect check-ins.",
       },
+      {
+        to: "/analytics",
+        label: "Analytics",
+        icon: TrendingUp,
+        description: "Conversion metrics and acquisition analytics.",
+      },
     ],
   },
   {
@@ -82,6 +91,12 @@ export const navigationGroups: NavGroup[] = [
         icon: Images,
         description: "Homepage concepts generated for prospects.",
       },
+      {
+        to: "/design-md",
+        label: "Design Guides",
+        icon: Palette,
+        description: "Visual design systems and brand style specs.",
+      },
     ],
   },
   {
@@ -92,6 +107,12 @@ export const navigationGroups: NavGroup[] = [
         label: "Apify",
         icon: Bot,
         description: "Actor automations and scraper connectors.",
+      },
+      {
+        to: "/notifications",
+        label: "Notifications",
+        icon: Bell,
+        description: "Inbox alerts, reply events, and push notifications.",
       },
     ],
   },

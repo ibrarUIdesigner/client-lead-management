@@ -36,14 +36,14 @@ class ResearchService:
             select(LeadResearch).where(LeadResearch.lead_id == lead_id)
         )
 
-    def research_lead(
+    def prepare_research(
         self,
         lead_id: UUID,
         *,
         force_refresh: bool = False,
         custom_query: str | None = None,
         preferred_tool: str | None = None,
-    ) -> LeadResearch:
+    ) -> tuple[LeadResearch, bool]:
         lead = self.leads.get(lead_id)
         if lead is None:
             raise AppError(
@@ -59,7 +59,7 @@ class ResearchService:
             and not force_refresh
             and not custom_query
         ):
-            return existing
+            return existing, False
 
         research = existing
         if research is None:
@@ -69,10 +69,6 @@ class ResearchService:
             research.status = ResearchStatus.RUNNING.value
             research.error_message = None
 
-        flush_or_reject(self.session)
-        self.session.commit()
-
-        # Build research query
         query_parts = [lead.business_name]
         if lead.city:
             query_parts.append(lead.city)
@@ -81,6 +77,27 @@ class ResearchService:
         base_query = custom_query.strip() if custom_query else " ".join(query_parts).strip()
         research.query_used = base_query
 
+        flush_or_reject(self.session)
+        self.session.commit()
+        return research, True
+
+    def execute_research(
+        self,
+        research_id: UUID,
+        *,
+        preferred_tool: str | None = None,
+    ) -> LeadResearch:
+        research = self.session.get(LeadResearch, research_id)
+        if research is None:
+            raise AppError(code="RESEARCH_NOT_FOUND", message="Research not found", status_code=404)
+        lead = self.leads.get(research.lead_id)
+        if lead is None:
+            research.status = ResearchStatus.FAILED.value
+            research.error_message = "Lead not found."
+            self.session.commit()
+            return research
+
+        base_query = research.query_used or lead.business_name
         try:
             (
                 sources,
@@ -90,7 +107,7 @@ class ResearchService:
                 tavily_data,
                 exa_data,
             ) = self._fetch_sources_sequential(base_query, lead, preferred_tool or "tavily")
-            # 3. Synthesize findings into Section 1 (Research) & Section 2 (Summary)
+
             research_data, summary_markdown = self._synthesize(lead, sources, base_query)
             research_data["provider_used"] = provider_used
             research_data["fallback_used"] = fallback_used
@@ -128,16 +145,30 @@ class ResearchService:
             return research
 
         except Exception as exc:
-            logger.exception("lead_research_failed lead_id=%s", lead_id)
+            logger.exception("lead_research_failed research_id=%s", research_id)
             research.status = ResearchStatus.FAILED.value
             research.error_message = str(exc)
             flush_or_reject(self.session)
             self.session.commit()
-            raise AppError(
-                code="RESEARCH_FAILED",
-                message=f"Research on lead failed: {exc}",
-                status_code=502,
-            ) from exc
+            return research
+
+    def research_lead(
+        self,
+        lead_id: UUID,
+        *,
+        force_refresh: bool = False,
+        custom_query: str | None = None,
+        preferred_tool: str | None = None,
+    ) -> LeadResearch:
+        research, should_run = self.prepare_research(
+            lead_id,
+            force_refresh=force_refresh,
+            custom_query=custom_query,
+            preferred_tool=preferred_tool,
+        )
+        if not should_run:
+            return research
+        return self.execute_research(research.id, preferred_tool=preferred_tool)
 
     def _fetch_sources_sequential(
         self,

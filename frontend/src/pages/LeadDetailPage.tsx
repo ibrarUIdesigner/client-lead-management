@@ -15,7 +15,7 @@ import {
   Target,
   Trash2,
 } from "lucide-react";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { EmptyState } from "../components/feedback/EmptyState";
@@ -171,20 +171,11 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
   const followups = (followupsQuery.data ?? []).filter((f) => f.lead_id === lead.id);
 
   // Tab synchronization with URL query param `?tab=...`
-  const initialTab = searchParams.get("tab") || "overview";
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const activeTab = searchParams.get("tab") || "overview";
   const [confirming, setConfirming] = useState(false);
   const [outreachFocus, setOutreachFocus] = useState<string | null>(null);
 
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam) {
-      setActiveTab((prev) => (prev === tabParam ? prev : tabParam));
-    }
-  }, [searchParams]);
-
   const handleSelectTab = (tabId: string) => {
-    setActiveTab(tabId);
     setSearchParams({ tab: tabId });
   };
 

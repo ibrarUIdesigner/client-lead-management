@@ -1,5 +1,5 @@
 import { ChevronDown, Compass, ExternalLink, Flame, Globe, Images, Mail, MapPin, Sparkles, Trash2 } from "lucide-react";
-import { useState, type FormEvent, useEffect } from "react";
+import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useToast } from "../components/feedback/useToast";
@@ -205,21 +205,18 @@ export function LeadListPage() {
   const pageSelected = rows.length > 0 && rows.every((row) => selected.has(row.id));
 
   // Sync when URL query params change
-  useEffect(() => {
+  const [prevParamsString, setPrevParamsString] = useState(() => searchParams.toString());
+  const currentParamsString = searchParams.toString();
+  if (currentParamsString !== prevParamsString) {
+    setPrevParamsString(currentParamsString);
     const statusParam = searchParams.get("lead_status") || "";
     const minScoreParam = searchParams.get("min_score") || "";
     if (searchParams.has("lead_status") || searchParams.has("min_score")) {
-      setDraft((prev) => {
-        if (prev.lead_status === statusParam && prev.min_score === minScoreParam) return prev;
-        return { ...prev, lead_status: statusParam, min_score: minScoreParam };
-      });
-      setApplied((prev) => {
-        if (prev.lead_status === statusParam && prev.min_score === minScoreParam) return prev;
-        return { ...prev, lead_status: statusParam, min_score: minScoreParam };
-      });
+      setDraft((prev) => ({ ...prev, lead_status: statusParam, min_score: minScoreParam }));
+      setApplied((prev) => ({ ...prev, lead_status: statusParam, min_score: minScoreParam }));
       setPage(1);
     }
-  }, [searchParams]);
+  }
 
   const updateDraft = (key: keyof Filters, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }));

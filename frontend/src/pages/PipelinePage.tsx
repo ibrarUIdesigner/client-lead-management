@@ -10,15 +10,16 @@ import { useLeads, useUpdateLeadStatus } from "../hooks/useLeads";
 import { apiErrorMessage } from "../lib/apiError";
 import type { LeadPage } from "../types/lead";
 
-const pipelineParams = {
-  limit: 100,
-  sort: "updated_at",
-  direction: "desc",
-} as const;
-
 export function PipelinePage() {
   const { notify } = useToast();
   const queryClient = useQueryClient();
+  const [limit, setLimit] = useState(100);
+  const pipelineParams = {
+    limit,
+    sort: "updated_at",
+    direction: "desc",
+  } as const;
+
   const leads = useLeads(pipelineParams);
   const updateStatus = useUpdateLeadStatus();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -86,11 +87,21 @@ export function PipelinePage() {
       ) : null}
       {leads.data ? (
         <>
-          {leads.data.has_next ? (
-            <p className="mb-4 text-small text-gray-500">
-              Showing the 100 most recently updated leads.
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-small text-gray-500">
+              Showing {leads.data.items.length} of {leads.data.total} leads.
             </p>
-          ) : null}
+            {leads.data.has_next ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                isLoading={leads.isFetching}
+                onClick={() => setLimit((prev) => prev + 100)}
+              >
+                Load more leads (+100)
+              </Button>
+            ) : null}
+          </div>
           <PipelineBoard leads={leads.data.items} pendingId={pendingId} onMove={moveLead} />
         </>
       ) : null}

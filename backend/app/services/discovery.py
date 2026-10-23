@@ -565,6 +565,9 @@ def _save_one(session: Session, business: FoundBusiness) -> str:
         "yell",
         "businesslist",
         "epages",
+        "apollo",
+        "serpapi",
+        "scrapingbee",
     }
     still_new = existing.lead_status == LeadStatus.NEW.value
     if not discovered or not still_new:

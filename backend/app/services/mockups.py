@@ -835,8 +835,16 @@ class MockupService:
 
 
     def delete(self, mockup_id: UUID) -> None:
+        import shutil
+
         mockup = self._get(mockup_id)
-        # Clean up screenshot files on disk if they exist
+        # Clean up files on disk if they exist
+        mockup_dir = self.storage_dir / "leads" / str(mockup.lead_id) / "mockups" / str(mockup.id)
+        if mockup_dir.exists():
+            try:
+                shutil.rmtree(mockup_dir)
+            except OSError:
+                pass
         for variant in ("desktop", "mobile"):
             screenshot_path = self.storage_dir / f"mockup-{mockup_id}-{variant}.png"
             if screenshot_path.exists():

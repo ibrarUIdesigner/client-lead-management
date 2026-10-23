@@ -53,21 +53,18 @@ export function LoginPage() {
     setTimeout(() => setCopiedAdminEmail(false), 2000);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
-    // Brief smooth transition for responsive tactile feedback
-    setTimeout(() => {
-      const success = signIn(email, password);
-      if (success) {
-        navigate("/", { replace: true });
-      } else {
-        setError("Invalid email or password. Please verify your workspace credentials.");
-        setIsSubmitting(false);
-      }
-    }, 280);
+    const success = await signIn(email, password);
+    if (success) {
+      navigate("/", { replace: true });
+    } else {
+      setError("Invalid email or password. Please verify your workspace credentials.");
+      setIsSubmitting(false);
+    }
   }
 
   return (

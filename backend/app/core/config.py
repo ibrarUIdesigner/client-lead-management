@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     vapid_private_key: str = ""
     vapid_claims_email: str = "mailto:ibraruidesigner@gmail.com"
 
+    # Authentication Settings
+    auth_email: str = "ibraruidesigner@gmail.com"
+    auth_password: str = "CAquiByIbrar@1234"
+    auth_enabled: bool = True
+
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),
         extra="ignore",

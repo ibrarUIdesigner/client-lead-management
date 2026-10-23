@@ -5,6 +5,8 @@ from urllib.parse import urljoin
 import httpx
 
 from app.core.config import Settings
+from app.core.errors import AppError
+from app.services.url_safety import assert_public_http_url
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,11 @@ def find_business_email(
 
     low_url = url.lower()
     if any(domain in low_url for domain in SKIP_WEBSITE_DOMAINS):
+        return None
+
+    try:
+        url = assert_public_http_url(url)
+    except AppError:
         return None
 
     headers = {

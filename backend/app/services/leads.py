@@ -1,7 +1,10 @@
+import shutil
+from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.enums import LeadStatus
 from app.models.lead import Lead
@@ -24,8 +27,9 @@ from app.services.persistence import flush_or_reject
 
 
 class LeadService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, storage_dir: Path | None = None) -> None:
         self.session = session
+        self.storage_dir = storage_dir or get_settings().storage_dir
         self.leads = LeadRepository(session)
         self.activities = ActivityRepository(session)
 
@@ -103,6 +107,7 @@ class LeadService:
 
     def delete(self, lead_id: UUID) -> None:
         lead = self._require(lead_id)
+        self._cleanup_storage(lead_id)
         self.session.delete(lead)
         self.session.commit()
 
@@ -112,10 +117,19 @@ class LeadService:
         for lead_id in unique_ids:
             lead = self.leads.get(lead_id)
             if lead is not None:
+                self._cleanup_storage(lead_id)
                 self.session.delete(lead)
                 deleted_count += 1
         self.session.commit()
         return deleted_count
+
+    def _cleanup_storage(self, lead_id: UUID) -> None:
+        lead_dir = self.storage_dir / "leads" / str(lead_id)
+        if lead_dir.exists():
+            try:
+                shutil.rmtree(lead_dir)
+            except OSError:
+                pass
 
     def bulk_update(self, data: BulkLeadUpdate) -> BulkLeadResult:
         ids = list(dict.fromkeys(data.ids))

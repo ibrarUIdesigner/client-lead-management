@@ -40,12 +40,18 @@ export function MockupDetailDialog({
   const queryClient = useQueryClient();
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const [instructions, setInstructions] = useState("");
-  const [provider, setProvider] = useState<MockupProvider>("stitch");
+  const [userProvider, setUserProvider] = useState<MockupProvider | null>(null);
+  const [prevMockupId, setPrevMockupId] = useState(mockupId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const processKicked = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const removeMockup = useDeleteMockup();
+
+  if (mockupId !== prevMockupId) {
+    setPrevMockupId(mockupId);
+    setUserProvider(null);
+  }
 
   const onDelete = () => {
     if (!mockupId) return;
@@ -99,12 +105,7 @@ export function MockupDetailDialog({
       });
   }, [open, mockupId, detail.data, queryClient]);
 
-  const detailProvider = detail.data?.provider;
-  useEffect(() => {
-    if (detailProvider) {
-      setProvider((current) => (current === detailProvider ? current : (detailProvider as MockupProvider)));
-    }
-  }, [detailProvider]);
+  const provider = userProvider ?? (detail.data?.provider as MockupProvider | undefined) ?? "stitch";
 
   useEffect(() => {
     if (detail.data?.status === "READY" || detail.data?.status === "FAILED") {
@@ -358,7 +359,7 @@ export function MockupDetailDialog({
                         { value: "groq", label: "Groq" },
                       ]}
                       onChange={(event) => {
-                        setProvider(event.target.value as MockupProvider);
+                        setUserProvider(event.target.value as MockupProvider);
                       }}
                     />
                     <Textarea
