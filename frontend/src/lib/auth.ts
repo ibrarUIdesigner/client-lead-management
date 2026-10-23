@@ -3,6 +3,11 @@ const SESSION_KEY = "clm.session";
 const STATIC_EMAIL = "ibrarUIdesigner@gmail.com";
 const STATIC_PASSWORD = "CAquiByIbrar@1234";
 
+export const DEMO_CREDENTIALS = {
+  email: STATIC_EMAIL,
+  password: STATIC_PASSWORD,
+};
+
 export function isAuthenticated(): boolean {
   return sessionStorage.getItem(SESSION_KEY) === "1";
 }
