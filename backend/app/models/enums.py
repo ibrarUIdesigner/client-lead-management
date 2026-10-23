@@ -101,5 +101,28 @@ class ApifyRunStatus(StrEnum):
     ABORTED = "ABORTED"
 
 
+class NotificationType(StrEnum):
+    NEW_EMAIL_REPLY = "NEW_EMAIL_REPLY"
+    POSITIVE_REPLY = "POSITIVE_REPLY"
+    OBJECTION_REPLY = "OBJECTION_REPLY"
+    MEETING_REQUEST = "MEETING_REQUEST"
+    FOLLOWUP_DUE = "FOLLOWUP_DUE"
+    MOCKUP_READY = "MOCKUP_READY"
+    RESEARCH_COMPLETE = "RESEARCH_COMPLETE"
+    AUDIT_COMPLETE = "AUDIT_COMPLETE"
+    EMAIL_DRAFT_READY = "EMAIL_DRAFT_READY"
+    EMAIL_SEND_FAILED = "EMAIL_SEND_FAILED"
+    LEAD_QUALIFIED = "LEAD_QUALIFIED"
+    HIGH_OPPORTUNITY_LEAD = "HIGH_OPPORTUNITY_LEAD"
+    APIFY_JOB_COMPLETE = "APIFY_JOB_COMPLETE"
+
+
+class NotificationPriority(StrEnum):
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+    URGENT = "URGENT"
+
+
 def enum_values(enum_cls: type[StrEnum]) -> tuple[str, ...]:
     return tuple(item.value for item in enum_cls)

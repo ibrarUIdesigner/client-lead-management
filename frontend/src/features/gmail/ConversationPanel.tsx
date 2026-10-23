@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Bot, CornerDownLeft, Sparkles } from "lucide-react";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
 import { QueryGate } from "../../components/feedback/QueryGate";
@@ -15,6 +16,7 @@ import {
   useMarkLeadEmailsRead,
   useReplyLeadEmail,
 } from "../../hooks/useGmail";
+import { useReplySuggestion } from "../../hooks/useIntelligence";
 import { apiErrorMessage } from "../../lib/apiError";
 import { cn } from "../../lib/cn";
 import { formatWhen } from "../../lib/format";
@@ -46,6 +48,12 @@ export function ConversationPanel({ leadId }: ConversationPanelProps) {
     }
     return thread.data;
   }, [thread.data]);
+
+  const hasInbound = Boolean(
+    summary?.items?.some((i) => i.direction === "INBOUND") || summary?.email_unread,
+  );
+  const suggestion = useReplySuggestion(leadId, hasInbound);
+  const latestInbound = summary?.items?.find((i) => i.direction === "INBOUND");
 
   useEffect(() => {
     if (!connected) {
@@ -188,6 +196,62 @@ export function ConversationPanel({ leadId }: ConversationPanelProps) {
           {summary.do_not_contact ? <Badge tone="red">Do not contact</Badge> : null}
           {summary.email_suppressed ? <Badge tone="red">Email suppressed</Badge> : null}
         </div>
+      ) : null}
+
+      {suggestion.data && hasInbound ? (
+        <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-purple-50/40 p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Bot className="size-4 text-indigo-600" />
+              <h3 className="text-small font-bold text-indigo-950">Harvey Reply Handler</h3>
+              <Badge tone={intentBadgeTone(suggestion.data.intent)}>{suggestion.data.intent}</Badge>
+              <Badge tone="gray">
+                {suggestion.data.sentiment} ({Math.round(suggestion.data.confidence * 100)}% conf)
+              </Badge>
+            </div>
+            <span className="text-caption font-semibold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-full">
+              Suggested Stage: <strong>{suggestion.data.suggested_stage}</strong>
+            </span>
+          </div>
+
+          <p className="mt-2 text-small text-gray-700">
+            <strong>Analysis: </strong>
+            {suggestion.data.summary}
+          </p>
+          <p className="mt-1 text-caption text-gray-600">
+            <strong>Recommended Next Step: </strong>
+            {suggestion.data.recommended_action}
+          </p>
+
+          {suggestion.data.suggested_response_body ? (
+            <div className="mt-3 rounded-lg border border-indigo-100 bg-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-caption font-semibold text-indigo-900 flex items-center gap-1">
+                  <Sparkles className="size-3.5 text-indigo-600" />
+                  Suggested Response (Objection Playbook)
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-7 px-2 text-caption font-semibold text-indigo-700 hover:text-indigo-900"
+                  onClick={() => {
+                    if (latestInbound) {
+                      setReplyToId(latestInbound.id);
+                    }
+                    setReplyBody(suggestion.data?.suggested_response_body || "");
+                    notify("Inserted suggested response from Harvey handler.", "success");
+                  }}
+                >
+                  <CornerDownLeft className="size-3.5 mr-1" />
+                  Insert Suggested Reply
+                </Button>
+              </div>
+              <p className="text-small text-gray-800 whitespace-pre-wrap italic bg-gray-50/50 p-2.5 rounded border border-gray-100">
+                &ldquo;{suggestion.data.suggested_response_body}&rdquo;
+              </p>
+            </div>
+          ) : null}
+        </Card>
       ) : null}
 
       {!connected ? (
@@ -346,5 +410,23 @@ function classificationLabel(value: string): string | null {
       return null;
     default:
       return value;
+  }
+}
+
+function intentBadgeTone(intent: string): "green" | "blue" | "orange" | "indigo" | "gray" {
+  switch (intent) {
+    case "Interested":
+    case "Positive":
+      return "green";
+    case "Meeting Request":
+      return "indigo";
+    case "Question":
+    case "Pricing":
+      return "blue";
+    case "Objection":
+    case "Not Interested":
+      return "orange";
+    default:
+      return "gray";
   }
 }

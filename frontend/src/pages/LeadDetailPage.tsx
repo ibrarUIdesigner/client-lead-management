@@ -26,13 +26,12 @@ import { Badge, StatusBadge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
-import { Tabs } from "../components/ui/Tabs";
 import { AuditPanel } from "../features/audits/AuditPanel";
 import { ConversationPanel } from "../features/gmail/ConversationPanel";
-import { GmailComposer } from "../features/gmail/GmailComposer";
 import { LeadJourney } from "../features/leads/LeadJourney";
 import { LeadResearchSection } from "../features/leads/LeadResearchSection";
 import { NextBestActionBanner } from "../features/leads/NextBestActionBanner";
+import { LeadIntelligencePanel } from "../features/leads/LeadIntelligencePanel";
 import { MockupGallery } from "../features/mockups/MockupGallery";
 import { MessageList } from "../features/outreach/MessageList";
 import { OutreachComposer } from "../features/outreach/OutreachComposer";
@@ -273,140 +272,86 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           </div>
         </div>
 
-        {/* Primary Acquisition Workflow Actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Lead Actions */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="secondary"
             className="h-9 px-3 text-small"
-            onClick={() => handleSelectTab("audit")}
-          >
-            <Globe className="size-4 mr-1 text-gray-500" />
-            Audit
-          </Button>
-          <Button
-            variant="secondary"
-            className="h-9 px-3 text-small"
-            onClick={() => handleSelectTab("research")}
-          >
-            <Sparkles className="size-4 mr-1 text-primary-600" />
-            Research
-          </Button>
-          <Button
-            variant="secondary"
-            className="h-9 px-3 text-small"
-            onClick={() => handleSelectTab("mockups")}
-          >
-            <Images className="size-4 mr-1 text-purple-600" />
-            Mockup
-          </Button>
-          <Button
-            variant="primary"
-            className="h-9 px-3 text-small"
-            onClick={() => handleSelectTab("outreach")}
-          >
-            <Mail className="size-4 mr-1" />
-            Outreach
-          </Button>
-          <Button
-            variant="ghost"
-            className="h-9 px-2 text-small text-gray-500 hover:text-ink"
             onClick={() => navigate(`/leads/${lead.id}/edit`)}
           >
-            Edit
+            Edit Lead
           </Button>
           <Button
             variant="danger"
             className="h-9 px-3 text-small"
             onClick={() => setConfirming(true)}
           >
-            <Trash2 className="size-4" />
+            <Trash2 className="size-4 mr-1" />
             Delete Lead
           </Button>
         </div>
       </div>
 
-      {/* Visual Acquisition Journey Bar (Section 13) */}
-      <LeadJourney steps={steps} onSelectTab={handleSelectTab} />
+      {/* Visual Acquisition Journey Bar as the Single Primary Navigation */}
+      <LeadJourney steps={steps} activeTab={activeTab} onSelectTab={handleSelectTab} />
 
-      {/* Primary Workspace Tabs: Overview | Audit | Research | Mockup | Outreach | Activity */}
-      <Tabs
-        label="Lead acquisition workspace"
-        value={activeTab}
-        onValueChange={handleSelectTab}
-        tabs={[
-          {
-            id: "overview",
-            label: "Overview",
-            content: (
-              <Overview
-                lead={lead}
-                audit={audit}
-                research={research}
-                mockups={mockups}
-                outreach={outreach}
-                followups={followups}
-                nba={nba}
-                opportunitySummary={opportunitySummary}
-                onSelectTab={handleSelectTab}
-              />
-            ),
-          },
-          {
-            id: "audit",
-            label: "Audit",
-            content: <AuditPanel leadId={lead.id} websiteUrl={lead.website_url} />,
-          },
-          {
-            id: "research",
-            label: "Research",
-            content: <LeadResearchSection lead={lead} onSelectTab={handleSelectTab} />,
-          },
-          {
-            id: "mockups",
-            label: "Mockups",
-            count: mockups.length > 0 ? mockups.length : undefined,
-            content: <MockupGallery leadId={lead.id} />,
-          },
-          {
-            id: "outreach",
-            label: "Outreach",
-            count: outreach.length > 0 ? outreach.length : undefined,
-            content: (
-              <div className="space-y-4">
-                <OutreachComposer
-                  leadId={lead.id}
-                  email={lead.email}
-                  hasWebsite={Boolean(lead.website_url) && lead.website_status !== "missing"}
-                  onCreated={setOutreachFocus}
-                />
-                <Card className="overflow-hidden p-0 shadow-sm">
-                  <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
-                    <section className="min-w-0 p-4 sm:p-5">
-                      <h2 className="text-h4 font-semibold text-ink">Messages</h2>
-                      <p className="mt-1 text-small text-gray-600">
-                        Drafts from the generator land here for manual review.
-                      </p>
-                      <div className="mt-3">
-                        <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
-                      </div>
-                    </section>
-                    <section className="min-w-0 border-t border-gray-100 p-4 sm:p-5 lg:border-t-0">
-                      <ConversationPanel leadId={lead.id} />
-                    </section>
+      {/* Active Lifecycle Stage View */}
+      <div className="mt-4">
+        {activeTab === "overview" && (
+          <Overview
+            lead={lead}
+            audit={audit}
+            research={research}
+            mockups={mockups}
+            outreach={outreach}
+            followups={followups}
+            nba={nba}
+            opportunitySummary={opportunitySummary}
+            onSelectTab={handleSelectTab}
+          />
+        )}
+        {activeTab === "audit" && (
+          <AuditPanel leadId={lead.id} websiteUrl={lead.website_url} />
+        )}
+        {activeTab === "intelligence" && (
+          <LeadIntelligencePanel leadId={lead.id} onSelectTab={handleSelectTab} />
+        )}
+        {activeTab === "research" && (
+          <LeadResearchSection lead={lead} onSelectTab={handleSelectTab} />
+        )}
+        {activeTab === "mockups" && (
+          <MockupGallery leadId={lead.id} />
+        )}
+        {activeTab === "outreach" && (
+          <div className="space-y-4">
+            <OutreachComposer
+              leadId={lead.id}
+              email={lead.email}
+              hasWebsite={Boolean(lead.website_url) && lead.website_status !== "missing"}
+              onCreated={setOutreachFocus}
+            />
+            <Card className="overflow-hidden p-0 shadow-sm">
+              <div className="grid min-w-0 lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
+                <section className="min-w-0 p-4 sm:p-5">
+                  <h2 className="text-h4 font-semibold text-ink">Messages</h2>
+                  <p className="mt-1 text-small text-gray-600">
+                    Drafts from the generator land here for manual review.
+                  </p>
+                  <div className="mt-3">
+                    <MessageList leadId={lead.id} focusId={outreachFocus} expandFirstDraft />
                   </div>
-                </Card>
-                <GmailComposer leadId={lead.id} defaultTo={lead.email} />
+                </section>
+                <section className="min-w-0 border-t border-gray-100 p-4 sm:p-5 lg:border-t-0">
+                  <ConversationPanel leadId={lead.id} />
+                </section>
               </div>
-            ),
-          },
-          {
-            id: "activity",
-            label: "Activity",
-            count: lead.activities.length,
-            content: <ActivityList lead={lead} />,
-          },
-        ]}
-      />
+            </Card>
+          </div>
+        )}
+        {activeTab === "activity" && (
+          <ActivityList lead={lead} />
+        )}
+      </div>
 
       <ConfirmDialog
         open={confirming}

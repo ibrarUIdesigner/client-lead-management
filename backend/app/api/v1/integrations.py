@@ -187,6 +187,17 @@ def get_integrations(request: Request) -> IntegrationsResponse:
             details="API key configured" if yelp_key else "Set YELP_API_KEY in .env to enable",
             website="https://fusion.yelp.com",
         ),
+        IntegrationItem(
+            id="webpush",
+            name="Web Push (VAPID)",
+            category="Notifications",
+            description="Browser Push Service and VAPID protocol for real-time background notifications on outreach replies and events.",
+            status="active" if settings.vapid_configured else "not_configured",
+            is_configured=settings.vapid_configured,
+            env_var="VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY",
+            details="VAPID keypair configured · Push delivery active" if settings.vapid_configured else "VAPID keys missing",
+            website="https://www.w3.org/TR/push-api/",
+        ),
     ]
 
     configured_count = sum(1 for item in items if item.is_configured)

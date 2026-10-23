@@ -35,6 +35,9 @@ EXPECTED_TABLES = {
     "apify_dismissed_actors",
     "design_guides",
     "lead_researches",
+    "notifications",
+    "push_subscriptions",
+    "notification_preferences",
 }
 
 
@@ -53,6 +56,7 @@ def test_child_rows_are_removed_with_their_lead() -> None:
         "followups": "lead_id",
         "activities": "lead_id",
         "lead_emails": "lead_id",
+        "notifications": "lead_id",
     }
 
     for table_name, column_name in lead_children.items():
@@ -76,6 +80,7 @@ def test_optional_links_do_not_delete_the_parent_record() -> None:
         ("outreach_messages", "template_id"): "outreach_templates",
         ("followups", "outreach_id"): "outreach_messages",
         ("lead_emails", "outreach_message_id"): "outreach_messages",
+        ("notifications", "email_id"): "lead_emails",
     }
 
     for (table_name, column_name), target in optional_links.items():

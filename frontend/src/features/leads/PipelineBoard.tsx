@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarClock, Flame, Globe } from "lucide-react";
+import { CalendarClock, Flame, Globe, Zap } from "lucide-react";
 
 import { Select } from "../../components/ui/Select";
 import { cn, focusRing } from "../../lib/cn";
@@ -121,10 +121,31 @@ function StageColumn({
                 >
                   {lead.business_name}
                 </Link>
-                {lead.lead_score ? (
-                  <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-orange-50 px-1.5 py-0.2 text-[11px] font-bold text-orange-700">
-                    <Flame className="size-3 text-orange-600" />
-                    {lead.lead_score}
+                {lead.lead_score !== null && lead.lead_score !== undefined ? (
+                  <span
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold shadow-2xs",
+                      lead.lead_score >= 70
+                        ? "bg-amber-100 text-amber-900 border border-amber-200"
+                        : lead.lead_score >= 40
+                          ? "bg-blue-50 text-blue-800 border border-blue-200"
+                          : "bg-gray-100 text-gray-700 border border-gray-200",
+                    )}
+                    title={`Opportunity Score: ${lead.lead_score}/100`}
+                  >
+                    {lead.lead_score >= 70 ? (
+                      <>
+                        <Flame className="size-3 text-amber-600 fill-amber-500" />
+                        <span>{lead.lead_score} High</span>
+                      </>
+                    ) : lead.lead_score >= 40 ? (
+                      <>
+                        <Zap className="size-3 text-blue-600 fill-blue-500" />
+                        <span>{lead.lead_score} Med</span>
+                      </>
+                    ) : (
+                      <span>{lead.lead_score} Low</span>
+                    )}
                   </span>
                 ) : null}
               </div>

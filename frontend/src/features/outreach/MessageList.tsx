@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Paperclip, Sparkles } from "lucide-react";
 
 import { EmptyState } from "../../components/feedback/EmptyState";
 import { QueryGate } from "../../components/feedback/QueryGate";
@@ -13,7 +13,7 @@ import { Textarea } from "../../components/ui/Textarea";
 import { FollowUpSchedule } from "../followups/FollowUpSchedule";
 import { useGmailStatus, useSendLeadEmail } from "../../hooks/useGmail";
 import { useMarkContacted, useMarkReplied, useUpdateOutreach } from "../../hooks/useOutreach";
-import { useOutreachMessages } from "../../hooks/useWorkspace";
+import { useMockups, useOutreachMessages } from "../../hooks/useWorkspace";
 import { apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
 import { formatWhen } from "../../lib/format";
@@ -100,6 +100,10 @@ function MessageCard({
   const markReplied = useMarkReplied();
   const gmail = useGmailStatus();
   const sendGmail = useSendLeadEmail(item.lead_id);
+  const mockupsQuery = useMockups(item.lead_id);
+  const readyMockup = (mockupsQuery.data ?? []).find(
+    (m) => m.status === "READY" && Boolean(m.has_desktop_screenshot || m.has_html),
+  );
   const [openedManually, setOpenedManually] = useState(false);
   const [subject, setSubject] = useState(item.subject ?? "");
   const [body, setBody] = useState(item.message ?? "");
@@ -187,9 +191,15 @@ function MessageCard({
         subject: saved.subject ?? subject,
         body: saved.message ?? body,
         outreach_message_id: item.id,
+        attachment_mockup_ids: readyMockup ? [readyMockup.id] : undefined,
         idempotency_key: crypto.randomUUID(),
       });
-      notify("Email sent via Gmail.", "success");
+      notify(
+        readyMockup
+          ? "Email sent via Gmail with mockup attached."
+          : "Email sent via Gmail.",
+        "success",
+      );
       setOpenedManually(false);
     } catch (error) {
       notify(apiErrorMessage(error, "Could not send via Gmail."), "danger");
@@ -324,6 +334,11 @@ function MessageCard({
           <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-800">
             <CheckCircle2 className="size-3 text-blue-600" /> Opportunity analysis
           </span>
+          {readyMockup ? (
+            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 font-medium text-amber-800 border border-amber-200">
+              <Paperclip className="size-3 text-amber-600" /> Mockup attached ({readyMockup.title || "Homepage Preview"})
+            </span>
+          ) : null}
         </div>
       ) : null}
 

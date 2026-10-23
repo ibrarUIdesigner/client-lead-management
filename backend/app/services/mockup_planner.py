@@ -68,6 +68,11 @@ class MockupPlanner:
         design_score: int | None = None,
         asset_labels: list[str] | None = None,
         client: httpx.Client | None = None,
+        signals: list[Any] | None = None,
+        opportunities: list[Any] | None = None,
+        mockup_focus: str | None = None,
+        previous_html: str | None = None,
+        refine_instructions: str | None = None,
     ) -> MockupPlan:
         """Run the full intelligent planning pipeline and construct the detailed brief."""
         archetype = detect_business_archetype(lead, research)
@@ -161,6 +166,42 @@ class MockupPlanner:
                 brief_lines.append(f"  * Strategic Opportunity: {opp.market_gap}")
                 brief_lines.append(f"  * Website Implementation: {opp.feature_solution}")
 
+        # Harvey Intelligence Signals & Opportunities
+        if signals:
+            brief_lines.extend([
+                "",
+                "## HARVEY SALES INTELLIGENCE SIGNALS & BOTTLENECK EVIDENCE",
+                "Your design MUST visibly resolve these verified technical, business, and sales signals:",
+            ])
+            for s in signals:
+                s_name = getattr(s, "name", str(s))
+                s_evidence = getattr(s, "evidence", "")
+                s_conf = getattr(s, "confidence", None)
+                conf_txt = f" (Confidence: {int(s_conf * 100)}%)" if s_conf is not None else ""
+                brief_lines.append(f"- Signal: {s_name}{conf_txt}")
+                if s_evidence:
+                    brief_lines.append(f"  * Evidence: {s_evidence}")
+
+        if opportunities:
+            brief_lines.extend([
+                "",
+                "## HIGH-IMPACT COMMERCIAL OPPORTUNITIES & RECOMMENDED SOLUTIONS",
+            ])
+            for opp in opportunities:
+                prob = getattr(opp, "problem", str(opp))
+                sol = getattr(opp, "recommended_solution", "")
+                impact = getattr(opp, "impact", "HIGH")
+                brief_lines.append(f"- Problem: {prob}")
+                if sol:
+                    brief_lines.append(f"  * Recommended Solution: {sol} [Impact: {impact}]")
+
+        if mockup_focus:
+            brief_lines.extend([
+                "",
+                "## BESPOKE MOCKUP STRATEGY FOCUS",
+                f"Core Conversion Directive: {mockup_focus}",
+            ])
+
         # Intelligent Section Blueprint
         brief_lines.extend([
             "",
@@ -227,6 +268,20 @@ class MockupPlanner:
                 "",
                 "## ADDITIONAL CUSTOMER INSTRUCTIONS",
                 requirements.strip(),
+            ])
+
+        if previous_html and previous_html.strip():
+            brief_lines.extend([
+                "",
+                "## PREVIOUS VERSION HTML TO REFINE",
+                previous_html.strip()[:120_000],
+            ])
+
+        if refine_instructions and refine_instructions.strip():
+            brief_lines.extend([
+                "",
+                "## REFINEMENT REQUEST",
+                refine_instructions.strip(),
             ])
 
         brief_text = "\n".join(brief_lines)

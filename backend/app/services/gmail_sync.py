@@ -466,6 +466,26 @@ class GmailSyncService:
                 "Lead replied by email",
                 description=parsed.subject,
             )
+
+            analysis = None
+            try:
+                from app.services.reply_handler import ReplyHandlerService
+                handler = ReplyHandlerService(self.session, self.settings)
+                analysis = handler.analyze_and_process_reply(
+                    lead.id,
+                    subject=parsed.subject,
+                    body_text=parsed.body_text or parsed.snippet,
+                    sender_email=parsed.sender_email,
+                )
+            except Exception as exc:
+                logger.warning("reply_handler_error: %s", exc)
+
+            try:
+                from app.services.notifications import NotificationService
+                notif_svc = NotificationService(self.session, self.settings)
+                notif_svc.create_reply_notification(lead, parsed, analysis)
+            except Exception as exc:
+                logger.warning("notification_dispatch_error: %s", exc)
             return
 
         if classification == EmailClassification.OUT_OF_OFFICE:
@@ -475,6 +495,25 @@ class GmailSyncService:
                 "Out-of-office reply recorded",
                 description=parsed.subject,
             )
+            try:
+                from app.services.notifications import NotificationService
+                from app.services.reply_handler import ReplyAnalysis
+
+                ooo_analysis = ReplyAnalysis(
+                    intent="Out of Office",
+                    sentiment="neutral",
+                    confidence=0.95,
+                    summary="Automated out-of-office autoreply detected.",
+                    suggested_stage="Replied",
+                    recommended_action="Wait for prospect to return.",
+                    suggested_response_subject=None,
+                    suggested_response_body=None,
+                )
+                NotificationService(self.session, self.settings).create_reply_notification(
+                    lead, parsed, ooo_analysis
+                )
+            except Exception as exc:
+                logger.warning("notification_dispatch_error: %s", exc)
             return
 
         if classification == EmailClassification.BOUNCE:
@@ -514,6 +553,25 @@ class GmailSyncService:
                 "Lead opted out of contact",
                 description=parsed.subject,
             )
+            try:
+                from app.services.notifications import NotificationService
+                from app.services.reply_handler import ReplyAnalysis
+
+                unsub_analysis = ReplyAnalysis(
+                    intent="Unsubscribe",
+                    sentiment="negative",
+                    confidence=0.96,
+                    summary="Prospect requested to unsubscribe or be removed from outreach.",
+                    suggested_stage="Unsubscribe",
+                    recommended_action="Lead marked as Do Not Contact.",
+                    suggested_response_subject=None,
+                    suggested_response_body=None,
+                )
+                NotificationService(self.session, self.settings).create_reply_notification(
+                    lead, parsed, unsub_analysis
+                )
+            except Exception as exc:
+                logger.warning("notification_dispatch_error: %s", exc)
 
     def _pause_followups(self, lead: Lead, *, reason: str) -> None:
         # Pause pending follow-ups by cancelling open ones after a human reply.

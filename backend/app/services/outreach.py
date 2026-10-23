@@ -293,6 +293,28 @@ class OutreachService:
         if research and isinstance(research.research_data, dict):
             proactive_solutions = research.research_data.get("proactive_solutions") or []
 
+        mockup = None
+        if getattr(data, "mockup_id", None):
+            mockup = self.session.get(Mockup, data.mockup_id)
+        if not mockup:
+            mockup = self._ready_mockup(lead.id)
+
+        from app.services.lead_intelligence import LeadIntelligenceService
+        intel_service = LeadIntelligenceService(self.session)
+        intel = intel_service.get_intelligence(lead.id)
+
+        framework = getattr(data, "framework", None) or intel.strategy.recommended_framework
+        primary_opp = intel.strategy.primary_opportunity
+        mockup_highlights = (intel.strategy.mockup_focus,) if intel.strategy.mockup_focus else ()
+        mockup_title = mockup.title if mockup else None
+        mockup_url = f"/mockups/{mockup.id}" if mockup else None
+
+        signals = [(s.name, s.evidence) for s in intel.signals]
+        opportunities = [
+            f"Problem: {o.problem} | Recommended Solution: {o.recommended_solution} (Impact: {o.impact})"
+            for o in intel.opportunities
+        ]
+
         brief = build_brief(
             business=lead.business_name,
             industry=lead.industry,
@@ -313,6 +335,13 @@ class OutreachService:
             sender_portfolio=sender_portfolio,
             research_summary=research_summary,
             proactive_solutions=proactive_solutions,
+            framework=framework,
+            mockup_title=mockup_title,
+            mockup_url=mockup_url,
+            mockup_highlights=mockup_highlights,
+            primary_opportunity=primary_opp,
+            signals=signals,
+            opportunities=opportunities,
         )
         return draft_email(brief, settings)
 
@@ -378,6 +407,18 @@ class OutreachService:
         if isinstance(title, str) and title.strip():
             return title.strip()
         return None
+
+    def _ready_mockup(self, lead_id: UUID) -> Mockup | None:
+        statement = (
+            select(Mockup)
+            .where(
+                Mockup.lead_id == lead_id,
+                Mockup.status == MockupStatus.READY.value,
+            )
+            .order_by(Mockup.version.desc())
+        )
+        rows = list(self.session.scalars(statement))
+        return rows[0] if rows else None
 
     def _require_lead(self, lead_id: UUID) -> Lead:
         lead = self.leads.get(lead_id)

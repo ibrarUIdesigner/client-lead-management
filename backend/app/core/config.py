@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     unsplash_secret_key: str = ""
     pixabay_api_key: str = ""
 
+    # Web Push / VAPID Keys
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_claims_email: str = "mailto:ibraruidesigner@gmail.com"
+
     model_config = SettingsConfigDict(
         env_file=(ROOT_DIR / ".env", BACKEND_DIR / ".env"),
         extra="ignore",
@@ -91,6 +96,10 @@ class Settings(BaseSettings):
     @property
     def lead_research_configured(self) -> bool:
         return bool(self.tavily_api_key.strip() or self.exa_api_key.strip())
+
+    @property
+    def vapid_configured(self) -> bool:
+        return bool(self.vapid_public_key.strip() and self.vapid_private_key.strip())
 
 
 def _is_local_database(url: str) -> bool:

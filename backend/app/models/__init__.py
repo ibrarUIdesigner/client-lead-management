@@ -16,6 +16,7 @@ from app.models.gmail import GmailAccount, GmailOAuthState, LeadEmail
 from app.models.lead import Lead
 from app.models.lead_research import LeadResearch
 from app.models.mockup import Mockup
+from app.models.notification import Notification, NotificationPreference, PushSubscription
 from app.models.outreach import OutreachMessage, OutreachTemplate
 from app.models.website_audit import WebsiteAudit
 
@@ -39,7 +40,10 @@ __all__ = [
     "LeadEmail",
     "LeadResearch",
     "Mockup",
+    "Notification",
+    "NotificationPreference",
     "OutreachMessage",
     "OutreachTemplate",
+    "PushSubscription",
     "WebsiteAudit",
 ]

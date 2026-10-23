@@ -74,6 +74,13 @@ class EmailBrief:
     sender_portfolio: str | None = None
     research_summary: str | None = None
     proactive_solutions: tuple[str, ...] = ()
+    framework: str = "auto"
+    mockup_title: str | None = None
+    mockup_url: str | None = None
+    mockup_highlights: tuple[str, ...] = ()
+    primary_opportunity: str | None = None
+    signals: tuple[tuple[str, str], ...] = ()
+    opportunities: tuple[str, ...] = ()
 
 
 def provider_ready(settings: Settings, name: str) -> bool:
@@ -122,6 +129,13 @@ def build_brief(
     tags: list[str] | tuple[str, ...] | None = None,
     research_summary: str | None = None,
     proactive_solutions: list[str] | tuple[str, ...] | None = None,
+    framework: str | None = None,
+    mockup_title: str | None = None,
+    mockup_url: str | None = None,
+    mockup_highlights: list[str] | tuple[str, ...] | None = None,
+    primary_opportunity: str | None = None,
+    signals: list[tuple[str, str]] | tuple[tuple[str, str], ...] | None = None,
+    opportunities: list[str] | tuple[str, ...] | None = None,
 ) -> EmailBrief:
     location = ", ".join(part for part in (city, country) if part and part.strip())
     cleaned_offer = " ".join((offer or "").split())
@@ -155,6 +169,13 @@ def build_brief(
         purpose="review" if has_website else "new_site",
         research_summary=research_summary.strip() if research_summary and research_summary.strip() else None,
         proactive_solutions=tuple(s.strip() for s in (proactive_solutions or []) if s.strip())[:5],
+        framework=(framework or "auto").strip().lower(),
+        mockup_title=mockup_title.strip() if mockup_title and mockup_title.strip() else None,
+        mockup_url=mockup_url.strip() if mockup_url and mockup_url.strip() else None,
+        mockup_highlights=tuple(h.strip() for h in (mockup_highlights or []) if h.strip()),
+        primary_opportunity=primary_opportunity.strip() if primary_opportunity and primary_opportunity.strip() else None,
+        signals=tuple((s[0].strip(), s[1].strip()) for s in (signals or []) if s and len(s) >= 2),
+        opportunities=tuple(o.strip() for o in (opportunities or []) if o and o.strip()),
     )
 
 
@@ -208,6 +229,38 @@ def render_brief(brief: EmailBrief) -> str:
             lines.append("Proactive solutions to offer the customer:")
             lines.extend(f"- {sol}" for sol in brief.proactive_solutions)
         lines.append("Instruction: Weave one of these proactive solutions into your value proposition to directly address their specific bottleneck.")
+
+    if brief.primary_opportunity:
+        lines.append(f"Identified Primary Opportunity: {brief.primary_opportunity}")
+
+    if brief.signals or brief.opportunities:
+        lines.append("=== HARVEY SALES INTELLIGENCE SIGNALS & COMMERCIAL OPPORTUNITIES ===")
+        if brief.signals:
+            lines.append("Detected Signals & Concrete Evidence:")
+            lines.extend(f"- [{name}]: {evidence}" for name, evidence in brief.signals)
+        if brief.opportunities:
+            lines.append("Verified Commercial Opportunities & Recommended Solutions:")
+            lines.extend(f"- {opp}" for opp in brief.opportunities)
+        lines.append(
+            "Copywriting Mandate: Directly reference these detected signals and verified opportunities "
+            "so the email proves you deeply analyzed their real website, market positioning, and operational bottlenecks."
+        )
+
+    if brief.mockup_title or brief.mockup_url or brief.mockup_highlights:
+        lines.append("=== GENERATED MOCKUP CONCEPT FOR THIS BUSINESS ===")
+        if brief.mockup_title:
+            lines.append(f"Mockup Title: {brief.mockup_title}")
+        if brief.mockup_highlights:
+            lines.append(f"Key Design Features: {', '.join(brief.mockup_highlights)}")
+        if brief.mockup_url:
+            lines.append(f"Mockup Preview Link: {brief.mockup_url}")
+        lines.append(
+            "Instruction: In the value proposition, mention that you already created a preview concept "
+            "specifically for their business addressing these gaps, and ask if they would like to see the preview link."
+        )
+
+    from app.services.knowledge import sales_knowledge
+    lines.append(sales_knowledge.format_framework_context(brief.framework))
 
     lines.append(f"Offer: {brief.offer}")
     lines.append(f"Tone: {brief.tone}. {_TONES.get(brief.tone, '')}")

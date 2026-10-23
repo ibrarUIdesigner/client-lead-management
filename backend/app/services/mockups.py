@@ -96,14 +96,20 @@ class MockupService:
         stock_assets: list[dict[str, object]] = []
         if not assets:
             try:
+                from app.services.lead_intelligence import LeadIntelligenceService
+                intel = LeadIntelligenceService(self.session).get_intelligence(lead.id)
                 planner = MockupPlanner(settings=self.settings)
                 plan = planner.build_plan(
                     lead=lead,
                     audit=audit,
+                    findings=findings,
                     research=getattr(lead, "research", None),
                     goal=data.goal,
                     requirements=data.requirements,
                     guidance=snapshot,
+                    signals=intel.signals,
+                    opportunities=intel.opportunities,
+                    mockup_focus=intel.strategy.mockup_focus,
                 )
                 stock_assets = plan.curated_assets
                 brief = plan.brief_text
@@ -320,10 +326,13 @@ class MockupService:
         try:
             audit, _ = self._latest_findings(lead.id)
             research = getattr(lead, "research", None)
+            from app.services.lead_intelligence import LeadIntelligenceService
+            intel = LeadIntelligenceService(self.session).get_intelligence(lead.id)
             planner = MockupPlanner(settings=self.settings)
             plan = planner.build_plan(
                 lead=lead,
                 audit=audit,
+                findings=findings,
                 research=research,
                 goal=goal,
                 requirements=requirements,
@@ -331,6 +340,9 @@ class MockupService:
                 asset_labels=asset_labels,
                 previous_html=previous_html,
                 refine_instructions=refine_instructions,
+                signals=intel.signals,
+                opportunities=intel.opportunities,
+                mockup_focus=intel.strategy.mockup_focus,
             )
             return plan.brief_text
         except Exception as exc:
@@ -444,6 +456,8 @@ class MockupService:
             if not mockup.asset_refs:
                 try:
                     audit, _ = self._latest_findings(lead.id)
+                    from app.services.lead_intelligence import LeadIntelligenceService
+                    intel = LeadIntelligenceService(self.session).get_intelligence(lead.id)
                     planner = MockupPlanner(settings=self.settings)
                     plan = planner.build_plan(
                         lead=lead,
@@ -452,6 +466,9 @@ class MockupService:
                         goal=mockup.goal or "calls",
                         client=client,
                         guidance=mockup.design_guide_snapshot,
+                        signals=intel.signals,
+                        opportunities=intel.opportunities,
+                        mockup_focus=intel.strategy.mockup_focus,
                     )
                     if plan.curated_assets:
                         mockup.asset_refs = plan.curated_assets

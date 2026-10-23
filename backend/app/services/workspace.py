@@ -168,29 +168,42 @@ class WorkspaceService:
             StatusCount(status=status.value, count=counts.get(status.value, 0))
             for status in LeadStatus
         ]
+        contacted = self._count(
+            OutreachMessage,
+            OutreachMessage.status.in_(
+                [
+                    OutreachStatus.SENT.value,
+                    OutreachStatus.OPENED.value,
+                    OutreachStatus.REPLIED.value,
+                ]
+            ),
+        )
+        replies = self._count(
+            OutreachMessage, OutreachMessage.status == OutreachStatus.REPLIED.value
+        )
+        meetings = counts.get(LeadStatus.MEETING.value, 0)
+        proposals = counts.get(LeadStatus.PROPOSAL.value, 0)
+        wins = counts.get(LeadStatus.WON.value, 0)
+        losses = counts.get(LeadStatus.LOST.value, 0)
+
+        reply_rate = round((replies / contacted * 100), 1) if contacted > 0 else 0.0
+        meeting_rate = round((meetings / contacted * 100), 1) if contacted > 0 else 0.0
+        win_rate = round((wins / contacted * 100), 1) if contacted > 0 else 0.0
+        pos_replies = replies + meetings + wins
+        positive_reply_rate = round((pos_replies / contacted * 100), 1) if contacted > 0 else 0.0
+
         return AnalyticsRead(
             leads=sum(item.count for item in by_status),
             audits_completed=self._count(
                 WebsiteAudit, WebsiteAudit.status == AuditStatus.COMPLETED.value
             ),
             mockups_ready=self._count(Mockup, Mockup.status == MockupStatus.READY.value),
-            contacted=self._count(
-                OutreachMessage,
-                OutreachMessage.status.in_(
-                    [
-                        OutreachStatus.SENT.value,
-                        OutreachStatus.OPENED.value,
-                        OutreachStatus.REPLIED.value,
-                    ]
-                ),
-            ),
-            replies=self._count(
-                OutreachMessage, OutreachMessage.status == OutreachStatus.REPLIED.value
-            ),
-            meetings=counts.get(LeadStatus.MEETING.value, 0),
-            proposals=counts.get(LeadStatus.PROPOSAL.value, 0),
-            wins=counts.get(LeadStatus.WON.value, 0),
-            losses=counts.get(LeadStatus.LOST.value, 0),
+            contacted=contacted,
+            replies=replies,
+            meetings=meetings,
+            proposals=proposals,
+            wins=wins,
+            losses=losses,
             by_status=by_status,
             by_industry=self._grouped(Lead.industry),
             by_city=self._grouped(Lead.city),
@@ -200,6 +213,10 @@ class WorkspaceService:
             outreach_drafts=self._count(
                 OutreachMessage, OutreachMessage.status == OutreachStatus.DRAFT.value
             ),
+            reply_rate=reply_rate,
+            positive_reply_rate=positive_reply_rate,
+            meeting_rate=meeting_rate,
+            win_rate=win_rate,
         )
 
     def _count(self, model: type[object], *criteria: object) -> int:

@@ -6,6 +6,7 @@ import { signOut } from "../../lib/auth";
 import { Button } from "../ui/Button";
 import { CommandPalette } from "./CommandPalette";
 import { QuickNewDropdown } from "./QuickNewDropdown";
+import { NotificationBell } from "../../features/notifications/NotificationBell";
 
 type TopbarProps = {
   collapsed: boolean;
@@ -89,6 +90,8 @@ export function Topbar({ collapsed, onOpenMenu, onToggleSidebar }: TopbarProps) 
           </Button>
 
           <QuickNewDropdown />
+
+          <NotificationBell />
 
           <Button
             variant="ghost"

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Calendar, Clock } from "lucide-react";
+import { ArrowRight, Calendar, Clock, Copy, Sparkles } from "lucide-react";
 
 import { useToast } from "../../components/feedback/useToast";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { useCancelFollowup, useCompleteFollowup, useUpdateFollowup } from "../../hooks/useOutreach";
 import { apiErrorMessage } from "../../lib/apiError";
+import { getFollowupDraft, type FollowupDraft } from "../../services/followups";
 import type { FollowupItem } from "../../types/workspace";
 import { dateInputToIso, isoToDateInput } from "./dates";
 
@@ -19,10 +20,34 @@ export function FollowUpActions({ item }: { item: FollowupItem }) {
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const [date, setDate] = useState(isoToDateInput(item.scheduled_for));
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftData, setDraftData] = useState<FollowupDraft | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
 
   if (item.status === "COMPLETED" || item.status === "CANCELLED") {
     return null;
   }
+
+  const handleToggleDraft = async () => {
+    if (draftOpen) {
+      setDraftOpen(false);
+      return;
+    }
+    if (draftData) {
+      setDraftOpen(true);
+      return;
+    }
+    setDraftLoading(true);
+    try {
+      const data = await getFollowupDraft(item.id);
+      setDraftData(data);
+      setDraftOpen(true);
+    } catch (err) {
+      notify(apiErrorMessage(err, "Could not load AI follow-up draft."), "danger");
+    } finally {
+      setDraftLoading(false);
+    }
+  };
 
   const snoozeDays = (days: number, label: string) => {
     const target = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
@@ -50,6 +75,16 @@ export function FollowUpActions({ item }: { item: FollowupItem }) {
         >
           <span>Send Follow-up</span>
           <ArrowRight className="size-3.5 ml-1" />
+        </Button>
+
+        <Button
+          variant="secondary"
+          className="h-8 px-2.5 text-small text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200"
+          onClick={() => handleToggleDraft()}
+          isLoading={draftLoading}
+        >
+          <Sparkles className="size-3.5 mr-1 text-indigo-600" />
+          <span>{draftOpen ? "Hide AI Draft" : "View AI Draft"}</span>
         </Button>
 
         <Button
@@ -136,6 +171,55 @@ export function FollowUpActions({ item }: { item: FollowupItem }) {
           </Button>
         )}
       </div>
+
+      {draftOpen && draftData ? (
+        <div className="rounded-lg border border-indigo-200 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 p-3.5 shadow-2xs space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="size-4 text-indigo-600" />
+              <span className="text-small font-bold text-indigo-950">
+                Sequence Step {draftData.step}: {draftData.stage_name}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              className="h-6 px-2 text-caption text-gray-500 hover:text-gray-800"
+              onClick={() => setDraftOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
+          <p className="text-caption text-indigo-800">
+            <strong>Strategy: </strong>
+            {draftData.strategy_notes}
+          </p>
+          <div className="rounded border border-indigo-100 bg-white p-2.5 text-small text-gray-800">
+            <p className="font-semibold text-gray-900 mb-1">Subject: {draftData.subject}</p>
+            <p className="whitespace-pre-wrap text-gray-700">{draftData.body}</p>
+          </div>
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              variant="secondary"
+              className="h-7 px-2.5 text-caption font-semibold"
+              onClick={() => {
+                navigator.clipboard.writeText(`Subject: ${draftData.subject}\n\n${draftData.body}`);
+                notify("AI follow-up draft copied to clipboard.", "success");
+              }}
+            >
+              <Copy className="size-3 mr-1" />
+              Copy Draft
+            </Button>
+            <Button
+              variant="primary"
+              className="h-7 px-2.5 text-caption font-semibold"
+              onClick={() => navigate(`/leads/${item.lead_id}?tab=outreach`)}
+            >
+              Use in Outreach
+              <ArrowRight className="size-3 ml-1" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {editing ? (
         <form

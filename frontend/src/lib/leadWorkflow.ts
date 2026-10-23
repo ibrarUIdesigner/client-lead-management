@@ -7,7 +7,7 @@ export type NextBestAction = {
   action: string;
   reason: string;
   badge: string;
-  targetTab: "overview" | "audit" | "research" | "mockups" | "outreach";
+  targetTab: "overview" | "audit" | "intelligence" | "research" | "mockups" | "outreach" | "activity";
   ctaLabel: string;
   tone: "primary" | "warning" | "success" | "neutral";
   priority: "critical" | "high" | "medium" | "low";
@@ -20,7 +20,7 @@ export type JourneyStep = {
   label: string;
   status: JourneyStepStatus;
   description: string;
-  tabId?: "overview" | "audit" | "research" | "mockups" | "outreach";
+  tabId?: "overview" | "audit" | "intelligence" | "research" | "mockups" | "outreach" | "activity";
 };
 
 export function getNextBestAction(
@@ -277,51 +277,67 @@ export function getLeadJourneySteps(
   return [
     {
       id: "discovered",
-      label: "Discovered",
+      label: "Overview",
       status: "completed",
       description: `Source: ${lead.source || "Database"}`,
       tabId: "overview",
     },
     {
-      id: "qualified",
-      label: "Qualified",
-      status: lead.lead_status !== "NEW" || Boolean(lead.lead_score) ? "completed" : "current",
-      description: lead.lead_score ? `Score: ${lead.lead_score}` : "Ready to pitch",
-      tabId: "overview",
-    },
-    {
       id: "audited",
-      label: "Audited",
+      label: "Audit",
       status: auditCompleted
         ? "completed"
+        : !lead.website_url
+        ? "completed"
         : lead.lead_status === "NEW" && !lead.lead_score
-        ? "upcoming"
+        ? "current"
         : "current",
       description: auditCompleted
         ? `Health: ${audit?.performance_score ?? "Audited"}`
+        : !lead.website_url
+        ? "No website"
         : "Website check",
       tabId: "audit",
     },
     {
+      id: "intelligence",
+      label: "Intelligence",
+      status:
+        lead.lead_score !== null && lead.lead_score !== undefined
+          ? "completed"
+          : auditCompleted
+          ? "current"
+          : "upcoming",
+      description:
+        lead.lead_score !== null && lead.lead_score !== undefined
+          ? `Score: ${lead.lead_score}/100`
+          : auditCompleted
+          ? "Signals ready"
+          : "Signals & Score",
+      tabId: "intelligence",
+    },
+    {
       id: "researched",
-      label: "Researched",
+      label: "Research",
       status: researchCompleted
         ? "completed"
         : auditCompleted
         ? "current"
         : "upcoming",
-      description: researchCompleted ? "Intelligence ready" : "Tavily & Exa",
+      description: researchCompleted ? "Market intel" : "Tavily & Exa",
       tabId: "research",
     },
     {
       id: "mockup",
-      label: "Mockup",
+      label: "Mockups",
       status: mockupReady
         ? "completed"
         : researchCompleted || auditCompleted
         ? "current"
         : "upcoming",
-      description: mockupReady ? "Concept ready" : "Homepage preview",
+      description: mockupReady
+        ? `${mockups.filter((m) => m.status === "READY").length} Ready`
+        : "Homepage concept",
       tabId: "mockups",
     },
     {
@@ -332,12 +348,12 @@ export function getLeadJourneySteps(
         : mockupReady || researchCompleted
         ? "current"
         : "upcoming",
-      description: outreachSent ? "Email delivered" : "Personalized pitch",
+      description: outreachSent ? "Pitch delivered" : "Personalized pitch",
       tabId: "outreach",
     },
     {
-      id: "followup",
-      label: "Follow-up",
+      id: "activity",
+      label: "Activity",
       status: isWon
         ? "completed"
         : followUpActive
@@ -348,16 +364,9 @@ export function getLeadJourneySteps(
       description: lead.last_replied_at
         ? "Replied"
         : lead.next_followup_at
-        ? "Scheduled"
-        : "Re-engagement",
-      tabId: "outreach",
-    },
-    {
-      id: "won",
-      label: "Won",
-      status: isWon ? "completed" : "upcoming",
-      description: isWon ? "Client closed" : "Acquisition target",
-      tabId: "overview",
+        ? "Follow-up due"
+        : "History & Timeline",
+      tabId: "activity",
     },
   ];
 }

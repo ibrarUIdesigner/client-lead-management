@@ -15,15 +15,17 @@ const tones: Record<BadgeTone, string> = {
 
 type BadgeProps = {
   tone?: BadgeTone;
+  className?: string;
   children: ReactNode;
 };
 
-export function Badge({ tone = "gray", children }: BadgeProps) {
+export function Badge({ tone = "gray", className, children }: BadgeProps) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-control px-2 py-1 text-caption font-medium",
         tones[tone],
+        className,
       )}
     >
       {children}

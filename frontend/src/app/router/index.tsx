@@ -17,6 +17,7 @@ import { LeadImportPage } from "../../pages/LeadImportPage";
 import { LeadListPage } from "../../pages/LeadListPage";
 import { LoginPage } from "../../pages/LoginPage";
 import { MockupsPage } from "../../pages/MockupsPage";
+import { NotificationsPage } from "../../pages/NotificationsPage";
 import { OutreachPage } from "../../pages/OutreachPage";
 import { PipelinePage } from "../../pages/PipelinePage";
 import { SettingsPage } from "../../pages/SettingsPage";
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
           { path: "outreach", element: <OutreachPage /> },
           { path: "follow-ups", element: <FollowUpsPage /> },
           { path: "analytics", element: <AnalyticsPage /> },
+          { path: "notifications", element: <NotificationsPage /> },
           { path: "settings", element: <SettingsPage /> },
           { path: "design-system", element: <DesignSystemPage /> },
         ],

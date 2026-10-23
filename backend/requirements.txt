@@ -9,5 +9,6 @@ brotli>=1.1
 httpx>=0.28
 apscheduler>=3.11
 cryptography>=44.0
+pywebpush>=2.0.0
 tavily-python>=0.8.0
 exa-py>=2.26.0

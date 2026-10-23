@@ -38,7 +38,17 @@ def plan_audit_improvements(
 ) -> list[AuditImprovement]:
     """Map technical audit findings to concrete UX/UI enhancements in the mockup."""
     improvements: list[AuditImprovement] = []
-    findings_list = findings or []
+    findings_list = list(findings or [])
+    if audit and isinstance(audit.raw_analysis, dict):
+        report = audit.raw_analysis.get("report")
+        if isinstance(report, list):
+            for item in report:
+                if isinstance(item, dict):
+                    title = str(item.get("title") or "")
+                    detail = str(item.get("detail") or "")
+                    line = f"{title}: {detail}" if detail else title
+                    if line and line not in findings_list:
+                        findings_list.append(line)
 
     # If audit issues exist on the model
     if audit and isinstance(audit.issues, list):

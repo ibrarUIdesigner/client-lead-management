@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Compass, Sparkles } from "lucide-react";
 
 import { useToast } from "../../components/feedback/useToast";
 import { Badge } from "../../components/ui/Badge";
@@ -11,9 +11,10 @@ import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { useLatestAudit } from "../../hooks/useAudit";
 import { useHealth } from "../../hooks/useHealth";
+import { useLeadIntelligence } from "../../hooks/useIntelligence";
 import { useGenerateOutreach, useSuggestOutreachOffer } from "../../hooks/useOutreach";
 import { useLeadResearch } from "../../hooks/useResearch";
-import { useOutreachTemplates } from "../../hooks/useWorkspace";
+import { useMockups, useOutreachTemplates } from "../../hooks/useWorkspace";
 import { apiErrorCode, apiErrorMessage } from "../../lib/apiError";
 import { cn, focusRing } from "../../lib/cn";
 import type { OutreachTone } from "../../services/outreach";
@@ -42,6 +43,15 @@ const toneOptions: { value: OutreachTone; label: string }[] = [
   { value: "brief", label: "Brief" },
 ];
 
+const frameworkOptions = [
+  { value: "auto", label: "Auto (Recommended by Strategist)" },
+  { value: "mockup_led", label: "Mockup-Led (Highlight custom homepage concept)" },
+  { value: "audit_led", label: "Audit-Led (Focus on mobile speed & UX friction)" },
+  { value: "research_led", label: "Research-Led (Competitor gap & market position)" },
+  { value: "opportunity_led", label: "Opportunity-Led (Frame lost inquiries / new site)" },
+  { value: "problem_solution", label: "Problem + Solution (Direct observation & fix)" },
+];
+
 export function OutreachComposer({
   leadId,
   email,
@@ -56,6 +66,11 @@ export function OutreachComposer({
   const generate = useGenerateOutreach(leadId);
   const researchQuery = useLeadResearch(leadId);
   const research = researchQuery.data;
+  const intel = useLeadIntelligence(leadId);
+  const mockupsQuery = useMockups(leadId);
+  const mockups = mockupsQuery.data ?? [];
+  const [framework, setFramework] = useState("auto");
+  const [mockupId, setMockupId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [offer, setOffer] = useState(() => readStored(OFFER_KEY, DEFAULT_OFFER));
   const [tone, setTone] = useState<OutreachTone>(() => readTone());
@@ -99,6 +114,8 @@ export function OutreachComposer({
         ? {
             offer: offer.trim() || undefined,
             tone,
+            framework: framework !== "auto" ? framework : undefined,
+            mockup_id: mockupId || undefined,
             sender_name: senderName.trim() || undefined,
             sender_email: senderEmail.trim() || undefined,
             sender_whatsapp: senderWhatsapp.trim() || undefined,
@@ -193,6 +210,61 @@ export function OutreachComposer({
           </div>
         </div>
       ) : null}
+      {intel.data?.strategy ? (
+        <div className="mt-4 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 p-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Compass className="size-4 text-indigo-600" />
+              <h4 className="text-small font-semibold text-indigo-950">
+                Harvey Outreach Strategy
+              </h4>
+              <Badge tone="indigo">{intel.data.strategy.recommended_framework.toUpperCase()}</Badge>
+            </div>
+            {intel.data.opportunity_score ? (
+              <span className="text-caption font-semibold text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded-full">
+                Score: {intel.data.opportunity_score.total_score}/100 ({intel.data.opportunity_score.tier})
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-2 text-small text-gray-700 leading-relaxed">
+            <strong className="text-gray-900">Sales Angle: </strong>
+            {intel.data.strategy.outreach_angle}
+          </p>
+          {intel.data.strategy.primary_opportunity ? (
+            <div className="mt-2 text-caption text-indigo-950 bg-indigo-50/60 p-2 rounded-md border border-indigo-100">
+              <strong>Focus Opportunity: </strong>
+              {intel.data.strategy.primary_opportunity}
+            </div>
+          ) : null}
+          {intel.data.strategy.suggested_offer ? (
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-indigo-100 pt-2.5">
+              <p className="text-caption text-indigo-900 truncate">
+                <span className="font-semibold">Suggested Offer: </span>
+                {intel.data.strategy.suggested_offer}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-7 px-2 shrink-0 text-caption font-semibold text-indigo-700 hover:text-indigo-900"
+                onClick={() => {
+                  if (intel.data?.strategy) {
+                    setOffer(intel.data.strategy.suggested_offer);
+                    setOfferTouched(true);
+                    writeStored(OFFER_KEY, intel.data.strategy.suggested_offer);
+                    if (intel.data.strategy.recommended_framework) {
+                      setFramework(intel.data.strategy.recommended_framework);
+                    }
+                    notify("Applied Harvey sales strategy and recommended framework.", "success");
+                  }
+                }}
+              >
+                Apply Strategy
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="mt-6 border-t border-gray-200 pt-6">
         <p className="text-caption font-semibold text-gray-500">2. Generate the draft</p>
         <p className="mt-1 text-body text-gray-600">
@@ -265,19 +337,39 @@ export function OutreachComposer({
               </Button>
             </div>
           </div>
-          <Select
-            label="Tone"
-            value={tone}
-            onChange={(event) => {
-              const next = event.target.value;
-              if (!isTone(next)) {
-                return;
-              }
-              setTone(next);
-              writeStored(TONE_KEY, next);
-            }}
-            options={toneOptions}
-          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Select
+              label="Framework"
+              value={framework}
+              onChange={(event) => setFramework(event.target.value)}
+              options={frameworkOptions}
+            />
+            <Select
+              label="Tone"
+              value={tone}
+              onChange={(event) => {
+                const next = event.target.value;
+                if (!isTone(next)) {
+                  return;
+                }
+                setTone(next);
+                writeStored(TONE_KEY, next);
+              }}
+              options={toneOptions}
+            />
+            <Select
+              label="Include Mockup"
+              value={mockupId}
+              onChange={(event) => setMockupId(event.target.value)}
+              options={[
+                { value: "", label: mockups.length ? "Auto / Latest Mockup" : "No Mockup Generated" },
+                ...mockups.map((m) => ({
+                  value: m.id,
+                  label: `${m.title || `Mockup v${m.version}`} (${m.status})`,
+                })),
+              ]}
+            />
+          </div>
         </div>
         <div className="mt-4">
           <Button

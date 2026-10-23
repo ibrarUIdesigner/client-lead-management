@@ -93,3 +93,7 @@ class AnalyticsRead(BaseModel):
     high_scores: int
     websites_missing: int
     outreach_drafts: int
+    reply_rate: float = 0.0
+    positive_reply_rate: float = 0.0
+    meeting_rate: float = 0.0
+    win_rate: float = 0.0

@@ -13,6 +13,8 @@ class OutreachGenerate(BaseModel):
     template_id: UUID | None = None
     offer: str | None = Field(default=None, max_length=800)
     tone: OutreachTone = "professional"
+    framework: str | None = Field(default=None, max_length=64)
+    mockup_id: UUID | None = None
     sender_name: str | None = Field(default=None, max_length=120)
     sender_email: str | None = Field(default=None, max_length=120)
     sender_whatsapp: str | None = Field(default=None, max_length=60)

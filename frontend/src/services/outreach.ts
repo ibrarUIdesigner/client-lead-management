@@ -7,6 +7,8 @@ export type OutreachGenerateInput = {
   template_id?: string;
   offer?: string;
   tone?: OutreachTone;
+  framework?: string;
+  mockup_id?: string;
   sender_name?: string;
   sender_email?: string;
   sender_whatsapp?: string;

@@ -1,13 +1,15 @@
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models.enums import FollowupStatus, LeadStatus
 from app.models.followup import Followup
 from app.models.lead import Lead
+from app.models.mockup import Mockup
 from app.models.outreach import OutreachMessage
 from app.repositories.activities import ActivityRepository
 from app.repositories.leads import LeadRepository
@@ -127,6 +129,88 @@ class FollowupService:
             description=followup.scheduled_for.date().isoformat(),
         )
         self.session.commit()
+
+    def generate_followup_draft(self, followup_id: UUID) -> dict[str, Any]:
+        followup = self._require(followup_id)
+        lead = self._require_lead(followup.lead_id)
+
+        statement = select(func.count()).where(
+            Followup.lead_id == lead.id,
+            Followup.status == FollowupStatus.COMPLETED.value,
+        )
+        completed_count = self.session.scalar(statement) or 0
+        sequence_step = min(3, completed_count + 1)
+
+        original_msg = None
+        if followup.outreach_id:
+            original_msg = self.session.get(OutreachMessage, followup.outreach_id)
+        if not original_msg:
+            stmt = (
+                select(OutreachMessage)
+                .where(OutreachMessage.lead_id == lead.id)
+                .order_by(OutreachMessage.created_at.desc())
+            )
+            rows = list(self.session.scalars(stmt))
+            original_msg = rows[0] if rows else None
+
+        orig_subj = (
+            original_msg.subject
+            if original_msg and original_msg.subject
+            else f"Homepage design for {lead.business_name}"
+        )
+        clean_subj = orig_subj if orig_subj.lower().startswith("re:") else f"Re: {orig_subj}"
+
+        mockup_stmt = select(Mockup).where(Mockup.lead_id == lead.id).order_by(Mockup.version.desc())
+        m_rows = list(self.session.scalars(mockup_stmt))
+        mockup = m_rows[0] if m_rows else None
+        mockup_url = f"/mockups/{mockup.id}" if mockup else None
+
+        first_name = lead.business_name.split()[0] if lead.business_name else "there"
+        sender_name = "Ibrar"
+
+        if sequence_step == 1:
+            body = (
+                f"Hi {first_name},\n\n"
+                f"Following up briefly on my earlier note about {lead.business_name}'s website.\n\n"
+            )
+            if mockup_url:
+                body += (
+                    f"In case you missed it, I had put together a quick preview concept showing a cleaner mobile layout with a direct booking section:\n"
+                    f"{mockup_url}\n\n"
+                )
+            else:
+                body += (
+                    "I'd love to share a couple of quick observations on how tightening the mobile conversion flow could help capture more inquiries.\n\n"
+                )
+            body += f"Would you be open to taking a quick look this week?\n\nBest,\n{sender_name}"
+            strategy_label = "Day 4: Value Bump with Mockup Preview"
+        elif sequence_step == 2:
+            ind = lead.industry or "businesses"
+            loc = lead.city or "your area"
+            body = (
+                f"Hi {first_name},\n\n"
+                f"One trend we're seeing across {ind} in {loc} is that over 60% of bookings happen outside typical working hours via mobile.\n\n"
+                f"Without an easy way to request a quote or book online, those prospective clients usually bounce over to the next provider.\n\n"
+                f"Happy to walk you through how the concept we designed solves that. Are you free for 5 minutes Thursday?\n\nBest,\n{sender_name}"
+            )
+            strategy_label = "Day 10: Market Trend & Mobile Friction Angle"
+        else:
+            body = (
+                f"Hi {first_name},\n\n"
+                f"I know you're busy running {lead.business_name}, so I won't clutter your inbox further.\n\n"
+                f"If you ever decide to refresh your website or improve mobile inquiries down the road, feel free to reach out anytime.\n\n"
+                f"Wishing you and the team continued success!\n\nBest,\n{sender_name}"
+            )
+            strategy_label = "Day 20: Graceful Breakup"
+
+        return {
+            "followup_id": str(followup.id),
+            "lead_id": str(lead.id),
+            "sequence_step": sequence_step,
+            "strategy": strategy_label,
+            "subject": clean_subj,
+            "body": body,
+        }
 
     def _sync_next_followup(self, lead: Lead) -> None:
         statement = (

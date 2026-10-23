@@ -35,3 +35,19 @@ export async function completeFollowup(followupId: string): Promise<FollowupItem
 export async function cancelFollowup(followupId: string): Promise<void> {
   await api.delete(`/followups/${followupId}`);
 }
+
+export type FollowupDraft = {
+  followup_id: string;
+  lead_id: string;
+  business_name: string;
+  step: number;
+  stage_name: string;
+  subject: string;
+  body: string;
+  strategy_notes: string;
+};
+
+export async function getFollowupDraft(followupId: string): Promise<FollowupDraft> {
+  const response = await api.get<FollowupDraft>(`/followups/${followupId}/draft`);
+  return response.data;
+}

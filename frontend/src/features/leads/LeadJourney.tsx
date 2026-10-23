@@ -8,11 +8,14 @@ import type { JourneyStep } from "../../lib/leadWorkflow";
 
 type LeadJourneyProps = {
   steps: JourneyStep[];
+  activeTab?: string;
   onSelectTab?: (tabId: string) => void;
   className?: string;
 };
 
-export function LeadJourney({ steps, onSelectTab, className }: LeadJourneyProps) {
+export function LeadJourney({ steps, activeTab, onSelectTab, className }: LeadJourneyProps) {
+  const activeStep = steps.find((s) => s.tabId === activeTab);
+
   return (
     <div
       className={cn(
@@ -21,21 +24,27 @@ export function LeadJourney({ steps, onSelectTab, className }: LeadJourneyProps)
       )}
     >
       <div className="flex items-center justify-between gap-2 px-1 pb-2.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary-600" />
           <span className="text-caption font-semibold tracking-wide uppercase text-gray-500">
             Acquisition Lifecycle Journey
           </span>
+          {activeStep ? (
+            <span className="rounded-full bg-primary-100/80 px-2.5 py-0.5 text-[11px] font-bold text-primary-800">
+              {activeStep.label}
+            </span>
+          ) : null}
         </div>
-        <span className="text-caption text-gray-400">
+        <span className="text-caption text-gray-400 hidden sm:inline">
           Click any step to inspect or execute
         </span>
       </div>
 
-      <ol className="flex items-center gap-1 overflow-x-auto py-1 scrollbar-none">
+      <ol className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
         {steps.map((step, idx) => {
           const isCompleted = step.status === "completed";
           const isCurrent = step.status === "current";
+          const isSelected = step.tabId === activeTab;
           const isClickable = Boolean(step.tabId && onSelectTab);
 
           return (
@@ -52,10 +61,14 @@ export function LeadJourney({ steps, onSelectTab, className }: LeadJourneyProps)
                   }
                 }}
                 className={cn(
-                  "group flex items-center gap-2 rounded-control px-2.5 py-1.5 text-left transition-all",
+                  "group flex items-center gap-2.5 rounded-control px-3 py-1.5 text-left transition-all border",
                   isClickable && "hover:bg-gray-50 cursor-pointer",
                   !isClickable && "cursor-default",
-                  isCurrent && "bg-primary-50/80 ring-1 ring-primary-200",
+                  isSelected
+                    ? "bg-primary-50/90 border-primary-300 ring-2 ring-primary-500/50 shadow-xs"
+                    : isCurrent
+                    ? "bg-primary-50/40 border-primary-200 ring-1 ring-primary-300/40"
+                    : "border-transparent hover:border-gray-200",
                 )}
                 title={step.description}
               >
@@ -63,8 +76,9 @@ export function LeadJourney({ steps, onSelectTab, className }: LeadJourneyProps)
                   className={cn(
                     "flex size-6 shrink-0 items-center justify-center rounded-full text-caption font-semibold transition-colors",
                     isCompleted && "bg-emerald-600 text-white",
-                    isCurrent && "bg-primary-600 text-white ring-2 ring-primary-200 ring-offset-1 animate-pulse",
-                    step.status === "upcoming" && "border border-gray-300 bg-gray-50 text-gray-400",
+                    !isCompleted && isSelected && "bg-primary-600 text-white ring-2 ring-primary-300 ring-offset-1",
+                    !isCompleted && isCurrent && !isSelected && "bg-primary-600 text-white ring-2 ring-primary-200 ring-offset-1 animate-pulse",
+                    !isCompleted && !isCurrent && !isSelected && "border border-gray-300 bg-gray-50 text-gray-400",
                   )}
                 >
                   {isCompleted ? (
@@ -78,9 +92,10 @@ export function LeadJourney({ steps, onSelectTab, className }: LeadJourneyProps)
                   <span
                     className={cn(
                       "text-caption font-semibold leading-tight",
-                      isCompleted && "text-gray-900",
-                      isCurrent && "text-primary-900 font-bold",
-                      step.status === "upcoming" && "text-gray-400",
+                      isSelected && "text-primary-950 font-bold",
+                      !isSelected && isCompleted && "text-gray-900",
+                      !isSelected && isCurrent && "text-primary-900 font-bold",
+                      !isSelected && step.status === "upcoming" && "text-gray-400",
                     )}
                   >
                     {step.label}
@@ -88,7 +103,11 @@ export function LeadJourney({ steps, onSelectTab, className }: LeadJourneyProps)
                   <span
                     className={cn(
                       "truncate text-[11px] leading-tight",
-                      isCurrent ? "text-primary-700 font-medium" : "text-gray-500",
+                      isSelected
+                        ? "text-primary-700 font-medium"
+                        : isCurrent
+                        ? "text-primary-700 font-medium"
+                        : "text-gray-500",
                     )}
                   >
                     {step.description}

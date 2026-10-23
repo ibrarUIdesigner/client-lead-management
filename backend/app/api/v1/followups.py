@@ -30,6 +30,11 @@ def complete_followup(followup_id: UUID, session: SessionDep) -> FollowupRead:
     return FollowupService(session).complete(followup_id)
 
 
+@router.get("/followups/{followup_id}/draft")
+def get_followup_draft(followup_id: UUID, session: SessionDep) -> dict:
+    return FollowupService(session).generate_followup_draft(followup_id)
+
+
 @router.delete("/followups/{followup_id}", status_code=204)
 def cancel_followup(followup_id: UUID, session: SessionDep) -> Response:
     FollowupService(session).cancel(followup_id)

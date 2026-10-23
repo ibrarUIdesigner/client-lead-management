@@ -14,6 +14,7 @@ import { Card } from "../components/ui/Card";
 import { Switch } from "../components/ui/Switch";
 import { Tabs } from "../components/ui/Tabs";
 import { GmailSettingsCard } from "../features/gmail/GmailSettingsCard";
+import { NotificationSettingsCard } from "../features/notifications/NotificationSettingsCard";
 import { useApify } from "../hooks/useApify";
 import { useDiscovery } from "../hooks/useDiscovery";
 import { useHealth, useProviders } from "../hooks/useHealth";
@@ -60,6 +61,7 @@ export function SettingsPage() {
         label="Settings sections"
         tabs={[
           { id: "workspace", label: "Workspace", content: <WorkspaceSection /> },
+          { id: "notifications", label: "Notifications", content: <NotificationSettingsCard /> },
           { id: "integrations", label: "Integrations", content: <IntegrationsSection /> },
           { id: "templates", label: "Templates", content: <TemplatesSection /> },
           { id: "account", label: "Account", content: <AccountSection /> },
