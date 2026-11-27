@@ -10,11 +10,20 @@ const optionalUrl = z
     message: "Start the address with http:// or https://.",
   });
 
-const requiredEmail = z
+// Leads found without an email (phone or website only) must stay editable.
+const optionalEmail = z
   .string()
   .trim()
-  .min(1, "Enter an email address.")
-  .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "Enter a valid email.");
+  .refine((value) => value === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value), {
+    message: "Enter a valid email.",
+  });
+
+const optionalAmount = z
+  .string()
+  .trim()
+  .refine((value) => value === "" || (Number.isFinite(Number(value)) && Number(value) >= 0), {
+    message: "Enter an amount of 0 or more.",
+  });
 
 export const leadFormSchema = z.object({
   business_name: z.string().trim().min(1, "Enter the business name.").max(255),
@@ -22,11 +31,12 @@ export const leadFormSchema = z.object({
   city: z.string().trim().max(120),
   country: z.string().trim().max(120),
   website_url: optionalUrl,
-  email: requiredEmail,
+  email: optionalEmail,
   phone: z.string().trim().max(40),
   source: z.string().trim().max(120),
   tags: z.string().trim(),
   notes: z.string().trim(),
+  deal_value: optionalAmount,
   lead_status: z.enum(LEAD_STATUS_VALUES),
 });
 
@@ -43,6 +53,7 @@ export const emptyLeadForm: LeadFormValues = {
   source: "",
   tags: "",
   notes: "",
+  deal_value: "",
   lead_status: "NEW",
 };
 
@@ -67,6 +78,7 @@ export function leadToForm(lead: Lead): LeadFormValues {
     source: lead.source ?? "",
     tags: lead.tags.join(", "),
     notes: lead.notes ?? "",
+    deal_value: lead.deal_value === null || lead.deal_value === undefined ? "" : String(lead.deal_value),
     lead_status: isLeadStatus(lead.lead_status) ? lead.lead_status : "NEW",
   };
 }
@@ -82,6 +94,7 @@ export function toLeadPayload(values: LeadFormValues): LeadWrite {
     phone: emptyToNull(values.phone),
     source: emptyToNull(values.source),
     notes: emptyToNull(values.notes),
+    deal_value: values.deal_value.trim() === "" ? null : Number(values.deal_value),
     tags: values.tags
       .split(",")
       .map((tag) => tag.trim())

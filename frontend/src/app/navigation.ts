@@ -1,6 +1,8 @@
 import {
   Bell,
   Bot,
+  CircleCheckBig,
+  Cog,
   CalendarClock,
   Images,
   LayoutDashboard,
@@ -63,6 +65,12 @@ export const navigationGroups: NavGroup[] = [
         description: "Move prospects through acquisition stages.",
       },
       {
+        to: "/approvals",
+        label: "Approvals",
+        icon: CircleCheckBig,
+        description: "Review and send the emails written for you.",
+      },
+      {
         to: "/outreach",
         label: "Outreach",
         icon: Mail,
@@ -73,6 +81,12 @@ export const navigationGroups: NavGroup[] = [
         label: "Follow-ups",
         icon: CalendarClock,
         description: "Today, overdue, and scheduled prospect check-ins.",
+      },
+      {
+        to: "/insights",
+        label: "Performance",
+        icon: TrendingUp,
+        description: "Daily results, best categories and countries, and what to do next.",
       },
       {
         to: "/analytics",
@@ -102,6 +116,12 @@ export const navigationGroups: NavGroup[] = [
   {
     title: "AUTOMATION",
     items: [
+      {
+        to: "/automation",
+        label: "Automation",
+        icon: Cog,
+        description: "Limits, targets, follow-ups and the activity log.",
+      },
       {
         to: "/apify",
         label: "Apify",

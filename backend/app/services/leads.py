@@ -226,6 +226,15 @@ class LeadService:
                 description=f"{previous_status} to {lead.lead_status}",
                 details={"from": previous_status, "to": lead.lead_status},
             )
+        if status_changed and lead.lead_status in ("MEETING", "WON"):
+            from app.models.enums import AttemptOutcome
+            from app.services.attempts import record_outcome
+
+            record_outcome(
+                self.session,
+                lead.id,
+                AttemptOutcome.MEETING if lead.lead_status == "MEETING" else AttemptOutcome.WON,
+            )
         if other_changes:
             self.activities.add(lead.id, "lead_updated", "Lead updated")
 

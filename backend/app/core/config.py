@@ -47,6 +47,29 @@ class Settings(BaseSettings):
     design_md_max_bytes: int = Field(default=262_144, ge=1_024, le=5_000_000)
     postgres_url: str = ""
 
+    # Public base URL of the deployed app. Used for links sent to prospects.
+    public_base_url: str = ""
+
+    # Outreach safety: daily send cap, postal address for the email footer, and
+    # the per-country sending policy (JSON object {"DE": "manual", ...}).
+    outreach_daily_send_cap: int = Field(default=20, ge=0, le=500)
+    outreach_postal_address: str = ""
+    outreach_country_policy: str = ""
+    # Automatic sends only happen inside this window (weekdays, local hours).
+    outreach_timezone: str = "UTC"
+    outreach_send_start_hour: int = Field(default=9, ge=0, le=23)
+    outreach_send_end_hour: int = Field(default=17, ge=1, le=24)
+    # Follow-ups per day (also counted in the daily send cap).
+    followup_daily_limit: int = Field(default=10, ge=0, le=200)
+
+    # Pipeline automation budgets (heavy steps per UTC day) and shared tick secret.
+    pipeline_enabled: bool = True
+    pipeline_min_score: int = Field(default=40, ge=0, le=100)
+    pipeline_daily_audits: int = Field(default=25, ge=0, le=500)
+    pipeline_daily_research: int = Field(default=25, ge=0, le=500)
+    pipeline_daily_mockups: int = Field(default=10, ge=0, le=200)
+    pipeline_daily_drafts: int = Field(default=30, ge=0, le=500)
+
     # Lead Research Providers (Tavily & Exa)
     tavily_api_key: str = ""
     exa_api_key: str = ""
@@ -68,7 +91,7 @@ class Settings(BaseSettings):
 
     # Authentication Settings
     auth_email: str = "ibraruidesigner@gmail.com"
-    auth_password: str = "CAquiByIbrar@1234"
+    auth_password: str = ""
     auth_enabled: bool = True
 
     model_config = SettingsConfigDict(
@@ -89,6 +112,10 @@ class Settings(BaseSettings):
                 # The deployment filesystem is read-only. Screenshots go to /tmp.
                 self.storage_dir = Path("/tmp/storage")
         return self
+
+    @property
+    def auth_configured(self) -> bool:
+        return bool(self.auth_password.strip())
 
     @property
     def cors_origin_list(self) -> list[str]:

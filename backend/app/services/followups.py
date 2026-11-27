@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.enums import FollowupStatus, LeadStatus
 from app.models.followup import Followup
@@ -16,6 +17,7 @@ from app.repositories.leads import LeadRepository
 from app.schemas.outreach import FollowupCreate, FollowupUpdate
 from app.schemas.workspace import FollowupRead
 from app.services.persistence import flush_or_reject
+from app.services.public_links import public_mockup_url
 from app.services.workspace import WorkspaceService
 
 _OPEN = {FollowupStatus.SCHEDULED.value, FollowupStatus.DUE.value}
@@ -163,10 +165,12 @@ class FollowupService:
         mockup_stmt = select(Mockup).where(Mockup.lead_id == lead.id).order_by(Mockup.version.desc())
         m_rows = list(self.session.scalars(mockup_stmt))
         mockup = m_rows[0] if m_rows else None
-        mockup_url = f"/mockups/{mockup.id}" if mockup else None
+        mockup_url = public_mockup_url(get_settings(), mockup)
 
-        first_name = lead.business_name.split()[0] if lead.business_name else "there"
-        sender_name = "Ibrar"
+        from app.services.automation import first_contact_name
+
+        first_name = first_contact_name(self.session, lead.id) or "there"
+        sender_name = get_settings().outreach_sender_name or "Ibrar"
 
         if sequence_step == 1:
             body = (
@@ -189,7 +193,7 @@ class FollowupService:
             loc = lead.city or "your area"
             body = (
                 f"Hi {first_name},\n\n"
-                f"One trend we're seeing across {ind} in {loc} is that over 60% of bookings happen outside typical working hours via mobile.\n\n"
+                f"One thing I keep noticing with {ind} in {loc} is that many customers look for a quote or booking on their phone outside working hours.\n\n"
                 f"Without an easy way to request a quote or book online, those prospective clients usually bounce over to the next provider.\n\n"
                 f"Happy to walk you through how the concept we designed solves that. Are you free for 5 minutes Thursday?\n\nBest,\n{sender_name}"
             )

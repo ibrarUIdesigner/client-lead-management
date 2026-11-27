@@ -156,6 +156,8 @@ class GmailClient:
         in_reply_to: str | None = None,
         references: str | None = None,
         attachments: list[GmailAttachment] | None = None,
+        list_unsubscribe: str | None = None,
+        body_html: str | None = None,
     ) -> dict[str, Any]:
         raw = self._build_raw_message(
             to=to,
@@ -165,6 +167,8 @@ class GmailClient:
             in_reply_to=in_reply_to,
             references=references,
             attachments=attachments or [],
+            list_unsubscribe=list_unsubscribe,
+            body_html=body_html,
         )
         payload: dict[str, Any] = {"raw": raw}
         if thread_id:
@@ -351,6 +355,8 @@ class GmailClient:
         in_reply_to: str | None,
         references: str | None,
         attachments: list[GmailAttachment],
+        list_unsubscribe: str | None = None,
+        body_html: str | None = None,
     ) -> str:
         if attachments:
             message: MIMEMultipart | MIMEText = MIMEMultipart()
@@ -361,6 +367,10 @@ class GmailClient:
                 if item.content_type:
                     part.set_type(item.content_type)
                 message.attach(part)
+        elif body_html:
+            message = MIMEMultipart("alternative")
+            message.attach(MIMEText(body_text, "plain", "utf-8"))
+            message.attach(MIMEText(body_html, "html", "utf-8"))
         else:
             message = MIMEText(body_text, "plain", "utf-8")
         message["To"] = to
@@ -370,6 +380,8 @@ class GmailClient:
             message["In-Reply-To"] = in_reply_to
         if references:
             message["References"] = references
+        if list_unsubscribe:
+            message["List-Unsubscribe"] = f"<{list_unsubscribe}>"
         encoded = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
         return encoded.rstrip("=")
 

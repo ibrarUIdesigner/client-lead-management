@@ -48,6 +48,15 @@ export function LeadFormFields({ register, errors }: LeadFormFieldsProps) {
         error={errors.lead_status?.message}
         {...register("lead_status")}
       />
+      <Input
+        label="Deal value"
+        type="number"
+        min={0}
+        step="any"
+        hint="What this client paid, once won. Used for revenue in Performance & Insights."
+        error={errors.deal_value?.message}
+        {...register("deal_value")}
+      />
       <div className="md:col-span-2">
         <Input
           label="Tags"

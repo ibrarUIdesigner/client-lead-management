@@ -1,8 +1,9 @@
+import hmac
 import json
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Request, Response
 from pydantic import BaseModel, EmailStr
 
 from app.core.config import Settings
@@ -55,12 +56,21 @@ def verify_access_token(token: str, settings: Settings) -> str:
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(data: LoginRequest, request: Request) -> LoginResponse:
+def login(data: LoginRequest, request: Request, response: Response) -> LoginResponse:
     settings: Settings = request.app.state.settings
     req_email = data.email.strip().lower()
     cfg_email = settings.auth_email.strip().lower()
 
-    if req_email != cfg_email or data.password != settings.auth_password:
+    if not settings.auth_configured:
+        raise AppError(
+            code="AUTH_NOT_CONFIGURED",
+            message="Set AUTH_PASSWORD in the server environment to enable sign-in.",
+            status_code=503,
+        )
+    password_ok = hmac.compare_digest(
+        data.password.encode("utf-8"), settings.auth_password.encode("utf-8")
+    )
+    if req_email != cfg_email or not password_ok:
         raise AppError(
             code="INVALID_CREDENTIALS",
             message="Invalid email or password.",
@@ -68,7 +78,24 @@ def login(data: LoginRequest, request: Request) -> LoginResponse:
         )
 
     token = create_access_token(req_email, settings)
+    # The cookie lets <img> tags load protected screenshots. The bearer token still
+    # works for API calls.
+    response.set_cookie(
+        "clm_token",
+        token,
+        max_age=86400 * 30,
+        httponly=True,
+        secure=request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https",
+        samesite="lax",
+        path="/",
+    )
     return LoginResponse(access_token=token, email=req_email)
+
+
+@router.post("/logout", status_code=204)
+def logout(response: Response) -> None:
+    response.delete_cookie("clm_token", path="/")
 
 
 @router.get("/me", response_model=UserResponse)
@@ -86,8 +113,3 @@ def get_me(request: Request, authorization: Annotated[str | None, Header()] = No
 
     email = verify_access_token(token, settings)
     return UserResponse(email=email, authenticated=True)
-
-
-@router.post("/logout")
-def logout() -> dict[str, bool]:
-    return {"success": True}

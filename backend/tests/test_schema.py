@@ -38,6 +38,13 @@ EXPECTED_TABLES = {
     "notifications",
     "push_subscriptions",
     "notification_preferences",
+    "pipeline_jobs",
+    "app_settings",
+    "market_cells",
+    "discovery_rejections",
+    "automation_runs",
+    "outreach_attempts",
+    "lead_exclusions",
 }
 
 
@@ -180,6 +187,8 @@ def test_activity_metadata_column_keeps_the_schema_name() -> None:
 
 def test_primary_keys_are_uuid_and_timestamps_are_timezone_aware() -> None:
     for table in Base.metadata.tables.values():
+        if table.name == "app_settings":
+            continue  # small key/value table keyed by name, not a record table
         primary_key = table.c.id
         assert primary_key.primary_key
         type_name = primary_key.type.__class__.__name__.lower()

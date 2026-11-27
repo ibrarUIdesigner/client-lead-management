@@ -124,5 +124,53 @@ class NotificationPriority(StrEnum):
     URGENT = "URGENT"
 
 
+class PipelineStep(StrEnum):
+    ENRICH = "enrich"
+    AUDIT = "audit"
+    RESEARCH = "research"
+    MOCKUP = "mockup"
+    DRAFT = "draft"
+    SEND = "send"
+
+
+class PipelineJobStatus(StrEnum):
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    DONE = "DONE"
+    SKIPPED = "SKIPPED"
+    FAILED = "FAILED"
+
+
+class AutomationRunStatus(StrEnum):
+    RUNNING = "RUNNING"
+    OK = "OK"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+
+class AttemptKind(StrEnum):
+    FIRST = "first"
+    FOLLOWUP = "followup"
+
+
+class AttemptOutcome(StrEnum):
+    NONE = "none"
+    BOUNCE = "bounce"
+    UNSUBSCRIBE = "unsubscribe"
+    REPLY = "reply"
+    NEGATIVE = "negative"
+    POSITIVE = "positive"
+    INTERESTED = "interested"
+    MEETING = "meeting"
+    WON = "won"
+
+
+class ExclusionKind(StrEnum):
+    DOMAIN = "domain"
+    EMAIL = "email"
+    NAME = "name"
+    CATEGORY = "category"
+
+
 def enum_values(enum_cls: type[StrEnum]) -> tuple[str, ...]:
     return tuple(item.value for item in enum_cls)

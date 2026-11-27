@@ -19,6 +19,9 @@ import { LoginPage } from "../../pages/LoginPage";
 import { MockupsPage } from "../../pages/MockupsPage";
 import { NotificationsPage } from "../../pages/NotificationsPage";
 import { OutreachPage } from "../../pages/OutreachPage";
+import { ApprovalsPage } from "../../pages/ApprovalsPage";
+import { InsightsPage } from "../../pages/InsightsPage";
+import { AutomationPage } from "../../pages/AutomationPage";
 import { PipelinePage } from "../../pages/PipelinePage";
 import { SettingsPage } from "../../pages/SettingsPage";
 
@@ -46,6 +49,9 @@ export const router = createBrowserRouter([
           { path: "design-md/:guideId", element: <DesignGuideViewPage /> },
           { path: "mockups", element: <MockupsPage /> },
           { path: "outreach", element: <OutreachPage /> },
+          { path: "approvals", element: <ApprovalsPage /> },
+          { path: "automation", element: <AutomationPage /> },
+          { path: "insights", element: <InsightsPage /> },
           { path: "follow-ups", element: <FollowUpsPage /> },
           { path: "analytics", element: <AnalyticsPage /> },
           { path: "notifications", element: <NotificationsPage /> },

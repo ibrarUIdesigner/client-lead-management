@@ -41,23 +41,9 @@ def evaluate_mockup_eligibility(
     lead: Lead,
     audit: WebsiteAudit | None,
 ) -> MockupEligibility:
-    """Mockups are for missing websites, researched leads, or existing sites with design score under 50."""
-    has_completed_research = bool(
-        getattr(lead, "research", None)
-        and getattr(lead.research, "status", None) == "COMPLETED"
-    )
-    if has_completed_research:
-        return MockupEligibility(
-            allowed=True,
-            reason="research_insights",
-            message=(
-                "Researched business details and proactive solutions ready. "
-                "Generate a tailored landing page mockup."
-            ),
-            design_score=audit.design_score if audit is not None else None,
-            has_website=lead_has_public_website(lead),
-        )
-
+    """Mockups are for missing websites or existing sites with a design score under 50."""
+    # Completed research alone does not unlock a mockup. A business with a working,
+    # well-designed website needs a weak audit design score first.
     if not lead_has_public_website(lead):
         return MockupEligibility(
             allowed=True,

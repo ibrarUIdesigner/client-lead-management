@@ -41,7 +41,6 @@ export function LoginPage() {
 
   function handleFillDemo() {
     setEmail(DEMO_CREDENTIALS.email);
-    setPassword(DEMO_CREDENTIALS.password);
     setError(null);
     setCopiedDemo(true);
     setTimeout(() => setCopiedDemo(false), 2000);

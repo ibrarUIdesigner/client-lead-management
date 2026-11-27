@@ -1,7 +1,8 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, DateTime, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -58,6 +59,7 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     facebook_url: Mapped[str | None] = mapped_column(Text)
     google_maps_url: Mapped[str | None] = mapped_column(Text)
     lead_score: Mapped[int | None] = mapped_column(Integer)
+    deal_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     lead_status: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
@@ -72,6 +74,13 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     last_replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_followup_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     email_unread: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+    )
+    pipeline_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pipeline_paused: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         default=False,

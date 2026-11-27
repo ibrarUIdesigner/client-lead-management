@@ -101,6 +101,7 @@ class LeadUpdate(BaseModel):
     source: str | None = Field(default=None, max_length=120)
     tags: list[str] | None = None
     notes: str | None = None
+    deal_value: float | None = Field(default=None, ge=0, le=100_000_000)
 
     @field_validator(
         "industry",
@@ -189,6 +190,7 @@ class LeadRead(BaseModel):
     facebook_url: str | None
     google_maps_url: str | None
     lead_score: int | None
+    deal_value: float | None = None
     lead_status: str
     source: str | None
     tags: list[str]

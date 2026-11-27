@@ -56,6 +56,7 @@ class OutreachMessage(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     channel: Mapped[str | None] = mapped_column(String(32))
     subject: Mapped[str | None] = mapped_column(Text)
     message: Mapped[str | None] = mapped_column(Text)
+    variant: Mapped[str | None] = mapped_column(String(32))
     template_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("outreach_templates.id", ondelete="SET NULL"),

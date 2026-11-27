@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
+from app.api.auth_middleware import RequireSessionMiddleware
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
@@ -71,6 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = create_db_engine(settings.database_url)
     app.state.session_factory = create_session_factory(app.state.engine)
 
+    app.add_middleware(RequireSessionMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,

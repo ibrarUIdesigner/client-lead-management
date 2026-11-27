@@ -13,6 +13,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Switch } from "../components/ui/Switch";
 import { Tabs } from "../components/ui/Tabs";
+import { AutomationSettingsCard } from "../features/automation/AutomationSettingsCard";
 import { GmailSettingsCard } from "../features/gmail/GmailSettingsCard";
 import { NotificationSettingsCard } from "../features/notifications/NotificationSettingsCard";
 import { useApify } from "../hooks/useApify";
@@ -61,6 +62,7 @@ export function SettingsPage() {
         label="Settings sections"
         tabs={[
           { id: "workspace", label: "Workspace", content: <WorkspaceSection /> },
+          { id: "automation", label: "Automation", content: <AutomationSettingsCard /> },
           { id: "notifications", label: "Notifications", content: <NotificationSettingsCard /> },
           { id: "integrations", label: "Integrations", content: <IntegrationsSection /> },
           { id: "templates", label: "Templates", content: <TemplatesSection /> },

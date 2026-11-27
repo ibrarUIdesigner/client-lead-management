@@ -38,6 +38,11 @@ from app.schemas.gmail import (
 )
 from app.services.gmail_accounts import GmailAccountService
 from app.services.outreach_copy import next_lead_status
+from app.services.outreach_policy import (
+    enforce_daily_cap,
+    enforce_policy_for_send,
+    with_compliance_footer,
+)
 from app.services.persistence import flush_or_reject
 from app.services.storage import read_screenshot, resolve_storage_path
 
@@ -113,6 +118,14 @@ class GmailMailService:
             if existing is not None:
                 return self._read(existing)
 
+        enforce_policy_for_send(lead, self.settings)
+        from app.services.automation_config import ExclusionSet
+
+        excluded = ExclusionSet.load(self.session).match_lead(lead)
+        if excluded:
+            raise AppError(code="LEAD_EXCLUDED", message=excluded, status_code=409)
+        enforce_daily_cap(self.session, self.settings)
+        body_text = with_compliance_footer(data.body, self.settings)
         account = self.accounts.require_active_account()
         recipient = (data.to or lead.email or "").strip().lower()
         if not recipient:
@@ -157,9 +170,10 @@ class GmailMailService:
                 access,
                 to=recipient,
                 subject=data.subject,
-                body_text=data.body,
+                body_text=body_text,
                 from_email=account.email,
                 attachments=attachments,
+                list_unsubscribe=f"mailto:{account.email}?subject=unsubscribe",
             )
         except GmailApiError as exc:
             if exc.code == "GMAIL_UNAUTHORIZED":
@@ -202,7 +216,7 @@ class GmailMailService:
             recipient_email=recipient,
             sender_email=account.email,
             subject=data.subject,
-            body_text=data.body,
+            body_text=body_text,
             body_html=None,
             gmail_message_id=gmail_message_id,
             gmail_thread_id=gmail_thread_id,
@@ -219,6 +233,7 @@ class GmailMailService:
             outreach.status = OutreachStatus.SENT.value
             outreach.sent_at = now
         flush_or_reject(self.session)
+        self._track_first_or_followup(lead, row, outreach, key, now)
         self.activities.add(
             lead.id,
             "gmail_sent",
@@ -302,6 +317,11 @@ class GmailMailService:
                 thread_id=parent.gmail_thread_id,
                 in_reply_to=parent.rfc_message_id,
                 references=references,
+                list_unsubscribe=(
+                    f"mailto:{account.email}?subject=unsubscribe"
+                    if (key or "").startswith("followup:")
+                    else None
+                ),
             )
         except GmailApiError as exc:
             if exc.code == "GMAIL_UNAUTHORIZED":
@@ -357,6 +377,47 @@ class GmailMailService:
         )
         self.session.commit()
         return self._read(row)
+
+    def _track_first_or_followup(
+        self,
+        lead: Lead,
+        row: LeadEmail,
+        outreach: OutreachMessage | None,
+        key: str | None,
+        sent_at: datetime,
+    ) -> None:
+        """Record the attempt for learning and queue the follow-up sequence after a first email."""
+        from sqlalchemy import func
+
+        from app.models.enums import AttemptKind
+        from app.services.attempts import record_attempt
+        from app.services.automation import schedule_followup_sequence
+
+        earlier = self.session.scalar(
+            select(func.count())
+            .select_from(LeadEmail)
+            .where(
+                LeadEmail.lead_id == lead.id,
+                LeadEmail.direction == EmailDirection.OUTBOUND.value,
+                LeadEmail.id != row.id,
+            )
+        )
+        kind = AttemptKind.FOLLOWUP if earlier else AttemptKind.FIRST
+        record_attempt(
+            self.session,
+            lead,
+            row,
+            kind=kind,
+            automatic=(key or "").startswith("auto-send:"),
+            message=outreach,
+        )
+        if kind is AttemptKind.FIRST:
+            try:
+                schedule_followup_sequence(
+                    self.session, lead, outreach.id if outreach else None, sent_at
+                )
+            except Exception:
+                logger.exception("schedule_followups_failed lead_id=%s", lead.id)
 
     def _assert_can_send(self, lead: Lead) -> None:
         if lead.do_not_contact or lead.lead_status == LeadStatus.DO_NOT_CONTACT.value:

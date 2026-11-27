@@ -16,6 +16,7 @@ export type Lead = {
   facebook_url: string | null;
   google_maps_url: string | null;
   lead_score: number | null;
+  deal_value?: number | null;
   lead_status: string;
   source: string | null;
   tags: string[];
@@ -81,6 +82,7 @@ export type LeadWrite = {
   source: string | null;
   tags: string[];
   notes: string | null;
+  deal_value?: number | null;
   lead_status: string;
 };
 

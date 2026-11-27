@@ -20,6 +20,7 @@ class OutreachGenerate(BaseModel):
     sender_whatsapp: str | None = Field(default=None, max_length=60)
     sender_portfolio: str | None = Field(default=None, max_length=300)
     use_ai: bool = True
+    style: str | None = Field(default=None, max_length=24)
 
 
 class OutreachCreate(BaseModel):

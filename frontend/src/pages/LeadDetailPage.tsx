@@ -32,6 +32,7 @@ import { LeadJourney } from "../features/leads/LeadJourney";
 import { LeadResearchSection } from "../features/leads/LeadResearchSection";
 import { NextBestActionBanner } from "../features/leads/NextBestActionBanner";
 import { LeadIntelligencePanel } from "../features/leads/LeadIntelligencePanel";
+import { LeadPipelinePanel } from "../features/leads/LeadPipelinePanel";
 import { MockupGallery } from "../features/mockups/MockupGallery";
 import { MessageList } from "../features/outreach/MessageList";
 import { OutreachComposer } from "../features/outreach/OutreachComposer";
@@ -305,7 +306,10 @@ function LeadDetailView({ lead }: { lead: LeadDetail }) {
           <AuditPanel leadId={lead.id} websiteUrl={lead.website_url} />
         )}
         {activeTab === "intelligence" && (
-          <LeadIntelligencePanel leadId={lead.id} onSelectTab={handleSelectTab} />
+          <div className="space-y-6">
+            <LeadPipelinePanel leadId={lead.id} />
+            <LeadIntelligencePanel leadId={lead.id} onSelectTab={handleSelectTab} />
+          </div>
         )}
         {activeTab === "research" && (
           <LeadResearchSection lead={lead} onSelectTab={handleSelectTab} />

@@ -480,6 +480,14 @@ class GmailSyncService:
             except Exception as exc:
                 logger.warning("reply_handler_error: %s", exc)
 
+            from app.services.attempts import outcome_for_intent, record_outcome
+
+            record_outcome(
+                self.session,
+                lead.id,
+                outcome_for_intent(analysis.intent if analysis else "Other"),
+            )
+
             try:
                 from app.services.notifications import NotificationService
                 notif_svc = NotificationService(self.session, self.settings)
@@ -520,6 +528,10 @@ class GmailSyncService:
             failed = parsed.recipient_email or lead.email
             lead.email_suppressed = True
             lead.suppressed_email = failed
+            from app.models.enums import AttemptOutcome
+            from app.services.attempts import record_outcome
+
+            record_outcome(self.session, lead.id, AttemptOutcome.BOUNCE)
             self._mark_outreach_bounced(lead.id)
             self.activities.add(
                 lead.id,
@@ -532,6 +544,10 @@ class GmailSyncService:
 
         if classification == EmailClassification.OPT_OUT:
             lead.do_not_contact = True
+            from app.models.enums import AttemptOutcome
+            from app.services.attempts import record_outcome
+
+            record_outcome(self.session, lead.id, AttemptOutcome.UNSUBSCRIBE)
             previous = lead.lead_status
             if previous not in {
                 LeadStatus.WON.value,

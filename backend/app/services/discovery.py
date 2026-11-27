@@ -508,6 +508,15 @@ def _save_businesses(
 
 
 def _save_one(session: Session, business: FoundBusiness) -> str:
+    from app.services.automation_config import ExclusionSet
+
+    if ExclusionSet.load(session).match(
+        name=business.name,
+        website=business.website_url,
+        email=business.email,
+        category=business.industry,
+    ):
+        return "skipped"
     existing = session.scalar(select(Lead).where(Lead.source_key == business.source_key))
     if existing is None:
         existing = session.scalar(
@@ -521,8 +530,14 @@ def _save_one(session: Session, business: FoundBusiness) -> str:
     if existing is None and business.website_url:
         existing = session.scalar(select(Lead).where(Lead.website_url == business.website_url))
     if existing is None:
-        if not business.email or not business.email.strip():
+        has_email = bool(business.email and business.email.strip())
+        # Keep leads we can still reach by phone, WhatsApp or a website contact form.
+        # Businesses with no way to contact them at all are not worth storing.
+        if not has_email and not (business.phone or business.website_url):
             return "skipped"
+        tags = list(business.tags or [])
+        if not has_email and "needs-contact" not in tags:
+            tags.append("needs-contact")
         lead = Lead(
             business_name=business.name,
             slug=slugify(business.name),
@@ -532,7 +547,7 @@ def _save_one(session: Session, business: FoundBusiness) -> str:
             city=business.city,
             website_url=business.website_url,
             website_status=business.website_status,
-            email=business.email,
+            email=business.email if has_email else None,
             phone=business.phone,
             instagram_url=business.instagram_url,
             facebook_url=business.facebook_url,
@@ -541,7 +556,7 @@ def _save_one(session: Session, business: FoundBusiness) -> str:
             lead_status=LeadStatus.NEW.value,
             source=business.source,
             source_key=business.source_key,
-            tags=business.tags,
+            tags=tags,
             notes=business.notes,
         )
         session.add(lead)

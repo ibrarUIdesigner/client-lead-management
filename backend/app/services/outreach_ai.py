@@ -81,6 +81,8 @@ class EmailBrief:
     primary_opportunity: str | None = None
     signals: tuple[tuple[str, str], ...] = ()
     opportunities: tuple[str, ...] = ()
+    strategy: str = "other"
+    style_hint: str = ""
 
 
 def provider_ready(settings: Settings, name: str) -> bool:
@@ -136,6 +138,8 @@ def build_brief(
     primary_opportunity: str | None = None,
     signals: list[tuple[str, str]] | tuple[tuple[str, str], ...] | None = None,
     opportunities: list[str] | tuple[str, ...] | None = None,
+    strategy: str | None = None,
+    style_hint: str | None = None,
 ) -> EmailBrief:
     location = ", ".join(part for part in (city, country) if part and part.strip())
     cleaned_offer = " ".join((offer or "").split())
@@ -176,6 +180,8 @@ def build_brief(
         primary_opportunity=primary_opportunity.strip() if primary_opportunity and primary_opportunity.strip() else None,
         signals=tuple((s[0].strip(), s[1].strip()) for s in (signals or []) if s and len(s) >= 2),
         opportunities=tuple(o.strip() for o in (opportunities or []) if o and o.strip()),
+        strategy=(strategy or "other").strip().lower(),
+        style_hint=(style_hint or "").strip(),
     )
 
 
@@ -322,7 +328,9 @@ def draft_email(
             ),
             status_code=503,
         )
-    prompt = _instructions(render_brief(brief), brief.purpose)
+    prompt = _instructions(
+        render_brief(brief), brief.purpose, strategy=brief.strategy, style_hint=brief.style_hint
+    )
     owns_client = client is None
     http = client or httpx.Client(timeout=25.0)
     raw = None
@@ -568,7 +576,9 @@ def parse_draft(raw: str) -> tuple[str, str]:
     return cleaned_subject, cleaned_body
 
 
-def _instructions(facts: str, purpose: str) -> str:
+def _instructions(
+    facts: str, purpose: str, strategy: str = "other", style_hint: str = ""
+) -> str:
     """
     Build the AI prompt following the strategic directives:
     - Peer-to-peer, observant, concise tone
@@ -612,7 +622,11 @@ def _instructions(facts: str, purpose: str) -> str:
             "Do NOT write a checklist or bullet list inside the email body.\n"
         )
 
-    return f"{task}\n{strict_rules}{facts}"
+    from app.services.outreach_variants import STRATEGY_GUIDANCE
+
+    angle = STRATEGY_GUIDANCE.get(strategy, STRATEGY_GUIDANCE["other"])
+    extras = f"{angle}\n{style_hint}\n" if style_hint else f"{angle}\n"
+    return f"{task}\n{extras}\n{strict_rules}{facts}"
 
 
 def _gemini(client: httpx.Client, settings: Settings, prompt: str) -> str:

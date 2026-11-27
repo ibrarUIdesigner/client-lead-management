@@ -5,11 +5,9 @@ const TOKEN_KEY = "clm.token";
 const EMAIL_KEY = "clm.email";
 
 const STATIC_EMAIL = "ibrarUIdesigner@gmail.com";
-const STATIC_PASSWORD = "CAquiByIbrar@1234";
 
 export const DEMO_CREDENTIALS = {
   email: STATIC_EMAIL,
-  password: STATIC_PASSWORD,
 };
 
 export function isAuthenticated(): boolean {
@@ -32,6 +30,7 @@ export async function signIn(email: string, password: string): Promise<boolean> 
 }
 
 export function signOut(): void {
+  void api.post("/auth/logout").catch(() => undefined);
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(EMAIL_KEY);

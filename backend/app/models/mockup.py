@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,10 @@ if TYPE_CHECKING:
     from app.models.website_audit import WebsiteAudit
 
 
+def _new_public_token() -> str:
+    return secrets.token_urlsafe(24)
+
+
 class Mockup(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     __tablename__ = "mockups"
     __table_args__ = (
@@ -27,6 +32,7 @@ class Mockup(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         Index("ix_mockups_status", "status"),
         Index("ix_mockups_created_at", "created_at"),
         Index("ix_mockups_design_guide_id", "design_guide_id"),
+        Index("uq_mockups_public_token", "public_token", unique=True),
     )
 
     lead_id: Mapped[uuid.UUID] = mapped_column(
@@ -37,6 +43,9 @@ class Mockup(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     audit_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("website_audits.id", ondelete="SET NULL"),
+    )
+    public_token: Mapped[str | None] = mapped_column(
+        String(64), default=_new_public_token, nullable=True
     )
     title: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(

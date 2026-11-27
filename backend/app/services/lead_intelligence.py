@@ -127,7 +127,7 @@ class LeadIntelligenceService:
         self.signal_detector = SignalDetector()
         self.opportunity_engine = OpportunityEngine()
 
-    def get_intelligence(self, lead_id: UUID) -> LeadIntelligence:
+    def get_intelligence(self, lead_id: UUID, *, persist_score: bool = False) -> LeadIntelligence:
         lead = self.session.get(Lead, lead_id)
         if lead is None:
             raise AppError(
@@ -155,8 +155,8 @@ class LeadIntelligenceService:
         # 3. Calculate Explainable Opportunity Score
         score = self.opportunity_engine.calculate_score(lead, signals, audit, research)
 
-        # Update lead_score on model if out of sync
-        if lead.lead_score != score.total_score:
+        # Reads must not write. Callers that refresh scores pass persist_score=True.
+        if persist_score and lead.lead_score != score.total_score:
             lead.lead_score = score.total_score
 
         # 4. Formulate Unified Sales Strategy (connecting Mockup & Outreach)

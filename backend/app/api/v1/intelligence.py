@@ -35,7 +35,7 @@ def refresh_lead_intelligence(
     db: SessionDep,
 ) -> LeadIntelligenceRead:
     service = LeadIntelligenceService(db)
-    intel = service.get_intelligence(lead_id)
+    intel = service.get_intelligence(lead_id, persist_score=True)
     flush_or_reject(db)
     return LeadIntelligenceRead(**intel.to_dict())
 

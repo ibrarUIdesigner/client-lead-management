@@ -29,6 +29,9 @@ from app.services.outreach_copy import (
     findings_message,
     next_lead_status,
 )
+from app.services.attempts import derive_strategy
+from app.services.outreach_variants import STYLE_HINTS, variant_label
+from app.services.public_links import public_mockup_url
 from app.services.persistence import flush_or_reject
 from app.services.workspace import WorkspaceService
 
@@ -117,6 +120,7 @@ class OutreachService:
             subject=subject,
             message=body,
             template_id=template.id if template else None,
+            variant=variant_label(data.tone, data.style) if data.use_ai else None,
             status=OutreachStatus.DRAFT.value,
         )
         self.session.add(message)
@@ -307,7 +311,7 @@ class OutreachService:
         primary_opp = intel.strategy.primary_opportunity
         mockup_highlights = (intel.strategy.mockup_focus,) if intel.strategy.mockup_focus else ()
         mockup_title = mockup.title if mockup else None
-        mockup_url = f"/mockups/{mockup.id}" if mockup else None
+        mockup_url = public_mockup_url(settings, mockup)
 
         signals = [(s.name, s.evidence) for s in intel.signals]
         opportunities = [
@@ -342,6 +346,8 @@ class OutreachService:
             primary_opportunity=primary_opp,
             signals=signals,
             opportunities=opportunities,
+            strategy=derive_strategy(lead, audit),
+            style_hint=STYLE_HINTS.get(data.style or "", ""),
         )
         return draft_email(brief, settings)
 
