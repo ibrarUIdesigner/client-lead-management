@@ -12,6 +12,11 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 from alembic import op
+from app.db.migration_helpers import (
+    add_column_if_missing,
+    create_index_if_missing,
+    create_table_if_missing,
+)
 
 revision: str = "k3b6c8d07f99"
 down_revision: str | Sequence[str] | None = "j2a5b7c96e88"
@@ -28,7 +33,7 @@ def _created() -> sa.Column:
 
 
 def upgrade() -> None:
-    op.create_table(
+    create_table_if_missing(
         "automation_runs",
         _id(),
         sa.Column("kind", sa.String(length=32), nullable=False),
@@ -44,10 +49,10 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("uq_automation_runs_run_key", "automation_runs", ["run_key"], unique=True)
-    op.create_index("ix_automation_runs_kind_created", "automation_runs", ["kind", "created_at"])
+    create_index_if_missing("uq_automation_runs_run_key", "automation_runs", ["run_key"], unique=True)
+    create_index_if_missing("ix_automation_runs_kind_created", "automation_runs", ["kind", "created_at"])
 
-    op.create_table(
+    create_table_if_missing(
         "outreach_attempts",
         _id(),
         sa.Column("lead_id", sa.Uuid(), nullable=False),
@@ -79,14 +84,14 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["outreach_message_id"], ["outreach_messages.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_outreach_attempts_lead_id", "outreach_attempts", ["lead_id"])
-    op.create_index("ix_outreach_attempts_sent_at", "outreach_attempts", ["sent_at"])
-    op.create_index(
+    create_index_if_missing("ix_outreach_attempts_lead_id", "outreach_attempts", ["lead_id"])
+    create_index_if_missing("ix_outreach_attempts_sent_at", "outreach_attempts", ["sent_at"])
+    create_index_if_missing(
         "ix_outreach_attempts_category_country", "outreach_attempts", ["category", "country"]
     )
-    op.create_index("uq_outreach_attempts_email_id", "outreach_attempts", ["email_id"], unique=True)
+    create_index_if_missing("uq_outreach_attempts_email_id", "outreach_attempts", ["email_id"], unique=True)
 
-    op.create_table(
+    create_table_if_missing(
         "lead_exclusions",
         _id(),
         sa.Column("kind", sa.String(length=16), nullable=False),
@@ -98,7 +103,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("uq_lead_exclusions_kind_value", "lead_exclusions", ["kind", "value"], unique=True)
+    create_index_if_missing("uq_lead_exclusions_kind_value", "lead_exclusions", ["kind", "value"], unique=True)
 
 
 def downgrade() -> None:

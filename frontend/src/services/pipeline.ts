@@ -45,6 +45,7 @@ export type OutreachOverview = {
   slots_left: number;
   sent_today: number;
   waiting: number;
+  drafts_to_review: number;
   next_up: {
     lead_id: string;
     business_name: string;

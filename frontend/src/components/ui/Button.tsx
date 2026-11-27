@@ -44,7 +44,7 @@ export function Button({
       type={type}
       disabled={disabled || isLoading}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-control select-none disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-control whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-50",
         focusRing,
         sizes[size],
         variants[variant],

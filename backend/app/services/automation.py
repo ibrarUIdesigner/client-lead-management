@@ -417,6 +417,7 @@ def learning_overview(session: Session) -> dict[str, Any]:
 
 
 def outreach_overview(session: Session, settings: Settings) -> dict[str, Any]:
+    from app.models.outreach import OutreachMessage
     from app.services.automation_config import get_config
     from app.services.outreach_policy import first_emails_sent_today
     from app.services.pipeline import PipelineService
@@ -445,6 +446,14 @@ def outreach_overview(session: Session, settings: Settings) -> dict[str, Any]:
         "slots_left": service.draft_slots_left(),
         "sent_today": first_emails_sent_today(session),
         "waiting": len(ranking),
+        "drafts_to_review": int(
+            session.scalar(
+                select(func.count())
+                .select_from(OutreachMessage)
+                .where(OutreachMessage.status.in_(("DRAFT", "READY")))
+            )
+            or 0
+        ),
         "next_up": next_up,
     }
 

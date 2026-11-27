@@ -4,6 +4,7 @@ import httpx
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
+from app.db.migrate import schema_state
 from app.db.session import check_database
 from app.schemas.providers import ProvidersRead
 from app.services.outreach_ai import provider_ready, resolve_email_provider
@@ -20,6 +21,7 @@ class HealthResponse(BaseModel):
     email_drafts: Literal["gemini", "groq", "unconfigured"]
     gemini: Literal["ready", "missing"]
     groq: Literal["ready", "missing"]
+    schema_state: Literal["current", "behind", "unknown"] = "unknown"
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -42,6 +44,7 @@ def health(request: Request) -> HealthResponse:
         email_drafts=drafts,
         gemini="ready" if provider_ready(settings, "gemini") else "missing",
         groq="ready" if provider_ready(settings, "groq") else "missing",
+        schema_state=schema_state(request.app.state.engine) if database == "ok" else "unknown",
     )
 
 

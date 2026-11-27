@@ -15,11 +15,6 @@ import type {
 
 const switches: { key: keyof AutomationFlags; label: string; help: string }[] = [
   {
-    key: "auto_send_enabled",
-    label: "Send first emails automatically",
-    help: "Drafts that pass the quality check are sent on weekdays inside the send window. Anything unusual is held for your review.",
-  },
-  {
     key: "followups_auto_send",
     label: "Send Day 4 and Day 10 follow-ups automatically",
     help: "Sent in the same email thread. A reply, bounce or opt-out cancels the rest.",
@@ -218,8 +213,8 @@ export function AutomationSettingsCard() {
         </div>
         <p className="mt-2 max-w-2xl text-body leading-relaxed text-gray-600">
           Leads are found, scored, audited, researched and given a mockup and a draft on their own.
-          The switches below decide whether emails also go out on their own. Everything is off
-          until you turn it on.
+          Whether first emails go out on their own is set under Settings, in Outreach mode. The
+          switches below cover follow-ups. Everything is off until you turn it on.
         </p>
         {tickStale ? (
           <p className="mt-3 text-small text-amber-800" role="status">

@@ -1,4 +1,5 @@
 import {
+  Activity,
   Bell,
   Bot,
   CircleCheckBig,
@@ -85,7 +86,7 @@ export const navigationGroups: NavGroup[] = [
       {
         to: "/insights",
         label: "Performance",
-        icon: TrendingUp,
+        icon: Activity,
         description: "Daily results, best categories and countries, and what to do next.",
       },
       {

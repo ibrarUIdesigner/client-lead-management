@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -213,6 +213,15 @@ def factory():
     engine = create_db_engine(get_settings().database_url)
     connection = engine.connect()
     transaction = connection.begin()
+    # The dev database may already hold leads found today (the app searches on start-up).
+    # Inside this rolled-back transaction, start from a clean day so the quota maths is exact.
+    connection.execute(
+        text(
+            "DELETE FROM leads WHERE created_at >= date_trunc('day', now()) "
+            "AND source IN ('openstreetmap','google_places','yelp','yell','businesslist',"
+            "'epages','apollo','serpapi','scrapingbee')"
+        )
+    )
 
     def make() -> Session:
         return Session(bind=connection, join_transaction_mode="create_savepoint")

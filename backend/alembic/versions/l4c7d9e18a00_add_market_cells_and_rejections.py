@@ -11,6 +11,11 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
+from app.db.migration_helpers import (
+    add_column_if_missing,
+    create_index_if_missing,
+    create_table_if_missing,
+)
 
 revision: str = "l4c7d9e18a00"
 down_revision: str | Sequence[str] | None = "k3b6c8d07f99"
@@ -31,7 +36,7 @@ def _count(name: str) -> sa.Column:
 
 
 def upgrade() -> None:
-    op.create_table(
+    create_table_if_missing(
         "market_cells",
         _id(),
         sa.Column("category", sa.String(length=80), nullable=False),
@@ -49,10 +54,10 @@ def upgrade() -> None:
         _ts("updated_at"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("uq_market_cells_key", "market_cells", ["category", "country", "city"], unique=True)
-    op.create_index("ix_market_cells_next_eligible", "market_cells", ["next_eligible_at"])
+    create_index_if_missing("uq_market_cells_key", "market_cells", ["category", "country", "city"], unique=True)
+    create_index_if_missing("ix_market_cells_next_eligible", "market_cells", ["next_eligible_at"])
 
-    op.create_table(
+    create_table_if_missing(
         "discovery_rejections",
         _id(),
         sa.Column("source_key", sa.String(length=300), nullable=False),
@@ -66,10 +71,10 @@ def upgrade() -> None:
         _ts("created_at"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
+    create_index_if_missing(
         "uq_discovery_rejections_source_key", "discovery_rejections", ["source_key"], unique=True
     )
-    op.create_index("ix_discovery_rejections_created_at", "discovery_rejections", ["created_at"])
+    create_index_if_missing("ix_discovery_rejections_created_at", "discovery_rejections", ["created_at"])
 
 
 def downgrade() -> None:

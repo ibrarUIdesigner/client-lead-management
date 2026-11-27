@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowRight,
   Check,
-  CheckCircle2,
   Copy,
   Eye,
   EyeOff,
@@ -12,9 +11,6 @@ import {
   Lock,
   Mail,
   ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Zap,
 } from "lucide-react";
 
 import { Button } from "../components/ui/Button";
@@ -32,18 +28,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [copiedDemo, setCopiedDemo] = useState(false);
   const [copiedAdminEmail, setCopiedAdminEmail] = useState(false);
 
   if (isAuthenticated()) {
     return <Navigate to="/" replace />;
-  }
-
-  function handleFillDemo() {
-    setEmail(DEMO_CREDENTIALS.email);
-    setError(null);
-    setCopiedDemo(true);
-    setTimeout(() => setCopiedDemo(false), 2000);
   }
 
   function handleCopyAdminEmail() {
@@ -97,91 +85,45 @@ export function LoginPage() {
               <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Growth Workspace</p>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-caption font-medium text-white/80 backdrop-blur-xs">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            Operational
-          </div>
         </div>
 
-        {/* Hero Copy & Live Feature Preview Card */}
+        {/* Hero Copy and how the workspace works */}
         <div className="relative z-10 my-auto py-8">
           <div className="max-w-lg">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary-400/30 bg-primary-500/15 px-3 py-1 text-caption font-medium text-primary-200 backdrop-blur-xs">
-              <Sparkles size={13} className="text-primary-300" />
-              Intelligent Pipeline Management
-            </div>
-
-            <h1 className="mt-4 text-display-lg font-bold tracking-tight text-white">
-              Precision workspace for high-value client acquisition.
+            <h1 className="text-display-lg font-bold tracking-tight text-white">
+              Find the businesses that need a better website.
             </h1>
             <p className="mt-3 text-body-lg text-white/70">
-              Automate prospect discovery, conduct website design audits, orchestrate outreach, and
-              track deal progress with actionable clarity.
+              The workspace discovers prospects, audits their sites, sketches a homepage for them,
+              writes the email, and follows up. You handle the people who reply.
             </p>
           </div>
 
-          {/* Interactive Metric Preview Card */}
-          <div className="mt-8 rounded-panel border border-white/10 bg-white/[0.04] p-5 shadow-2xl backdrop-blur-md">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <TrendingUp size={16} className="text-emerald-400" />
-                <span className="text-small font-medium text-white/90">Pipeline Momentum</span>
-              </div>
-              <span className="text-caption text-white/50">Active sprint</span>
-            </div>
-
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <div className="rounded-control border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-caption text-white/60">Active Leads</p>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-h2 font-bold text-white">148</span>
-                  <span className="text-[11px] font-semibold text-emerald-400">+18%</span>
-                </div>
-              </div>
-              <div className="rounded-control border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-caption text-white/60">Delivery Rate</p>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-h2 font-bold text-white">99.2%</span>
-                </div>
-              </div>
-              <div className="rounded-control border border-white/5 bg-white/[0.03] p-3">
-                <p className="text-caption text-white/60">Design Audits</p>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="text-h2 font-bold text-white">36</span>
-                  <span className="text-[11px] font-semibold text-primary-300">Ready</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3.5 flex items-center justify-between rounded-control border border-white/5 bg-white/[0.02] px-3 py-2 text-caption text-white/70">
-              <span className="flex items-center gap-2">
-                <CheckCircle2 size={13} className="text-emerald-400" />
-                Automated discovery run completed
-              </span>
-              <span className="text-white/40">2m ago</span>
-            </div>
-          </div>
+          <ol className="mt-8 grid max-w-lg gap-3">
+            {[
+              ["Discover", "Businesses with no site or a weak one, across your markets."],
+              ["Show", "An audit and a homepage concept made for each business."],
+              ["Reach out", "A short personal email you approve, or send automatically."],
+              ["Follow up", "Replies are tracked and follow-ups stop when they answer."],
+            ].map(([title, body], index) => (
+              <li
+                key={title}
+                className="flex items-start gap-3 rounded-control border border-white/10 bg-white/[0.04] px-4 py-3"
+              >
+                <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-500/25 text-caption font-bold text-primary-200">
+                  {index + 1}
+                </span>
+                <span>
+                  <span className="block text-small font-semibold text-white">{title}</span>
+                  <span className="block text-small text-white/60">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        {/* Bottom Trust & Security Footnote */}
         <div className="relative z-10 border-t border-white/10 pt-6">
-          <div className="grid grid-cols-3 gap-4 text-caption text-white/60">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={15} className="shrink-0 text-emerald-400" />
-              <span>256-bit encryption</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Zap size={15} className="shrink-0 text-amber-400" />
-              <span>Sub-second queries</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Lock size={15} className="shrink-0 text-primary-300" />
-              <span>Role-gated security</span>
-            </div>
-          </div>
-          <p className="mt-4 text-caption text-white/40">
-            © 2026 Client Acquisition System · Private Internal Suite
-          </p>
+          <p className="text-caption text-white/40">Private workspace. Sign in to continue.</p>
         </div>
       </aside>
 
@@ -206,32 +148,6 @@ export function LoginPage() {
               <p className="mt-1 text-body text-gray-500">
                 Enter your workspace credentials to access the portal.
               </p>
-            </div>
-
-            {/* Quick Demo Fill Helper Banner */}
-            <div className="mb-6 flex items-center justify-between rounded-control border border-primary-200/70 bg-primary-50/60 px-3.5 py-2.5">
-              <div className="flex items-center gap-2">
-                <Sparkles size={15} className="text-primary-600" />
-                <span className="text-small font-medium text-primary-900">Demo workspace</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleFillDemo}
-                className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-caption font-semibold text-primary-700 shadow-2xs hover:bg-primary-50 hover:text-primary-800 transition-colors"
-                title="Fill demo email and password"
-              >
-                {copiedDemo ? (
-                  <>
-                    <Check size={12} className="text-emerald-600" />
-                    <span>Applied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} />
-                    <span>Quick Fill</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {/* Error Message Box */}

@@ -11,6 +11,7 @@ import { Card } from "../components/ui/Card";
 import { Checkbox } from "../components/ui/Checkbox";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
+import { Tabs } from "../components/ui/Tabs";
 import { Textarea } from "../components/ui/Textarea";
 import { AutomationSettingsCard } from "../features/automation/AutomationSettingsCard";
 import { useReportActions } from "../hooks/useInsights";
@@ -71,7 +72,7 @@ export function AutomationPage() {
               isLoading={actions.pause.isPending || actions.resume.isPending}
             >
               {query.data.paused ? <Play className="size-4" aria-hidden /> : <Pause className="size-4" aria-hidden />}
-              {query.data.paused ? "Resume automation" : "Pause automation"}
+              {query.data.paused ? "Resume" : "Pause"}
             </Button>
           ) : null
         }
@@ -86,18 +87,29 @@ export function AutomationPage() {
             are still tracked.
           </p>
         ) : null}
-        <QueryGate
-          pending={query.isPending}
-          error={query.error}
-          onRetry={() => void query.refetch()}
-          fallback="Automation settings could not be loaded."
-          loadingLabel="Loading automation settings"
-        >
-          {query.data ? <ConfigForm key={query.dataUpdatedAt} initial={query.data} /> : null}
-        </QueryGate>
-        <ExclusionsCard />
-        <AutomationSettingsCard />
-        <LogCard />
+        <Tabs
+          label="Automation sections"
+          tabs={[
+            { id: "overview", label: "Overview", content: <AutomationSettingsCard /> },
+            {
+              id: "settings",
+              label: "Settings",
+              content: (
+                <QueryGate
+                  pending={query.isPending}
+                  error={query.error}
+                  onRetry={() => void query.refetch()}
+                  fallback="Automation settings could not be loaded."
+                  loadingLabel="Loading automation settings"
+                >
+                  {query.data ? <ConfigForm key={query.dataUpdatedAt} initial={query.data} /> : null}
+                </QueryGate>
+              ),
+            },
+            { id: "exclusions", label: "Do-not-contact", content: <ExclusionsCard /> },
+            { id: "log", label: "Activity", content: <LogCard /> },
+          ]}
+        />
       </div>
     </>
   );
@@ -335,7 +347,8 @@ function ConfigForm({ initial }: { initial: AutomationConfig }) {
         <ReportActions />
       </Card>
 
-      <div className="flex justify-end">
+      <div className="sticky bottom-0 z-10 -mx-1 flex items-center justify-between gap-3 rounded-card border border-gray-200 bg-white/95 px-4 py-3 shadow-md backdrop-blur">
+        <p className="text-small text-gray-600">Changes apply on the next cycle.</p>
         <Button type="submit" isLoading={save.isPending}>
           Save settings
         </Button>

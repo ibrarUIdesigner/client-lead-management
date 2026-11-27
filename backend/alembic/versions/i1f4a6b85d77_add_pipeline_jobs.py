@@ -12,6 +12,11 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 from alembic import op
+from app.db.migration_helpers import (
+    add_column_if_missing,
+    create_index_if_missing,
+    create_table_if_missing,
+)
 
 revision: str = "i1f4a6b85d77"
 down_revision: str | Sequence[str] | None = "h0e3f5a74c66"
@@ -20,14 +25,14 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
+    add_column_if_missing(
         "leads",
         sa.Column("pipeline_paused", sa.Boolean(), nullable=False, server_default=sa.text("false")),
     )
-    op.add_column(
+    add_column_if_missing(
         "leads", sa.Column("pipeline_checked_at", sa.DateTime(timezone=True), nullable=True)
     )
-    op.create_table(
+    create_table_if_missing(
         "pipeline_jobs",
         sa.Column("id", sa.Uuid(), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column("lead_id", sa.Uuid(), nullable=False),
@@ -53,9 +58,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["lead_id"], ["leads.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_pipeline_jobs_lead_id", "pipeline_jobs", ["lead_id"])
-    op.create_index("ix_pipeline_jobs_status_run_after", "pipeline_jobs", ["status", "run_after"])
-    op.create_index(
+    create_index_if_missing("ix_pipeline_jobs_lead_id", "pipeline_jobs", ["lead_id"])
+    create_index_if_missing("ix_pipeline_jobs_status_run_after", "pipeline_jobs", ["status", "run_after"])
+    create_index_if_missing(
         "uq_pipeline_jobs_open",
         "pipeline_jobs",
         ["lead_id", "step"],

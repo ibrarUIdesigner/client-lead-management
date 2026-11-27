@@ -15,6 +15,7 @@ from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
+from app.db.migrate import upgrade_to_head
 from app.db.session import create_db_engine, create_session_factory
 from app.jobs.discovery import start_discovery_scheduler
 from app.jobs.gmail_sync import start_gmail_scheduler
@@ -71,6 +72,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = create_db_engine(settings.database_url)
     app.state.session_factory = create_session_factory(app.state.engine)
+    if settings.should_auto_migrate and settings.app_env != "test":
+        upgrade_to_head(app.state.engine)
 
     app.add_middleware(RequireSessionMiddleware)
     app.add_middleware(RequestContextMiddleware)

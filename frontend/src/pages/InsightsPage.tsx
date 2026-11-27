@@ -98,7 +98,7 @@ function Today({ activity }: { activity: Activity }) {
   return (
     <Card>
       <h2 className="text-h3 font-semibold text-ink">Today</h2>
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="Leads found" value={activity.leads_discovered} hint={`${activity.leads_rejected} left out`} />
         <Stat label="Leads qualified" value={activity.leads_qualified} />
         <Stat label="Audits done" value={activity.audits_completed} />
@@ -208,7 +208,7 @@ function Rates({ data }: { data: Insights }) {
   return (
     <Card>
       <h2 className="text-h3 font-semibold text-ink">Outreach results, all time</h2>
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="Leads" value={funnel.leads} />
         <Stat label="Emailed" value={funnel.emailed} />
         <Stat label="Replied" value={funnel.replied} hint={`${rates.reply_rate}% reply rate`} />

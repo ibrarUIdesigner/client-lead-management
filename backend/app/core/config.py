@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     design_md_max_bytes: int = Field(default=262_144, ge=1_024, le=5_000_000)
     postgres_url: str = ""
 
+    # Apply pending database migrations when the app starts. Defaults to on in Vercel
+    # (which has no release step) and off elsewhere. Set AUTO_MIGRATE=true or false to override.
+    auto_migrate: bool | None = None
+
     # Public base URL of the deployed app. Used for links sent to prospects.
     public_base_url: str = ""
 
@@ -112,6 +116,12 @@ class Settings(BaseSettings):
                 # The deployment filesystem is read-only. Screenshots go to /tmp.
                 self.storage_dir = Path("/tmp/storage")
         return self
+
+    @property
+    def should_auto_migrate(self) -> bool:
+        if self.auto_migrate is not None:
+            return self.auto_migrate
+        return os.environ.get("VERCEL") == "1"
 
     @property
     def auth_configured(self) -> bool:

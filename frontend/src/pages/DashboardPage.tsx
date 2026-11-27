@@ -18,6 +18,7 @@ import {
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Skeleton } from "../components/ui/Skeleton";
+import { AutomationStrip } from "../features/automation/AutomationStrip";
 import { followUpBucket } from "../features/followups/buckets";
 import { useHealth } from "../hooks/useHealth";
 import { useLeads } from "../hooks/useLeads";
@@ -197,6 +198,8 @@ export function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <AutomationStrip />
 
       {/* Key Metrics Row (Clickable Filters) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
